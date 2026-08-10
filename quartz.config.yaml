@@ -273,6 +273,12 @@ plugins:
       darkMode: auto
       exportPadding: 20
     order: 50
+  - source: "@quartz-community/local-content-tree"
+    enabled: true
+    options: {}
+    layout:
+      position: afterBody
+      priority: 5
 layout:
   groups:
     toolbar:
