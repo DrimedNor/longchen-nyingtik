@@ -115,6 +115,24 @@ var audioPlaylistScript = `
     if (playAll) {
       playAll.addEventListener("click", function () { playIndex(0); });
     }
+    // Auto-play a track named by the URL hash (e.g. #计划赶不上无常),
+    // so links from the content nav can deep-link straight into playback.
+    function tryPlayHash() {
+      var raw = window.location.hash || "";
+      if (!raw) return;
+      var name = decodeURIComponent(raw.slice(1));
+      var idx = tracks.findIndex(function (t) {
+        var btn = t.querySelector(".audio-title");
+        return btn && btn.textContent === name;
+      });
+      if (idx >= 0) {
+        playIndex(idx);
+        // scroll the chosen track into view
+        try { tracks[idx].scrollIntoView({ behavior: "smooth", block: "center" }); } catch (e) {}
+      }
+    }
+    tryPlayHash();
+    window.addEventListener("hashchange", tryPlayHash);
   }
   function initPlaylist() {
     setupPlaylist(document);

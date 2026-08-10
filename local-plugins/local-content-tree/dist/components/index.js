@@ -1,9 +1,12 @@
-// ContentTree v3 — nested nav per Obsidian folder structure
-// top theme -> sub-theme (folder) -> articles, fully expanded; audio dir as clickable group.
+// ContentTree v4 — nested nav per Obsidian folder structure
+// theme -> sub-folder (as sub-theme) -> article link; audio dir lists audio files directly.
 import { jsx, jsxs, Fragment } from "preact/jsx-runtime"
 import { resolveRelative } from "@quartz-community/utils/path"
+import { readdirSync, existsSync } from "node:fs"
+import { join } from "node:path"
 
 const AUDIO_DIR = "音频资源"
+const AUDIO_EXTS = [".mp3", ".wav", ".ogg", ".m4a", ".aac", ".flac"]
 
 function titleOf(file, lastSeg) {
   return file?.frontmatter?.title ?? lastSeg
@@ -13,8 +16,11 @@ function buildNode() {
   return { subs: new Map(), articles: [] }
 }
 
+// Insert an article into the tree. The LAST path segment is the article file
+// itself -> it becomes an article entry of its parent node, NOT a sub-folder.
 function insert(node, segs, slug, title) {
-  if (segs.length === 0) {
+  if (segs.length <= 1) {
+    // article sits directly under this node
     node.articles.push({ slug, title })
     return
   }
@@ -32,6 +38,7 @@ function buildTree(allFiles) {
     if (s.startsWith("tags/")) continue
     if (s === "index" || s === "" || s === "404") continue
     if (s.startsWith("404/")) continue
+    if (s.startsWith(AUDIO_DIR + "/")) continue // audio handled separately
     const segs = s.split("/")
     if (segs[segs.length - 1] === "index") continue
     const lastSeg = decodeURIComponent(segs[segs.length - 1])
@@ -42,10 +49,64 @@ function buildTree(allFiles) {
   return root
 }
 
-// Convert a tree node into nested <div class="tree-sub">/ul for rendering.
+// Scan audio files at build time so the nav can list them like articles.
+function scanAudioFiles(contentRoot) {
+  const dir = join(contentRoot, AUDIO_DIR)
+  if (!existsSync(dir)) return []
+  let entries = []
+  try {
+    entries = readdirSync(dir)
+  } catch {
+    return []
+  }
+  return entries
+    .filter((f) => AUDIO_EXTS.includes(f.slice(f.lastIndexOf(".")).toLowerCase()))
+    .map((f) => {
+      const name = f.replace(/\.[^.]+$/, "")
+      return { title: name, file: f }
+    })
+    .sort((a, b) => a.title.localeCompare(b.title, "zh"))
+}
+
+function renderArticles(articles, fromSlug) {
+  return jsx("ul", {
+    class: "tree-ul",
+    children: articles.map((a) =>
+      jsx("li", {
+        class: "tree-li",
+        children: jsx("a", {
+          href: resolveRelative(fromSlug, a.slug),
+          class: "internal internal-link tree-link",
+          children: a.title,
+        }),
+      }),
+    ),
+  })
+}
+
+// Audio entries: link to the audio index page with a #hash of the track name,
+// so the playlist script on that page can auto-play the chosen track.
+function renderAudioEntries(entries, fromSlug) {
+  const audioIndexSlug = AUDIO_DIR + "/index"
+  const baseHref = resolveRelative(fromSlug, audioIndexSlug)
+  return jsx("ul", {
+    class: "tree-ul tree-audio-ul",
+    children: entries.map((a) =>
+      jsx("li", {
+        class: "tree-li tree-audio-li",
+        children: jsx("a", {
+          href: baseHref + "#" + encodeURIComponent(a.title),
+          class: "internal internal-link tree-link tree-audio-link",
+          children: a.title,
+        }),
+      }),
+    ),
+  })
+}
+
+// Render a node: direct articles first, then sub-folders as nested sub-themes.
 function renderNode(node, fromSlug, depth) {
   const children = []
-  // top-level articles of this node (direct files)
   if (node.articles.length > 0) {
     children.push(renderArticles(node.articles, fromSlug))
   }
@@ -68,36 +129,19 @@ function renderNode(node, fromSlug, depth) {
   return jsxs("div", { class: "tree-nested", children }, "n" + depth)
 }
 
-function renderArticles(articles, fromSlug) {
-  return jsx("ul", {
-    class: "tree-ul",
-    children: articles.map((a) =>
-      jsx("li", {
-        class: "tree-li",
-        children: jsx("a", {
-          href: resolveRelative(fromSlug, a.slug),
-          class: "internal internal-link tree-link",
-          children: a.title,
-        }),
-      }),
-    ),
-  })
-}
-
 var Component = (props) => {
-  const { fileData, allFiles } = props
+  const { fileData, allFiles, ctx } = props
   const fm = fileData.frontmatter
   if (!fm || !fm.homepage) return null
   const fromSlug = fileData.slug ?? ""
   const tree = buildTree(allFiles)
   const navRoot = tree
 
-  // Audio dir: add its index landing page as a clickable group entry in the nav
-  const audioIdx = allFiles.find((f) => String(f?.slug) === AUDIO_DIR + "/index")
-  if (audioIdx && !navRoot.subs.has("音频资源")) {
-    const an = buildNode()
-    an.articles.push({ slug: AUDIO_DIR + "/index", title: audioIdx?.frontmatter?.title ?? "音频资源" })
-    navRoot.subs.set("音频资源", an)
+  // Audio: list audio files directly under the 音频资源 group (clickable -> autoplay)
+  const contentRoot = ctx?.argv?.directory ?? join(process.cwd(), "content")
+  const audioEntries = scanAudioFiles(contentRoot)
+  if (audioEntries.length > 0) {
+    navRoot.subs.set(AUDIO_DIR, { subs: new Map(), articles: [], audioEntries })
   }
 
   const themeOrder = [...navRoot.subs.keys()].sort((a, b) => a.localeCompare(b, "zh"))
@@ -108,7 +152,7 @@ var Component = (props) => {
       jsx("h2", { children: "内容导航" }),
       jsx("p", {
         class: "content-tree-hint",
-        children: "按主题与文件夹归类，全部文章一键展开，随笔记更新自动同步。",
+        children: "按主题与文件夹归类，全部文章与音频一键展开，随笔记更新自动同步。",
       }),
       themeOrder.map((theme) =>
         jsxs(
@@ -117,7 +161,9 @@ var Component = (props) => {
             class: "tree-group",
             children: [
               jsx("h3", { class: "tree-theme", children: theme }),
-              renderNode(navRoot.subs.get(theme), fromSlug, 0),
+              theme === AUDIO_DIR && audioEntries.length > 0
+                ? renderAudioEntries(audioEntries, fromSlug)
+                : renderNode(navRoot.subs.get(theme), fromSlug, 0),
             ],
           },
           theme,
@@ -177,6 +223,11 @@ Component.css = `
 }
 .content-tree .tree-link {
   font-weight: 500;
+}
+.content-tree .tree-audio-link::before {
+  content: "▶ ";
+  color: var(--tertiary);
+  font-size: 0.75rem;
 }
 `
 
