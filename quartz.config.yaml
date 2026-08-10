@@ -279,6 +279,12 @@ plugins:
     layout:
       position: afterBody
       priority: 5
+  - source: "@quartz-community/audio-index"
+    enabled: true
+    options: {}
+    layout:
+      position: afterBody
+      priority: 6
 layout:
   groups:
     toolbar:

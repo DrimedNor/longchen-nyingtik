@@ -73,7 +73,60 @@ export default (() => {
     init();
   }
 })();
-`
+`;
+
+// 音频总览连播：扫描页面上的播放列表，点击单曲或「全部连播」顺序播放。
+var audioPlaylistScript = `
+(function () {
+  function setupPlaylist(root) {
+    var section = root.querySelector("[data-audio-playlist]");
+    if (!section || section.dataset.playlistBound) return;
+    section.dataset.playlistBound = "true";
+    var tracks = Array.prototype.slice.call(section.querySelectorAll(".audio-track"));
+    if (tracks.length === 0) return;
+    var player = document.createElement("audio");
+    player.preload = "none";
+    document.body.appendChild(player);
+    var current = -1;
+    function clearPlaying() {
+      tracks.forEach(function (t) { t.classList.remove("playing"); });
+    }
+    function playIndex(i) {
+      if (i < 0 || i >= tracks.length) return;
+      current = i;
+      clearPlaying();
+      tracks[i].classList.add("playing");
+      player.src = tracks[i].getAttribute("data-audio-src");
+      var p = player.play();
+      if (p && p.catch) p.catch(function () {});
+    }
+    player.addEventListener("ended", function () {
+      if (current + 1 < tracks.length) {
+        playIndex(current + 1);
+      } else {
+        clearPlaying();
+        current = -1;
+      }
+    });
+    tracks.forEach(function (t, i) {
+      t.addEventListener("click", function () { playIndex(i); });
+    });
+    var playAll = section.querySelector("[data-play-all]");
+    if (playAll) {
+      playAll.addEventListener("click", function () { playIndex(0); });
+    }
+  }
+  function initPlaylist() {
+    setupPlaylist(document);
+  }
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", initPlaylist);
+  } else {
+    initPlaylist();
+  }
+  document.addEventListener("nav", function () { initPlaylist(); });
+})();
+`;
 
     const url = new URL(`https://${cfg.baseUrl ?? "example.com"}`)
     const path = url.pathname as FullSlug
@@ -158,6 +211,7 @@ export default (() => {
           }
         })}
         <script dangerouslySetInnerHTML={{ __html: audioPlayerScript }} />
+        <script dangerouslySetInnerHTML={{ __html: audioPlaylistScript }} />
       </head>
     )
   }

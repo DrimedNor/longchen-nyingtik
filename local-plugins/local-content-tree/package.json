@@ -1,0 +1,23 @@
+{
+  "name": "@quartz-community/local-content-tree",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "exports": {
+    ".": "./dist/index.js",
+    "./components": "./dist/components/index.js",
+    "./package.json": "./package.json"
+  },
+  "quartz": {
+    "name": "local-content-tree",
+    "displayName": "Content Tree",
+    "category": "component",
+    "components": {
+      "ContentTree": {
+        "displayName": "Content Tree",
+        "defaultPosition": "afterBody",
+        "defaultPriority": 5
+      }
+    }
+  }
+}
