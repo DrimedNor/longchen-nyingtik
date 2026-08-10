@@ -7,7 +7,7 @@ configuration:
   analytics:
     provider: plausible
   locale: zh-CN
-  baseUrl: drimednor.github.io/long-de-chuanshen
+  baseUrl: drimednor.github.io/longchen-nyingtik
   ignorePatterns:
     - private
     - templates
