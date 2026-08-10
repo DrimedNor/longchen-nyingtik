@@ -50,12 +50,28 @@ export default (() => {
       }
     }
   }
-  enhanceAudio();
-  if (window.MutationObserver) {
-    var obs = new MutationObserver(function () { enhanceAudio(); });
-    obs.observe(document.body, { childList: true, subtree: true });
+  function init() {
+    enhanceAudio();
+    if (window.MutationObserver) {
+      try {
+        var target = document.body || document.documentElement;
+        var obs = new MutationObserver(function () { enhanceAudio(); });
+        obs.observe(target, { childList: true, subtree: true });
+      } catch (e) {}
+    }
+    document.addEventListener("nav", function () { enhanceAudio(); });
   }
-  document.addEventListener("nav", function () { enhanceAudio(); });
+  if (!document.getElementById("audio-player-style")) {
+    var st = document.createElement("style");
+    st.id = "audio-player-style";
+    st.textContent = ".audio-player{margin:1rem 0;}.audio-player audio{width:100%;}";
+    document.head.appendChild(st);
+  }
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", init);
+  } else {
+    init();
+  }
 })();
 `
 
