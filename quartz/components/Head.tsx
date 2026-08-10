@@ -22,6 +22,43 @@ export default (() => {
 
     const { css, js, additionalHead } = externalResources
 
+    // 音频播放器增强：把文章里指向 .mp3/.wav/.ogg 等音频文件的链接
+    // 自动替换为 <audio controls> 播放器（对原始笔记零侵入，纯前端处理）。
+    const audioPlayerScript = `
+(function () {
+  var exts = [".mp3", ".wav", ".ogg", ".m4a", ".aac", ".flac"];
+  function enhanceAudio() {
+    var links = document.querySelectorAll("a[href]");
+    for (var i = 0; i < links.length; i++) {
+      var a = links[i];
+      var href = a.getAttribute("href") || "";
+      var lower = href.toLowerCase();
+      var isAudio = exts.some(function (e) { return lower.endsWith(e); });
+      if (!isAudio) continue;
+      if (a.dataset.audioEnhanced) continue;
+      a.dataset.audioEnhanced = "true";
+      var audio = document.createElement("audio");
+      audio.controls = true;
+      audio.preload = "none";
+      audio.src = href;
+      var wrapper = document.createElement("div");
+      wrapper.className = "audio-player";
+      wrapper.appendChild(audio);
+      if (a.parentNode) {
+        a.parentNode.insertBefore(wrapper, a);
+        a.remove();
+      }
+    }
+  }
+  enhanceAudio();
+  if (window.MutationObserver) {
+    var obs = new MutationObserver(function () { enhanceAudio(); });
+    obs.observe(document.body, { childList: true, subtree: true });
+  }
+  document.addEventListener("nav", function () { enhanceAudio(); });
+})();
+`
+
     const url = new URL(`https://${cfg.baseUrl ?? "example.com"}`)
     const path = url.pathname as FullSlug
     const baseDir = fileData.slug === "404" ? path : pathToRoot(fileData.slug!)
@@ -104,6 +141,7 @@ export default (() => {
             return resource
           }
         })}
+        <script dangerouslySetInnerHTML={{ __html: audioPlayerScript }} />
       </head>
     )
   }
