@@ -1,0 +1,23 @@
+{
+  "name": "@quartz-community/audio-index",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "exports": {
+    ".": "./dist/index.js",
+    "./components": "./dist/components/index.js",
+    "./package.json": "./package.json"
+  },
+  "quartz": {
+    "name": "audio-index",
+    "displayName": "Audio Index",
+    "category": "component",
+    "components": {
+      "AudioIndex": {
+        "displayName": "Audio Index",
+        "defaultPosition": "afterBody",
+        "defaultPriority": 5
+      }
+    }
+  }
+}
