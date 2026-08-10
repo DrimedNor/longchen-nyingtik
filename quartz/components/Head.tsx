@@ -128,6 +128,75 @@ var audioPlaylistScript = `
 })();
 `;
 
+// 注册 Service Worker（缓存层）：自动适配 GitHub Pages 子路径与自定义域名。
+var swRegisterScript = `
+(function () {
+  if (!("serviceWorker" in navigator)) return;
+  if (window.location.protocol !== "https:" && window.location.hostname !== "localhost") return;
+  function getScope() {
+    var path = window.location.pathname;
+    // GitHub Pages 项目站点：域名后第一段即仓库名，需作为 scope
+    if (/github\\.io$/.test(window.location.hostname)) {
+      var seg = path.split("/").filter(Boolean);
+      if (seg.length > 0) return "/" + seg[0] + "/";
+    }
+    var base = document.querySelector("base");
+    if (base && base.getAttribute("href")) return base.getAttribute("href");
+    return "./";
+  }
+  var scope = getScope();
+  window.addEventListener("load", function () {
+    navigator.serviceWorker.register(scope + "sw.js", { scope: scope }).catch(function () {});
+  });
+})();
+`;
+
+// 字号调节：悬浮按钮 A- / A+，5 档循环，写入 localStorage，作用于全站根字号。
+var fontSizeScript = `
+(function () {
+  if (document.getElementById("fontsize-style")) return;
+  var st = document.createElement("style");
+  st.id = "fontsize-style";
+  st.textContent = "#font-size-bar{position:fixed;right:1rem;bottom:1rem;z-index:9999;display:flex;gap:.3rem;background:var(--light);border:1px solid var(--lightgray);border-radius:999px;padding:.3rem .5rem;box-shadow:0 2px 10px rgba(0,0,0,.12);}#font-size-bar button{width:2.2rem;height:2.2rem;border:none;border-radius:50%;background:var(--tertiary);color:var(--light);font-size:1rem;cursor:pointer;line-height:1;}#font-size-bar button:hover{opacity:.9;}#font-size-bar .fs-label{min-width:3.2rem;display:flex;align-items:center;justify-content:center;font-size:.8rem;color:var(--darkgray);}";
+  document.head.appendChild(st);
+
+  var SCALES = [0.9, 1, 1.1, 1.25, 1.4];
+  var KEY = "lct-fontscale";
+  function apply(i) {
+    var v = SCALES[i];
+    document.documentElement.style.fontSize = (16 * v) + "px";
+    var label = document.getElementById("fs-label");
+    if (label) label.textContent = Math.round(v * 100) + "%";
+    try { localStorage.setItem(KEY, String(i)); } catch (e) {}
+  }
+  function current() {
+    try { var s = localStorage.getItem(KEY); if (s !== null) return parseInt(s, 10); } catch (e) {}
+    return 1;
+  }
+  var bar = document.createElement("div");
+  bar.id = "font-size-bar";
+  bar.setAttribute("aria-label", "调节字号");
+  var dec = document.createElement("button");
+  dec.textContent = "A−";
+  dec.title = "缩小字号";
+  var label = document.createElement("span");
+  label.id = "fs-label";
+  label.className = "fs-label";
+  var inc = document.createElement("button");
+  inc.textContent = "A+";
+  inc.title = "放大字号";
+  dec.addEventListener("click", function () {
+    var i = current(); if (i > 0) apply(i - 1);
+  });
+  inc.addEventListener("click", function () {
+    var i = current(); if (i < SCALES.length - 1) apply(i + 1);
+  });
+  bar.appendChild(dec); bar.appendChild(label); bar.appendChild(inc);
+  document.body.appendChild(bar);
+  apply(current());
+})();
+`;
+
     const url = new URL(`https://${cfg.baseUrl ?? "example.com"}`)
     const path = url.pathname as FullSlug
     const baseDir = fileData.slug === "404" ? path : pathToRoot(fileData.slug!)
@@ -212,6 +281,8 @@ var audioPlaylistScript = `
         })}
         <script dangerouslySetInnerHTML={{ __html: audioPlayerScript }} />
         <script dangerouslySetInnerHTML={{ __html: audioPlaylistScript }} />
+        <script dangerouslySetInnerHTML={{ __html: fontSizeScript }} />
+        <script dangerouslySetInnerHTML={{ __html: swRegisterScript }} />
       </head>
     )
   }

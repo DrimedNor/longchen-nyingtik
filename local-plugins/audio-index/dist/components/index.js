@@ -1,15 +1,15 @@
-// AudioIndex v1 — 音频总览 + 连播
-// 构建时扫描 content/音频资源/ 下的音频文件，列出清单并支持连续播放。
-// 纯前端连播逻辑在 Head.tsx（audioPlaylistScript）中统一管理。
+// AudioIndex v2 — audio index + playlist
+// Build-time scan of content/音樂资源/ for audio files; lists them with continuous play.
 import { jsx, jsxs, Fragment } from "preact/jsx-runtime"
 import { readdirSync, existsSync } from "node:fs"
 import { join, dirname } from "node:path"
 import { pathToRoot } from "@quartz-community/utils/path"
 
 const AUDIO_EXTS = [".mp3", ".wav", ".ogg", ".m4a", ".aac", ".flac"]
+const AUDIO_DIR = "音频资源"
 
 function scanAudioFiles(contentRoot) {
-  const dir = join(contentRoot, "音频资源")
+  const dir = join(contentRoot, AUDIO_DIR)
   if (!existsSync(dir)) return []
   let entries = []
   try {
@@ -21,7 +21,8 @@ function scanAudioFiles(contentRoot) {
     .filter((f) => AUDIO_EXTS.includes(f.slice(f.lastIndexOf(".")).toLowerCase()))
     .map((f) => {
       const name = f.replace(/\.[^.]+$/, "")
-      return { file: f, title: name, slug: `音频资源/${name}` }
+      const ext = f.slice(f.lastIndexOf(".")).toLowerCase()
+      return { file: f, title: name, ext, slug: AUDIO_DIR + "/" + name }
     })
     .sort((a, b) => a.title.localeCompare(b.title, "zh"))
 }
@@ -29,12 +30,13 @@ function scanAudioFiles(contentRoot) {
 var Component = (props) => {
   const { fileData, ctx } = props
   const fm = fileData.frontmatter
-  // 仅在本页（音频资源）渲染
-  if (!fm || fm.title !== "音频资源") return null
+  // Only render on the audio index page (slug starts with the audio dir)
+  const slug = String(fileData.slug ?? "")
+  if (!slug.startsWith(AUDIO_DIR + "/")) return null
 
   const contentRoot = ctx?.argv?.directory ?? join(process.cwd(), "content")
   const audios = scanAudioFiles(contentRoot)
-  const root = pathToRoot(fileData.slug ?? "音频资源")
+  const root = pathToRoot(fileData.slug ?? AUDIO_DIR)
 
   if (audios.length === 0) {
     return jsx("div", {
@@ -47,42 +49,43 @@ var Component = (props) => {
     class: "audio-index",
     "data-audio-playlist": "true",
     children: [
-      jsx("h2", { children: "🎧 音频总览（连续播放）" }),
+      jsx("h2", { children: "音频总览（连续播放）" }),
       jsx("p", {
         class: "audio-index-hint",
-        children: "点击「▶ 全部连播」可顺序播放全部音频；点击单曲可单独播放。",
+        children: "点击「全部联播」可顺序播放全部音频；点击单曲可单独播放。",
       }),
       jsx("div", {
         class: "audio-player-top",
         children: jsx("button", {
           class: "audio-play-all",
           "data-play-all": "true",
-          children: "▶ 全部连播",
+          children: "全部连播",
         }),
       }),
       jsx(
         "ul",
         {
           class: "audio-list",
-          children: audios.map((a, i) =>
-            jsx(
+          children: audios.map((a, i) => {
+            const encodedSrc = root + AUDIO_DIR + "/" + encodeURIComponent(a.title) + a.ext
+            return jsx(
               "li",
               {
                 class: "audio-item",
                 "data-index": String(i),
                 children: jsxs("button", {
                   class: "audio-track",
-                  "data-audio-src": `${root}${a.slug}`,
+                  "data-audio-src": encodedSrc,
                   children: [
-                    jsx("span", { class: "audio-seq", children: `${i + 1}.` }),
+                    jsx("span", { class: "audio-seq", children: (i + 1) + "." }),
                     jsx("span", { class: "audio-title", children: a.title }),
                     jsx("span", { class: "audio-status", children: "" }),
                   ],
                 }),
               },
               a.slug,
-            ),
-          ),
+            )
+          }),
         },
       ),
     ],
