@@ -1,0 +1,23 @@
+{
+  "name": "@quartz-community/resource-index",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "exports": {
+    ".": "./dist/index.js",
+    "./components": "./dist/components/index.js",
+    "./package.json": "./package.json"
+  },
+  "quartz": {
+    "name": "resource-index",
+    "displayName": "Resource Index",
+    "category": "component",
+    "components": {
+      "ResourceIndex": {
+        "displayName": "Resource Index",
+        "defaultPosition": "afterBody",
+        "defaultPriority": 7
+      }
+    }
+  }
+}

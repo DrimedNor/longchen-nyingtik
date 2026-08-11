@@ -285,6 +285,17 @@ plugins:
     layout:
       position: afterBody
       priority: 6
+  - source: "@quartz-community/resource-index"
+    enabled: true
+    options:
+      sections:
+        - slug: 书籍
+          label: 电子书
+          exts: [".pdf", ".epub", ".mobi", ".azw3"]
+          target: _blank
+    layout:
+      position: afterBody
+      priority: 7
 layout:
   groups:
     toolbar:

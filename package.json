@@ -89,6 +89,7 @@
     "@quartz-themes/default": "^1.0.1",
     "@quartz-community/local-content-tree": "file:./local-plugins/local-content-tree",
     "@quartz-community/audio-index": "file:./local-plugins/audio-index",
+    "@quartz-community/resource-index": "file:./local-plugins/resource-index",
     "ansi-truncate": "^1.4.0",
     "async-mutex": "^0.5.0",
     "chokidar": "^5.0.0",
