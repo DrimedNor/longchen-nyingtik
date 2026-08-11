@@ -64,7 +64,15 @@ export default (() => {
   if (!document.getElementById("audio-player-style")) {
     var st = document.createElement("style");
     st.id = "audio-player-style";
-    st.textContent = ".audio-player{margin:1rem 0;}.audio-player audio{width:100%;}.article-title{background:transparent!important;}";
+    st.textContent = ".audio-player{margin:1rem 0;}.audio-player audio{width:100%;}.article-title{background:transparent!important;}" +
+      ".audio-player-bar{position:sticky;top:0;z-index:60;display:flex;flex-direction:column;gap:.5rem;background:var(--light);border:1px solid var(--lightgray);border-radius:10px;padding:.7rem .9rem;margin:.4rem 0 1rem;box-shadow:0 2px 12px rgba(0,0,0,.10);}" +
+      ".audio-player-bar .ap-row{display:flex;align-items:center;gap:.6rem;}" +
+      ".audio-player-bar .ap-btn{width:2.5rem;height:2.5rem;border:none;border-radius:50%;background:var(--tertiary);color:var(--light);font-size:1.05rem;cursor:pointer;line-height:1;display:flex;align-items:center;justify-content:center;flex:0 0 auto;}" +
+      ".audio-player-bar .ap-btn:hover{opacity:.9;}" +
+      ".audio-player-bar .ap-meta{flex:1;min-width:0;}" +
+      ".audio-player-bar .ap-title{font-size:.95rem;font-weight:600;color:var(--darkgray);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}" +
+      ".audio-player-bar .ap-time{font-size:.78rem;color:var(--gray);margin-top:.1rem;}" +
+      ".audio-player-bar .ap-progress{width:100%;accent-color:var(--tertiary);cursor:pointer;}";
     document.head.appendChild(st);
   }
   if (document.readyState === "loading") {
@@ -78,24 +86,66 @@ export default (() => {
 // 音频总览连播：扫描页面上的播放列表，点击单曲或「全部连播」顺序播放。
 var audioPlaylistScript = `
 (function () {
+  function fmtTime(s) {
+    if (!isFinite(s) || s < 0) s = 0;
+    var m = Math.floor(s / 60);
+    var sec = Math.floor(s % 60);
+    return (m < 10 ? "0" + m : m) + ":" + (sec < 10 ? "0" + sec : sec);
+  }
   function setupPlaylist(root) {
     var section = root.querySelector("[data-audio-playlist]");
     if (!section || section.dataset.playlistBound) return;
     section.dataset.playlistBound = "true";
     var tracks = Array.prototype.slice.call(section.querySelectorAll(".audio-track"));
     if (tracks.length === 0) return;
+
+    // 隐藏的播放引擎：仅承载媒体控制，界面由下方自建卡片呈现。
+    // 原先这里没有 controls，移动端就只剩声音、没有任何界面。
     var player = document.createElement("audio");
     player.preload = "none";
+    player.style.display = "none";
     document.body.appendChild(player);
+
+    // 自建可见播放卡片：进度条 + 播放/暂停 + 曲目名 + 上一首/下一首。
+    var bar = document.createElement("div");
+    bar.className = "audio-player-bar";
+    bar.innerHTML =
+      '<div class="ap-row">' +
+        '<button class="ap-btn ap-prev" aria-label="上一首">\\u23EE</button>' +
+        '<button class="ap-btn ap-toggle" aria-label="播放或暂停">\\u25B6</button>' +
+        '<button class="ap-btn ap-next" aria-label="下一首">\\u23ED</button>' +
+        '<div class="ap-meta">' +
+          '<div class="ap-title">未选择音频</div>' +
+          '<div class="ap-time">00:00 / 00:00</div>' +
+        '</div>' +
+      '</div>' +
+      '<input class="ap-progress" type="range" min="0" max="1000" value="0" step="1" aria-label="播放进度">';
+    section.insertBefore(bar, section.firstChild);
+
+    var btnPrev = bar.querySelector(".ap-prev");
+    var btnToggle = bar.querySelector(".ap-toggle");
+    var btnNext = bar.querySelector(".ap-next");
+    var elTitle = bar.querySelector(".ap-title");
+    var elTime = bar.querySelector(".ap-time");
+    var elProg = bar.querySelector(".ap-progress");
+
     var current = -1;
+
     function clearPlaying() {
       tracks.forEach(function (t) { t.classList.remove("playing"); });
+    }
+    function setToggleIcon() {
+      btnToggle.textContent = player.paused ? "\\u25B6" : "\\u23F8";
     }
     function playIndex(i) {
       if (i < 0 || i >= tracks.length) return;
       current = i;
       clearPlaying();
       tracks[i].classList.add("playing");
+      var titleEl = tracks[i].querySelector(".audio-title");
+      elTitle.textContent = titleEl ? titleEl.textContent : ("第 " + (i + 1) + " 首");
+      elProg.value = 0;
+      elTime.textContent = "00:00 / 00:00";
       player.src = tracks[i].getAttribute("data-audio-src");
       // 关键：换源后必须 load()，否则部分浏览器（尤其移动端）在 ended 后
       // 直接 play() 会因媒体未就绪而静默失败，导致连播播完第一首就停住。
@@ -103,14 +153,48 @@ var audioPlaylistScript = `
       var p = player.play();
       if (p && p.catch) p.catch(function () {});
     }
+    function togglePlay() {
+      if (current === -1) { playIndex(0); return; }
+      if (player.paused) {
+        var p = player.play();
+        if (p && p.catch) p.catch(function () {});
+      } else {
+        player.pause();
+      }
+    }
+    function seek() {
+      if (!player.duration) return;
+      player.currentTime = (parseFloat(elProg.value) / 1000) * player.duration;
+    }
+
+    player.addEventListener("play", setToggleIcon);
+    player.addEventListener("pause", setToggleIcon);
     player.addEventListener("ended", function () {
       if (current + 1 < tracks.length) {
         playIndex(current + 1);
       } else {
         clearPlaying();
         current = -1;
+        setToggleIcon();
+        elTitle.textContent = "播放完毕";
+        elProg.value = 0;
       }
     });
+    player.addEventListener("timeupdate", function () {
+      if (player.duration) {
+        elProg.value = Math.round((player.currentTime / player.duration) * 1000);
+        elTime.textContent = fmtTime(player.currentTime) + " / " + fmtTime(player.duration);
+      }
+    });
+    player.addEventListener("loadedmetadata", function () {
+      elTime.textContent = fmtTime(player.currentTime) + " / " + fmtTime(player.duration);
+    });
+
+    btnToggle.addEventListener("click", togglePlay);
+    btnPrev.addEventListener("click", function () { if (current > 0) playIndex(current - 1); });
+    btnNext.addEventListener("click", function () { if (current < tracks.length - 1) playIndex(current + 1); });
+    elProg.addEventListener("input", seek);
+
     tracks.forEach(function (t, i) {
       t.addEventListener("click", function () { playIndex(i); });
     });
