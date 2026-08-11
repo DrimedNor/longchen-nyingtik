@@ -36,7 +36,11 @@ var Component = (props) => {
 
   const contentRoot = ctx?.argv?.directory ?? join(process.cwd(), "content")
   const audios = scanAudioFiles(contentRoot)
-  const root = pathToRoot(fileData.slug ?? AUDIO_DIR)
+  const rootRaw = pathToRoot(fileData.slug ?? AUDIO_DIR)
+  // pathToRoot 可能返回 ".." 之类不带尾斜杠的值，
+  // 直接拼接 AUDIO_DIR 会得到 "..音频资源/..." 这种错误路径段（浏览器当成字面文件名 -> 404）。
+  // 这里统一补上尾斜杠，确保生成 "../音频资源/..." 这样的合法相对路径。
+  const root = rootRaw.endsWith("/") ? rootRaw : rootRaw + "/"
 
   if (audios.length === 0) {
     return jsx("div", {
