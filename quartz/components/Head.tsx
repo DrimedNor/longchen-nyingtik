@@ -64,7 +64,7 @@ export default (() => {
   if (!document.getElementById("audio-player-style")) {
     var st = document.createElement("style");
     st.id = "audio-player-style";
-    st.textContent = ".audio-player{margin:1rem 0;}.audio-player audio{width:100%;}";
+    st.textContent = ".audio-player{margin:1rem 0;}.audio-player audio{width:100%;}.article-title{background:transparent!important;}";
     document.head.appendChild(st);
   }
   if (document.readyState === "loading") {
@@ -97,6 +97,9 @@ var audioPlaylistScript = `
       clearPlaying();
       tracks[i].classList.add("playing");
       player.src = tracks[i].getAttribute("data-audio-src");
+      // 关键：换源后必须 load()，否则部分浏览器（尤其移动端）在 ended 后
+      // 直接 play() 会因媒体未就绪而静默失败，导致连播播完第一首就停住。
+      try { player.load(); } catch (e) {}
       var p = player.play();
       if (p && p.catch) p.catch(function () {});
     }
