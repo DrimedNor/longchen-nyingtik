@@ -299,10 +299,11 @@ var swRegisterScript = `
 // 字号调节：悬浮按钮 A- / A+，5 档循环，写入 localStorage，作用于全站根字号。
 var fontSizeScript = `
 (function () {
-  if (document.getElementById("fontsize-style")) return;
-  var st = document.createElement("style");
+  function initFs() {
+    if (document.getElementById("fontsize-style")) return;
+    var st = document.createElement("style");
   st.id = "fontsize-style";
-  st.textContent = "#font-size-bar{position:fixed;top:4.2rem;right:1rem;z-index:9999;display:flex;align-items:center;gap:.5rem;background:var(--light);border:2px solid var(--lightgray);border-radius:999px;padding:.5rem .8rem;box-shadow:0 2px 14px rgba(0,0,0,.18);}#font-size-bar button{width:3.4rem;height:3.4rem;border:none;border-radius:999px;background:var(--tertiary);color:var(--light);font-size:1.5rem;font-weight:700;cursor:pointer;line-height:1;display:flex;align-items:center;justify-content:center;flex:0 0 auto;}#font-size-bar button:hover{opacity:.9;}#font-size-bar .fs-label{display:flex;flex-direction:column;align-items:center;justify-content:center;color:var(--darkgray);line-height:1.15;}#font-size-bar .fs-label .fs-cap{font-size:.8rem;font-weight:700;}#font-size-bar .fs-label .fs-val{font-size:1.05rem;font-weight:700;color:var(--tertiary);}";
+  st.textContent = "#font-size-bar{position:fixed;top:4.2rem;right:1rem;z-index:9999;display:flex;align-items:center;gap:.5rem;background:var(--light,#fff);border:2px solid var(--lightgray,#ccc);border-radius:999px;padding:.5rem .8rem;box-shadow:0 2px 14px rgba(0,0,0,.18);}#font-size-bar button{width:3.4rem;height:3.4rem;border:none;border-radius:999px;background:var(--tertiary,#3b6ea5);color:var(--light,#fff);font-size:1.5rem;font-weight:700;cursor:pointer;line-height:1;display:flex;align-items:center;justify-content:center;flex:0 0 auto;}#font-size-bar button:hover{opacity:.9;}#font-size-bar .fs-label{display:flex;flex-direction:column;align-items:center;justify-content:center;color:var(--darkgray,#333);line-height:1.15;}#font-size-bar .fs-label .fs-cap{font-size:.8rem;font-weight:700;}#font-size-bar .fs-label .fs-val{font-size:1.05rem;font-weight:700;color:var(--tertiary,#3b6ea5);}";
   document.head.appendChild(st);
 
   var SCALES = [0.9, 1, 1.1, 1.25, 1.4];
@@ -346,6 +347,12 @@ var fontSizeScript = `
   bar.appendChild(dec); bar.appendChild(label); bar.appendChild(inc);
   document.body.appendChild(bar);
   apply(current());
+  }
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", initFs);
+  } else {
+    initFs();
+  }
 })();
 `;
 
