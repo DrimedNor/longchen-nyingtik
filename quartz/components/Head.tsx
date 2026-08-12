@@ -302,7 +302,7 @@ var fontSizeScript = `
   if (document.getElementById("fontsize-style")) return;
   var st = document.createElement("style");
   st.id = "fontsize-style";
-  st.textContent = "#font-size-bar{position:fixed;right:1rem;bottom:1rem;z-index:9999;display:flex;gap:.3rem;background:var(--light);border:1px solid var(--lightgray);border-radius:999px;padding:.3rem .5rem;box-shadow:0 2px 10px rgba(0,0,0,.12);}#font-size-bar button{width:2.2rem;height:2.2rem;border:none;border-radius:50%;background:var(--tertiary);color:var(--light);font-size:1rem;cursor:pointer;line-height:1;}#font-size-bar button:hover{opacity:.9;}#font-size-bar .fs-label{min-width:3.2rem;display:flex;align-items:center;justify-content:center;font-size:.8rem;color:var(--darkgray);}";
+  st.textContent = "#font-size-bar{position:fixed;top:4.2rem;right:1rem;z-index:9999;display:flex;align-items:center;gap:.5rem;background:var(--light);border:2px solid var(--lightgray);border-radius:999px;padding:.5rem .8rem;box-shadow:0 2px 14px rgba(0,0,0,.18);}#font-size-bar button{width:3.4rem;height:3.4rem;border:none;border-radius:999px;background:var(--tertiary);color:var(--light);font-size:1.5rem;font-weight:700;cursor:pointer;line-height:1;display:flex;align-items:center;justify-content:center;flex:0 0 auto;}#font-size-bar button:hover{opacity:.9;}#font-size-bar .fs-label{display:flex;flex-direction:column;align-items:center;justify-content:center;color:var(--darkgray);line-height:1.15;}#font-size-bar .fs-label .fs-cap{font-size:.8rem;font-weight:700;}#font-size-bar .fs-label .fs-val{font-size:1.05rem;font-weight:700;color:var(--tertiary);}";
   document.head.appendChild(st);
 
   var SCALES = [0.9, 1, 1.1, 1.25, 1.4];
@@ -310,8 +310,8 @@ var fontSizeScript = `
   function apply(i) {
     var v = SCALES[i];
     document.documentElement.style.fontSize = (16 * v) + "px";
-    var label = document.getElementById("fs-label");
-    if (label) label.textContent = Math.round(v * 100) + "%";
+    var valEl = document.getElementById("fs-val");
+    if (valEl) valEl.textContent = Math.round(v * 100) + "%";
     try { localStorage.setItem(KEY, String(i)); } catch (e) {}
   }
   function current() {
@@ -325,8 +325,15 @@ var fontSizeScript = `
   dec.textContent = "A−";
   dec.title = "缩小字号";
   var label = document.createElement("span");
-  label.id = "fs-label";
   label.className = "fs-label";
+  var cap = document.createElement("span");
+  cap.className = "fs-cap";
+  cap.textContent = "字号";
+  var val = document.createElement("span");
+  val.id = "fs-val";
+  val.className = "fs-val";
+  label.appendChild(cap);
+  label.appendChild(val);
   var inc = document.createElement("button");
   inc.textContent = "A+";
   inc.title = "放大字号";
