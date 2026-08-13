@@ -11,7 +11,7 @@ build_site.py — 把 content/ 下的 Obsidian 库生成静态站 (dist/)
 
 音频策略(2026-08-13 定):
   1. 正文 [[xxx.mp3]] 引用且本地 content 下存在同名文件 → 内嵌 <audio> 本地播放；
-  2. 本地不存在的（如《大圆满前行》226集，已迁走）→ 音频资源页放常乐寺详情页跳转链接。
+  2. 本地不存在的（如《大圆满前行》226集，已迁走）→ 音频资源页放昌列寺详情页跳转链接。
 """
 import os
 import re
@@ -24,7 +24,7 @@ from urllib.parse import quote
 CONTENT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "content")
 DIST_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "dist")
 
-# 常乐寺《大圆满前行》有声书专辑详情页（稳定地址，用于跳转）
+# 昌列寺《大圆满前行》有声书专辑详情页（稳定地址，用于跳转）
 CHANGLESI_ALBUM = "http://www.changleisi.com/index/Audio/details/id/71"
 
 # 收集本地存在的音频文件名（含 .mp3 后缀），供 inline 判断
@@ -65,14 +65,13 @@ def inline(text):
             target, alias = inner, None
         label = alias if alias else target
         if target.lower().endswith((".mp3", ".m4a", ".wav")):
-            # 本地存在 → 内嵌播放器；否则跳转常乐寺
+            # 本地存在 → 播放按钮（触发全局播放器）；否则跳转昌列寺
             fname = target.split("/")[-1].strip()
             if fname in LOCAL_AUDIO:
-                src = "audio/" + quote(fname)
-                return ('<audio class="inline-audio" controls preload="none" src="%s">'
-                        '您的浏览器不支持音频播放</audio>' % src)
+                return ('<button class="play-btn" data-audio="%s">▶ 播放本篇开示</button>'
+                        % html_mod.escape(fname, quote=True))
             return ('<a class="audio-jump" href="%s" target="_blank" rel="noopener">'
-                    '🎧 收听音频（跳转常乐寺）</a>' % CHANGLESI_ALBUM)
+                    '🎧 收听音频（跳转昌列寺）</a>' % CHANGLESI_ALBUM)
         # 内部链接 -> data-page 锚点
         slug = target.strip()
         return ('<a class="wikilink" data-page="%s">%s</a>'
@@ -314,7 +313,7 @@ a:hover{color:var(--accent-soft)}
 .nav .dir-name{font-size:.78rem; color:var(--accent); padding:.55rem .55rem .1rem; font-weight:600}
 
 /* 内容区 */
-.content{flex:1; padding:2.6rem clamp(1.4rem, 6vw, 4.5rem) 5rem; max-width:820px; margin:0 auto}
+.content{flex:1; padding:2.6rem clamp(1.4rem, 6vw, 4.5rem) 6.5rem; max-width:820px; margin:0 auto}
 .article h1{font-size:1.85em; margin:.1rem 0 .7rem; line-height:1.35; font-weight:700}
 .article h2{font-size:1.3em; margin:1.7em 0 .6em; padding-bottom:.35em; border-bottom:1px solid var(--line); font-weight:600}
 .article h3{font-size:1.1em; margin:1.5em 0 .4em; font-weight:600}
@@ -333,7 +332,11 @@ a:hover{color:var(--accent-soft)}
 .article strong{color:var(--ink); font-weight:600}
 
 /* 音频 */
-.article .inline-audio{display:block; width:100%; max-width:520px; margin:1rem 0}
+.article .play-btn{display:inline-flex; align-items:center; gap:.4rem; border:1px solid var(--accent);
+  color:var(--accent); background:#fff; padding:.42rem 1.2rem; border-radius:999px;
+  font-size:.95em; cursor:pointer; margin:.5rem 0; transition:all .15s; font-family:inherit}
+.article .play-btn:hover{background:var(--accent); color:#fff}
+.article .play-btn.playing{background:var(--accent); color:#fff}
 .article .audio-jump{display:inline-block; border:1px solid var(--accent); color:var(--accent);
   padding:.3rem 1.1rem; border-radius:999px; font-size:.92em; margin:.4rem 0}
 .article .audio-jump:hover{background:var(--accent); color:#fff}
@@ -344,6 +347,53 @@ a:hover{color:var(--accent-soft)}
 .album-card a{display:inline-block; margin-top:.6rem; border:1px solid var(--accent);
   color:var(--accent); padding:.3rem 1.1rem; border-radius:999px; font-size:.92em}
 .album-card a:hover{background:var(--accent); color:#fff}
+
+/* 面包屑导航 */
+.breadcrumb{display:flex; flex-wrap:wrap; align-items:center; gap:.3rem;
+  font-size:.85em; color:var(--ink-faint); margin:0 0 1.2rem; padding-bottom:.9rem;
+  border-bottom:1px solid var(--line)}
+.breadcrumb a{color:var(--ink-soft); cursor:pointer}
+.breadcrumb a:hover{color:var(--accent)}
+.breadcrumb .sep{color:var(--ink-faint); opacity:.5; padding:0 .1rem}
+.breadcrumb .cur{color:var(--ink); font-weight:600}
+
+/* 全局播放条 */
+.player{position:fixed; left:0; right:0; bottom:0; z-index:40; background:#fffdfa;
+  border-top:1px solid var(--line); box-shadow:0 -2px 12px rgba(0,0,0,.05);
+  transform:translateY(100%); transition:transform .25s}
+.player.show{transform:translateY(0)}
+.player .p-bar{display:flex; align-items:center; gap:.7rem; padding:.55rem 1.2rem;
+  max-width:960px; margin:0 auto}
+.player .p-info{flex:1; min-width:0}
+.player .p-title{font-size:.92em; color:var(--ink); font-weight:600; white-space:nowrap;
+  overflow:hidden; text-overflow:ellipsis}
+.player .p-sub{font-size:.78em; color:var(--ink-faint)}
+.player .p-progress{height:3px; background:var(--line); border-radius:2px; margin-top:.4rem; cursor:pointer; position:relative}
+.player .p-progress .p-fill{position:absolute; left:0; top:0; bottom:0; background:var(--accent);
+  border-radius:2px; width:0%}
+.player .p-btn{border:none; background:none; cursor:pointer; color:var(--ink);
+  font-size:1.15rem; width:2.4rem; height:2.4rem; border-radius:50%; line-height:1;
+  display:flex; align-items:center; justify-content:center; transition:background .15s}
+.player .p-btn:hover{background:#f3f0ea}
+.player .p-btn.p-play{width:2.9rem; height:2.9rem; background:var(--accent); color:#fff; font-size:1.1rem}
+.player .p-btn.p-play:hover{background:var(--accent-soft)}
+.player .p-time{font-size:.78em; color:var(--ink-faint); white-space:nowrap}
+.player .p-listbtn{font-size:1rem}
+
+/* 播放列表弹层 */
+.plist{position:fixed; left:0; right:0; bottom:0; z-index:39; background:#fffdfa;
+  border-top:1px solid var(--line); box-shadow:0 -4px 16px rgba(0,0,0,.08);
+  transform:translateY(100%); transition:transform .25s; max-height:60vh; overflow-y:auto}
+.plist.show{transform:translateY(0)}
+.plist .pl-head{display:flex; align-items:center; justify-content:space-between;
+  padding:.8rem 1.2rem; border-bottom:1px solid var(--line); font-weight:600}
+.plist .pl-close{border:none; background:none; cursor:pointer; color:var(--ink-soft); font-size:1.2rem}
+.plist .pl-item{display:flex; align-items:center; gap:.6rem; padding:.65rem 1.2rem;
+  cursor:pointer; border-bottom:1px solid #f3f0ea; color:var(--ink-soft); font-size:.94em}
+.plist .pl-item:hover{background:#f7f4ee}
+.plist .pl-item.playing{color:var(--accent); font-weight:600; background:#faf5ec}
+.plist .pl-item .pl-dot{width:6px; height:6px; border-radius:50%; background:var(--accent-soft); flex:0 0 6px}
+.plist .pl-item.playing .pl-dot{background:var(--accent)}
 
 /* 元信息 */
 .meta{font-size:.85em; color:var(--ink-faint); margin:1.2rem 0 1.6rem; display:flex; flex-wrap:wrap; gap:.3rem .9rem}
@@ -373,6 +423,11 @@ a:hover{color:var(--accent-soft)}
 .hn-link::before{content:""; width:5px; height:5px; border-radius:50%;
   background:var(--accent-soft); flex:0 0 5px; opacity:.6}
 .hn-link:hover::before{background:var(--accent); opacity:1}
+.hn-audio{cursor:pointer}
+.hn-audio.playing{color:var(--accent); font-weight:600; background:#faf5ec; border-color:var(--accent-soft)}
+.hn-audio.playing::before{background:var(--accent); opacity:1}
+.audio-list{margin-top:.5rem}
+.audio-list-title{font-size:.88em; color:var(--ink-faint); margin:1.2rem 0 .5rem; font-weight:600}
 
 /* 移动端 */
 @media(max-width:760px){
@@ -380,15 +435,18 @@ a:hover{color:var(--accent-soft)}
   .sidebar{position:fixed; left:0; top:53px; bottom:0; transform:translateX(-100%);
     transition:transform .2s; z-index:15; width:260px; background:var(--bg)}
   .sidebar.open{transform:translateX(0)}
-  .content{padding:1.6rem 1.1rem 3.5rem}
+  .content{padding:1.6rem 1.1rem 6rem}
   .welcome .big{font-size:1.7em}
+  .player .p-bar{padding:.5rem .7rem; gap:.45rem}
+  .player .p-time{display:none}
+  .player .p-sub{display:none}
 }
 </style>
 </head>
 <body>
 <div class="topbar">
   <button class="menu-btn" id="menuBtn">☰</button>
-  <span class="brand">@@SITE_TITLE@@<small id="pageCrumbs"></small></span>
+  <span class="brand" id="brandHome" style="cursor:pointer">@@SITE_TITLE@@<small id="pageCrumbs"></small></span>
   <span class="spacer"></span>
   <div class="fs-pill">
     <button id="fsDec" title="缩小字号">A−</button>
@@ -405,11 +463,34 @@ a:hover{color:var(--accent-soft)}
   <main class="content" id="content"></main>
 </div>
 
+<!-- 全局播放条 -->
+<div class="player" id="player">
+  <div class="p-bar">
+    <button class="p-btn" id="pListBtn" title="播放列表">☰</button>
+    <button class="p-btn" id="pPrev" title="上一首">⏮</button>
+    <button class="p-btn p-play" id="pPlay" title="播放/暂停">▶</button>
+    <button class="p-btn" id="pNext" title="下一首">⏭</button>
+    <div class="p-info">
+      <div class="p-title" id="pTitle">未播放</div>
+      <div class="p-sub" id="pSub"></div>
+      <div class="p-progress" id="pProgress"><div class="p-fill" id="pFill"></div></div>
+    </div>
+    <span class="p-time" id="pTime">0:00 / 0:00</span>
+  </div>
+</div>
+
+<!-- 播放列表弹层 -->
+<div class="plist" id="plist">
+  <div class="pl-head"><span>🎧 开示音频列表</span><button class="pl-close" id="plClose">✕</button></div>
+  <div id="plItems"></div>
+</div>
+
 <script>
 var SITE_TITLE = @@SITE_TITLE_JSON@@;
 var PAGES = @@PAGES_JSON@@;
 var TREE = @@TREE_JSON@@;
 var AUDIO_ALBUM = @@AUDIO_ALBUM_JSON@@;
+var AUDIO_TRACKS = @@AUDIO_TRACKS_JSON@@;
 
 var bySlug = {};
 PAGES.forEach(function(p){ bySlug[p.slug] = p; });
@@ -466,7 +547,12 @@ function show(slug){
           + '<div class="welcome-sub">龙钦宁提资料库 · 学习整理与分享</div></div>'
           + p.html + renderHomeNav();
   }
-  document.getElementById('content').innerHTML = '<div class="article">' + inner + '</div>';
+  // 音频资源页 → 附加独立音频列表
+  if (p.is_index && p.slug.indexOf('音频资源') === 0){
+    inner += renderAudioList();
+  }
+  var crumb = renderBreadcrumb(p);
+  document.getElementById('content').innerHTML = '<div class="article">' + crumb + inner + '</div>';
   document.getElementById('pageCrumbs').textContent = p.is_index ? '' : (' / ' + p.title);
   document.querySelectorAll('.nav-link').forEach(function(a){
     a.classList.toggle('active', a.dataset.slug === slug);
@@ -488,7 +574,51 @@ function show(slug){
       if (hit) show(hit.slug); else alert('未找到页面：' + target);
     };
   });
+  // 首页导览音频项 → 直接播放
+  document.querySelectorAll('.hn-audio').forEach(function(a){
+    a.onclick = function(ev){
+      ev.preventDefault();
+      playTrack(parseInt(a.dataset.idx, 10));
+    };
+  });
+  // 面包屑链接
+  document.querySelectorAll('.breadcrumb a').forEach(function(a){
+    a.onclick = function(ev){
+      ev.preventDefault();
+      var target = a.dataset.page;
+      var hit = bySlug[target] || matchByTitle(target);
+      if (hit) show(hit.slug); else alert('未找到页面：' + target);
+    };
+  });
+  // 播放按钮 → 触发全局播放器
+  document.querySelectorAll('.play-btn').forEach(function(b){
+    b.onclick = function(){
+      playByAudio(b.dataset.audio);
+    };
+  });
+  updatePlayBtns();
   window.scrollTo({top:0, behavior:'smooth'});
+}
+
+// ---- 面包屑导航 ----
+function renderBreadcrumb(p){
+  var parts = p.slug.split('/').filter(function(x){ return x && x !== 'index'; });
+  var crumbs = ['<a class="crumb" data-page="index">主页</a>'];
+  var sectionSlug = parts[0] ? parts[0] + '/index' : null;
+  if (sectionSlug && bySlug[sectionSlug] && parts.length > 1){
+    crumbs.push('<span class="sep">›</span><a class="crumb" data-page="' + esc(sectionSlug) + '">' + esc(parts[0]) + '</a>');
+  } else if (sectionSlug && bySlug[sectionSlug] && parts.length === 1 && p.slug !== 'index'){
+    crumbs.push('<span class="sep">›</span><span class="cur">' + esc(parts[0]) + '</span>');
+  }
+  // 中间目录层级（不可点击，仅展示）
+  for (var i = 1; i < parts.length - 1; i++){
+    crumbs.push('<span class="sep">›</span><span>' + esc(parts[i]) + '</span>');
+  }
+  // 当前页标题（文章页）
+  if (parts.length > 1){
+    crumbs.push('<span class="sep">›</span><span class="cur">' + esc(p.title) + '</span>');
+  }
+  return '<div class="breadcrumb">' + crumbs.join('') + '</div>';
 }
 
 // ---- 首页导览：递归渲染目录树为可点击板块 ----
@@ -503,7 +633,7 @@ function walkBlock(node, depth){
   (node.children || []).forEach(function(c){
     if (c.type === 'page' && !c.is_index){
       var p = bySlug[c.slug];
-      var hasAudio = p && p.html.indexOf('inline-audio') >= 0;
+      var hasAudio = p && p.html.indexOf('play-btn') >= 0;
       arr.push('<a class="hn-link" data-page="' + esc(c.slug) + '">'
         + esc(c.title) + (hasAudio ? ' 🔊' : '') + '</a>');
     }
@@ -521,17 +651,16 @@ function renderHomeNav(){
     walkBlock(TREE.dirs['上师开示'], 0).forEach(function(x){ html.push(x); });
     html.push('</section>');
   }
-  // 板块二：音频资料（列出所有带内嵌音频的文章 + 常乐寺有声书）
-  var audioPages = PAGES.filter(function(p){ return p.html.indexOf('inline-audio') >= 0; });
+  // 板块二：音频资料（独立音频列表，点击直接播放）
   html.push('<section class="hn-sec">');
   html.push('<h2 class="hn-sec-title">🎧 音频资料</h2>');
-  html.push('<p class="hn-desc">文字转语音版开示，点击即可在线收听。</p>');
-  audioPages.forEach(function(p){
-    html.push('<a class="hn-link" data-page="' + esc(p.slug) + '">🔊 ' + esc(p.title) + '</a>');
+  html.push('<p class="hn-desc">文字转语音版开示，点击标题即可在当前页面直接收听，也可用底部播放器连播。</p>');
+  AUDIO_TRACKS.forEach(function(t, i){
+    html.push('<a class="hn-link hn-audio" data-idx="' + i + '">🔊 ' + esc(t.title) + '</a>');
   });
   html.push('<div class="album-card"><div class="t">《大圆满前行》有声书（226 集）</div>'
-    + '<div class="d">嘎玛仁波切译 · 常乐寺收录。点击前往常乐寺官网在线收听。</div>'
-    + '<a href="' + AUDIO_ALBUM + '" target="_blank" rel="noopener">前往常乐寺收听 ↗</a></div>');
+    + '<div class="d">嘎玛仁波切译 · 昌列寺收录。因音频体积较大，点击前往昌列寺官网在线收听。</div>'
+    + '<a href="' + AUDIO_ALBUM + '" target="_blank" rel="noopener">前往昌列寺收听 ↗</a></div>');
   html.push('</section>');
   // 板块三：书籍
   if (TREE.dirs['书籍']){
@@ -543,6 +672,15 @@ function renderHomeNav(){
   return '<div class="home-nav">' + html.join('') + '</div>';
 }
 
+// ---- 音频资源页：独立音频列表 ----
+function renderAudioList(){
+  if (!AUDIO_TRACKS.length) return '';
+  var items = AUDIO_TRACKS.map(function(t, i){
+    return '<a class="hn-link hn-audio" data-idx="' + i + '">🔊 ' + esc(t.title) + '</a>';
+  }).join('');
+  return '<div class="audio-list"><div class="audio-list-title">全部开示音频（' + AUDIO_TRACKS.length + ' 篇）</div>' + items + '</div>';
+}
+
 function matchByTitle(t){
   t = t.replace(/🔊\s*/g, '').trim();
   for (var k in bySlug){
@@ -551,6 +689,129 @@ function matchByTitle(t){
   }
   return null;
 }
+
+// ---- 全局音频播放器 ----
+var playerAudio = new Audio();
+playerAudio.preload = 'none';
+var curIdx = -1;
+
+function fmtTime(s){
+  if (!isFinite(s) || s < 0) s = 0;
+  var m = Math.floor(s / 60), sec = Math.floor(s % 60);
+  return m + ':' + (sec < 10 ? '0' : '') + sec;
+}
+
+function showPlayer(){
+  document.getElementById('player').classList.add('show');
+  document.getElementById('plist').classList.remove('show');
+}
+
+function playTrack(idx){
+  if (idx < 0 || idx >= AUDIO_TRACKS.length) return;
+  curIdx = idx;
+  var t = AUDIO_TRACKS[idx];
+  playerAudio.src = t.src;
+  playerAudio.play();
+  document.getElementById('pTitle').textContent = t.title;
+  document.getElementById('pSub').textContent = '第 ' + (idx + 1) + ' / ' + AUDIO_TRACKS.length + ' 篇';
+  document.getElementById('pPlay').textContent = '⏸';
+  showPlayer();
+  renderPlist();
+  updatePlayBtns();
+}
+
+function playByAudio(fname){
+  for (var i = 0; i < AUDIO_TRACKS.length; i++){
+    if (AUDIO_TRACKS[i].src.indexOf(encodeURIComponent(fname)) >= 0 || AUDIO_TRACKS[i].src.indexOf(fname) >= 0){
+      playTrack(i); return;
+    }
+  }
+  // 兜底：按文件名匹配
+  for (var j = 0; j < AUDIO_TRACKS.length; j++){
+    var srcName = decodeURIComponent(AUDIO_TRACKS[j].src.split('/').pop());
+    if (srcName === fname){ playTrack(j); return; }
+  }
+}
+
+function updatePlayBtns(){
+  // 文章内播放按钮
+  document.querySelectorAll('.play-btn').forEach(function(b){
+    var active = false;
+    if (curIdx >= 0){
+      var srcName = decodeURIComponent(AUDIO_TRACKS[curIdx].src.split('/').pop());
+      active = (srcName === b.dataset.audio);
+    }
+    b.classList.toggle('playing', active);
+    b.textContent = active ? '⏸ 正在播放' : '▶ 播放本篇开示';
+  });
+  // 首页/音频资源页的音频列表项
+  document.querySelectorAll('.hn-audio').forEach(function(a){
+    a.classList.toggle('playing', parseInt(a.dataset.idx, 10) === curIdx);
+  });
+  // 播放列表弹层项
+  document.querySelectorAll('.pl-item').forEach(function(it){
+    it.classList.toggle('playing', parseInt(it.dataset.idx, 10) === curIdx);
+  });
+}
+
+document.getElementById('pPlay').onclick = function(){
+  if (curIdx < 0 && AUDIO_TRACKS.length) playTrack(0);
+  else if (playerAudio.paused){ playerAudio.play(); this.textContent = '⏸'; }
+  else { playerAudio.pause(); this.textContent = '▶'; }
+};
+document.getElementById('pNext').onclick = function(){
+  if (curIdx < 0) playTrack(0);
+  else playTrack((curIdx + 1) % AUDIO_TRACKS.length);
+};
+document.getElementById('pPrev').onclick = function(){
+  if (curIdx < 0) playTrack(0);
+  else playTrack((curIdx - 1 + AUDIO_TRACKS.length) % AUDIO_TRACKS.length);
+};
+
+playerAudio.addEventListener('timeupdate', function(){
+  var pct = playerAudio.duration ? (playerAudio.currentTime / playerAudio.duration * 100) : 0;
+  document.getElementById('pFill').style.width = pct + '%';
+  document.getElementById('pTime').textContent = fmtTime(playerAudio.currentTime) + ' / ' + fmtTime(playerAudio.duration);
+});
+playerAudio.addEventListener('ended', function(){
+  // 自动连播下一首
+  if (curIdx >= 0 && curIdx < AUDIO_TRACKS.length - 1) playTrack(curIdx + 1);
+  else { document.getElementById('pPlay').textContent = '▶'; }
+});
+playerAudio.addEventListener('play', function(){ document.getElementById('pPlay').textContent = '⏸'; });
+playerAudio.addEventListener('pause', function(){ document.getElementById('pPlay').textContent = '▶'; });
+
+// 进度条点击跳转
+document.getElementById('pProgress').onclick = function(ev){
+  if (curIdx < 0 || !playerAudio.duration) return;
+  var rect = this.getBoundingClientRect();
+  var ratio = (ev.clientX - rect.left) / rect.width;
+  playerAudio.currentTime = ratio * playerAudio.duration;
+};
+
+// 播放列表弹层
+function renderPlist(){
+  var box = document.getElementById('plItems');
+  var arr = AUDIO_TRACKS.map(function(t, i){
+    return '<div class="pl-item' + (i === curIdx ? ' playing' : '') + '" data-idx="' + i + '">'
+      + '<span class="pl-dot"></span><span>' + esc(t.title) + '</span></div>';
+  });
+  box.innerHTML = arr.join('');
+  box.querySelectorAll('.pl-item').forEach(function(it){
+    it.onclick = function(){ playTrack(parseInt(it.dataset.idx, 10)); };
+  });
+}
+document.getElementById('pListBtn').onclick = function(){
+  var pl = document.getElementById('plist');
+  pl.classList.toggle('show');
+  if (pl.classList.contains('show')) renderPlist();
+};
+document.getElementById('plClose').onclick = function(){
+  document.getElementById('plist').classList.remove('show');
+};
+
+// 顶栏品牌点击返回主页
+document.getElementById('brandHome').onclick = function(){ show('index'); };
 
 function esc(s){ var d=document.createElement('div'); d.textContent = s==null?'':String(s); return d.innerHTML; }
 
@@ -593,13 +854,13 @@ def main():
     if not pages:
         print("content 目录下没有找到 md 文件"); sys.exit(1)
 
-    # 在「音频资源」index 页追加常乐寺跳转卡片
+    # 在「音频资源」index 页追加昌列寺跳转卡片
     for p in pages:
         if p["is_index"] and p["slug"].startswith("音频资源"):
             card = ('<div class="album-card">'
                     '<div class="t">《大圆满前行》有声书（226 集）</div>'
-                    '<div class="d">嘎玛仁波切译 · 常乐寺收录。因音频体积较大，点击下方按钮前往常乐寺官网在线收听。</div>'
-                    '<a href="%s" target="_blank" rel="noopener">前往常乐寺收听 ↗</a>'
+                    '<div class="d">嘎玛仁波切译 · 昌列寺收录。因音频体积较大，点击下方按钮前往昌列寺官网在线收听。</div>'
+                    '<a href="%s" target="_blank" rel="noopener">前往昌列寺收听 ↗</a>'
                     '</div>' % CHANGLESI_ALBUM)
             p["html"] += card
             break
@@ -610,9 +871,23 @@ def main():
         if p["slug"] == "index" and p["meta"].get("title"):
             site_title = p["meta"]["title"]
 
+    # 生成音频轨道列表：每篇带本地音频的文章，对应一个 track（标题=文章标题，src=audio/文件名）
+    audio_tracks = []
+    for p in pages:
+        for m in re.finditer(r'data-audio="([^"]+)"', p["html"]):
+            fname = m.group(1)
+            title = fname[:-4] if fname.lower().endswith(".mp3") else fname
+            audio_tracks.append({
+                "title": p["title"] or title,
+                "slug": p["slug"],
+                "src": "audio/" + quote(fname),
+                "file": fname,
+            })
+
     html_out = PAGE_TEMPLATE
     html_out = html_out.replace("@@SITE_TITLE_JSON@@", json.dumps(site_title, ensure_ascii=False))
     html_out = html_out.replace("@@AUDIO_ALBUM_JSON@@", json.dumps(CHANGLESI_ALBUM, ensure_ascii=False))
+    html_out = html_out.replace("@@AUDIO_TRACKS_JSON@@", json.dumps(audio_tracks, ensure_ascii=False))
     html_out = html_out.replace("@@PAGES_JSON@@", json.dumps(pages, ensure_ascii=False))
     html_out = html_out.replace("@@TREE_JSON@@", json.dumps(tree, ensure_ascii=False))
     html_out = html_out.replace("@@SITE_TITLE@@", site_title)
