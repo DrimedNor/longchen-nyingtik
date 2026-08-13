@@ -353,6 +353,26 @@ a:hover{color:var(--accent-soft)}
 /* 欢迎页 */
 .welcome{text-align:left; padding:.5rem 0 1rem}
 .welcome .big{font-size:2.2em; color:var(--ink); font-weight:700; margin-bottom:.5rem; letter-spacing:.02em}
+.welcome .welcome-sub{color:var(--ink-faint); font-size:.95em}
+
+/* 首页导览 */
+.home-nav{margin-top:2.2rem; border-top:1px solid var(--line); padding-top:1.8rem}
+.hn-sec{margin-bottom:2.2rem}
+.hn-sec-title{font-size:1.15em; font-weight:700; color:var(--ink); margin:0 0 .3rem;
+  display:flex; align-items:center; gap:.5rem; letter-spacing:.02em}
+.hn-desc{color:var(--ink-faint); font-size:.88em; margin:0 0 .8rem}
+.hn-dir{font-size:.82em; color:var(--accent); font-weight:600; letter-spacing:.05em;
+  margin:.85rem 0 .35rem}
+.hn-dir[data-depth="0"]{margin-top:.4rem; font-size:.88em}
+.hn-dir[data-depth="1"]{margin-top:.7rem}
+.hn-dir[data-depth="2"]{margin-top:.55rem; color:var(--ink-soft); font-weight:500}
+.hn-link{display:flex; align-items:center; gap:.4rem; padding:.42rem .7rem;
+  border-radius:8px; color:var(--ink-soft); font-size:.95em; cursor:pointer;
+  border:1px solid transparent; transition:all .15s}
+.hn-link:hover{background:#f3f0ea; color:var(--ink); border-color:var(--line)}
+.hn-link::before{content:""; width:5px; height:5px; border-radius:50%;
+  background:var(--accent-soft); flex:0 0 5px; opacity:.6}
+.hn-link:hover::before{background:var(--accent); opacity:1}
 
 /* 移动端 */
 @media(max-width:760px){
@@ -361,6 +381,7 @@ a:hover{color:var(--accent-soft)}
     transition:transform .2s; z-index:15; width:260px; background:var(--bg)}
   .sidebar.open{transform:translateX(0)}
   .content{padding:1.6rem 1.1rem 3.5rem}
+  .welcome .big{font-size:1.7em}
 }
 </style>
 </head>
@@ -388,6 +409,7 @@ a:hover{color:var(--accent-soft)}
 var SITE_TITLE = @@SITE_TITLE_JSON@@;
 var PAGES = @@PAGES_JSON@@;
 var TREE = @@TREE_JSON@@;
+var AUDIO_ALBUM = @@AUDIO_ALBUM_JSON@@;
 
 var bySlug = {};
 PAGES.forEach(function(p){ bySlug[p.slug] = p; });
@@ -435,11 +457,14 @@ function show(slug){
   if (p.meta.author) meta += '<span>作者：' + esc(p.meta.author) + '</span>';
   if (p.meta.source_url) meta += '<span class="src"><a href="' + esc(p.meta.source_url) + '" target="_blank" rel="noopener">查看原文 ↗</a></span>';
   if (p.meta.tags && p.meta.tags.length) meta += p.meta.tags.map(function(t){return '<span class="tag">' + esc(t) + '</span>';}).join('');
+  var isHome = (p.slug === 'index');
   var titleHtml = p.is_index ? '' : '<h1>' + esc(p.title) + '</h1>';
   var metaHtml = meta ? '<div class="meta">' + meta + '</div>' : '';
   var inner = titleHtml + metaHtml + p.html;
-  if (p.is_index){
-    inner = '<div class="welcome"><div class="big">' + esc(SITE_TITLE) + '</div></div>' + p.html;
+  if (isHome){
+    inner = '<div class="welcome"><div class="big">' + esc(SITE_TITLE) + '</div>'
+          + '<div class="welcome-sub">龙钦宁提资料库 · 学习整理与分享</div></div>'
+          + p.html + renderHomeNav();
   }
   document.getElementById('content').innerHTML = '<div class="article">' + inner + '</div>';
   document.getElementById('pageCrumbs').textContent = p.is_index ? '' : (' / ' + p.title);
@@ -454,7 +479,68 @@ function show(slug){
       if (hit) show(hit.slug); else alert('未找到页面：' + target);
     };
   });
+  // 首页导览卡片点击跳转
+  document.querySelectorAll('.hn-link').forEach(function(a){
+    a.onclick = function(ev){
+      ev.preventDefault();
+      var target = a.dataset.page;
+      var hit = bySlug[target] || matchByTitle(target);
+      if (hit) show(hit.slug); else alert('未找到页面：' + target);
+    };
+  });
   window.scrollTo({top:0, behavior:'smooth'});
+}
+
+// ---- 首页导览：递归渲染目录树为可点击板块 ----
+function walkBlock(node, depth){
+  var arr = [];
+  var childDirs = node.dirs ? Object.keys(node.dirs) : [];
+  childDirs.forEach(function(name){
+    var sub = node.dirs[name];
+    arr.push('<div class="hn-dir" data-depth="' + depth + '">' + esc(name) + '</div>');
+    walkBlock(sub, depth + 1).forEach(function(x){ arr.push(x); });
+  });
+  (node.children || []).forEach(function(c){
+    if (c.type === 'page' && !c.is_index){
+      var p = bySlug[c.slug];
+      var hasAudio = p && p.html.indexOf('inline-audio') >= 0;
+      arr.push('<a class="hn-link" data-page="' + esc(c.slug) + '">'
+        + esc(c.title) + (hasAudio ? ' 🔊' : '') + '</a>');
+    }
+  });
+  return arr;
+}
+
+function renderHomeNav(){
+  var html = [];
+  // 板块一：上师开示
+  if (TREE.dirs['上师开示']){
+    html.push('<section class="hn-sec">');
+    html.push('<h2 class="hn-sec-title">📖 上师开示</h2>');
+    html.push('<p class="hn-desc">按主题整理的上师开示，点击标题直接阅读。</p>');
+    walkBlock(TREE.dirs['上师开示'], 0).forEach(function(x){ html.push(x); });
+    html.push('</section>');
+  }
+  // 板块二：音频资料（列出所有带内嵌音频的文章 + 常乐寺有声书）
+  var audioPages = PAGES.filter(function(p){ return p.html.indexOf('inline-audio') >= 0; });
+  html.push('<section class="hn-sec">');
+  html.push('<h2 class="hn-sec-title">🎧 音频资料</h2>');
+  html.push('<p class="hn-desc">文字转语音版开示，点击即可在线收听。</p>');
+  audioPages.forEach(function(p){
+    html.push('<a class="hn-link" data-page="' + esc(p.slug) + '">🔊 ' + esc(p.title) + '</a>');
+  });
+  html.push('<div class="album-card"><div class="t">《大圆满前行》有声书（226 集）</div>'
+    + '<div class="d">嘎玛仁波切译 · 常乐寺收录。点击前往常乐寺官网在线收听。</div>'
+    + '<a href="' + AUDIO_ALBUM + '" target="_blank" rel="noopener">前往常乐寺收听 ↗</a></div>');
+  html.push('</section>');
+  // 板块三：书籍
+  if (TREE.dirs['书籍']){
+    html.push('<section class="hn-sec">');
+    html.push('<h2 class="hn-sec-title">📚 书籍</h2>');
+    walkBlock(TREE.dirs['书籍'], 0).forEach(function(x){ html.push(x); });
+    html.push('</section>');
+  }
+  return '<div class="home-nav">' + html.join('') + '</div>';
 }
 
 function matchByTitle(t){
@@ -526,6 +612,7 @@ def main():
 
     html_out = PAGE_TEMPLATE
     html_out = html_out.replace("@@SITE_TITLE_JSON@@", json.dumps(site_title, ensure_ascii=False))
+    html_out = html_out.replace("@@AUDIO_ALBUM_JSON@@", json.dumps(CHANGLESI_ALBUM, ensure_ascii=False))
     html_out = html_out.replace("@@PAGES_JSON@@", json.dumps(pages, ensure_ascii=False))
     html_out = html_out.replace("@@TREE_JSON@@", json.dumps(tree, ensure_ascii=False))
     html_out = html_out.replace("@@SITE_TITLE@@", site_title)
