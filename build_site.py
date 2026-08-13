@@ -261,8 +261,24 @@ PAGE_TEMPLATE = r"""<!DOCTYPE html>
 <title>@@SITE_TITLE@@</title>
 <style>
 :root{
-  --bg:#fcfbf9; --ink:#2b2722; --ink-soft:#8b857b; --ink-faint:#b5afa4;
-  --line:#ece8e0; --accent:#a07a3c; --accent-soft:#c2a467; --fs:1rem;
+  /* —— 背景：浅红系 —— */
+  --bg:#fbf1ef;            /* 页面主背景，极浅暖红 */
+  --bg-2:#fcedea;          /* 区块/段落交替底色 */
+  --surface:#fff8f6;       /* 卡片/播放条/弹层表面（近白暖红） */
+  --surface-soft:#fae9e6;  /* 引用块/代码/标签/选中态的浅红底 */
+  --surface-hover:#f6e0dc; /* 悬停态浅红底 */
+  /* —— 文字层级 —— */
+  --ink:#2e1a18;           /* 主文字 / 标题：深褐红 */
+  --ink-soft:#876765;      /* 次级文字：正文辅助、导航项 */
+  --ink-faint:#b49590;     /* 三级文字：提示、面包屑、元信息 */
+  /* —— 线条 —— */
+  --line:#f0d7d2;          /* 普通分割线 / 边框 */
+  --line-strong:#e6c2bc;   /* 强调分割线 */
+  /* —— 藏红主色系 —— */
+  --accent:#a3332e;        /* 藏红主色：链接 / 按钮 / 关键强调 */
+  --accent-soft:#c2554e;   /* 藏红浅色：悬停 / 次级强调（如目录名、进度） */
+  --accent-deep:#7e221e;   /* 藏红深色：按下 / 当前激活态 */
+  --fs:1rem;
 }
 *{box-sizing:border-box}
 html,body{margin:0;padding:0}
@@ -277,7 +293,7 @@ a:hover{color:var(--accent-soft)}
 /* 顶栏 */
 .topbar{
   position:sticky; top:0; z-index:20; display:flex; align-items:center; gap:.8rem;
-  padding:.7rem 1.2rem; background:rgba(252,251,249,.9); backdrop-filter:blur(10px);
+  padding:.7rem 1.2rem; background:rgba(251,241,239,.9); backdrop-filter:blur(10px);
   border-bottom:1px solid var(--line);
 }
 .brand{font-size:1rem; font-weight:600; color:var(--ink); letter-spacing:.06em}
@@ -306,8 +322,8 @@ a:hover{color:var(--accent-soft)}
 .sidebar .search:focus{border-color:var(--accent-soft)}
 .nav a{display:block; padding:.32rem .55rem; border-radius:6px; color:var(--ink-soft);
   font-size:.9rem; cursor:pointer}
-.nav a:hover{background:#f3f0ea; color:var(--ink)}
-.nav a.active{background:var(--ink); color:#fff; text-decoration:none}
+.nav a:hover{background:var(--surface-hover); color:var(--ink)}
+.nav a.active{background:var(--accent); color:#fff; text-decoration:none}
 .nav .group-label{font-size:.75rem; color:var(--ink-faint); letter-spacing:.1em;
   padding:.7rem .55rem .2rem; font-weight:600}
 .nav .dir-name{font-size:.78rem; color:var(--accent); padding:.55rem .55rem .1rem; font-weight:600}
@@ -321,14 +337,14 @@ a:hover{color:var(--accent-soft)}
 .article p{margin:.85em 0}
 .article blockquote{border-left:2px solid var(--accent-soft); margin:1.1em 0; padding:.1em 0 .1em 1.1em;
   color:var(--ink-soft); font-size:.96em}
-.article .callout{border:1px solid var(--line); background:#f7f4ee;
+.article .callout{border:1px solid var(--line); background:var(--surface-soft);
   border-radius:8px; padding:1em 1.2em; margin:1.1em 0}
 .article .callout-title{display:block; font-weight:600; color:var(--accent);
   margin-bottom:.35em; font-size:.95em}
 .article ul{margin:.6em 0 .6em 1.5em; padding:0}
 .article li{margin:.35em 0}
 .article hr{border:none; border-top:1px solid var(--line); margin:2.4em auto; width:50%}
-.article code{background:#f3f0ea; padding:.1em .4em; border-radius:4px; font-size:.88em; font-family:ui-monospace,Consolas,monospace}
+.article code{background:var(--surface-soft); padding:.1em .4em; border-radius:4px; font-size:.88em; font-family:ui-monospace,Consolas,monospace}
 .article strong{color:var(--ink); font-weight:600}
 
 /* 音频 */
@@ -341,7 +357,7 @@ a:hover{color:var(--accent-soft)}
   padding:.3rem 1.1rem; border-radius:999px; font-size:.92em; margin:.4rem 0}
 .article .audio-jump:hover{background:var(--accent); color:#fff}
 .album-card{border:1px solid var(--line); border-radius:10px; padding:1.1rem 1.3rem;
-  margin:1.2rem 0; background:#f7f4ee}
+  margin:1.2rem 0; background:var(--surface-soft)}
 .album-card .t{font-weight:600; margin-bottom:.3rem}
 .album-card .d{color:var(--ink-soft); font-size:.92em}
 .album-card a{display:inline-block; margin-top:.6rem; border:1px solid var(--accent);
@@ -358,7 +374,7 @@ a:hover{color:var(--accent-soft)}
 .breadcrumb .cur{color:var(--ink); font-weight:600}
 
 /* 全局播放条 */
-.player{position:fixed; left:0; right:0; bottom:0; z-index:40; background:#fffdfa;
+.player{position:fixed; left:0; right:0; bottom:0; z-index:40; background:var(--surface);
   border-top:1px solid var(--line); box-shadow:0 -2px 12px rgba(0,0,0,.05);
   transform:translateY(100%); transition:transform .25s}
 .player.show{transform:translateY(0)}
@@ -374,14 +390,14 @@ a:hover{color:var(--accent-soft)}
 .player .p-btn{border:none; background:none; cursor:pointer; color:var(--ink);
   font-size:1.15rem; width:2.4rem; height:2.4rem; border-radius:50%; line-height:1;
   display:flex; align-items:center; justify-content:center; transition:background .15s}
-.player .p-btn:hover{background:#f3f0ea}
+.player .p-btn:hover{background:var(--surface-hover)}
 .player .p-btn.p-play{width:2.9rem; height:2.9rem; background:var(--accent); color:#fff; font-size:1.1rem}
 .player .p-btn.p-play:hover{background:var(--accent-soft)}
 .player .p-time{font-size:.78em; color:var(--ink-faint); white-space:nowrap}
 .player .p-listbtn{font-size:1rem}
 
 /* 播放列表弹层 */
-.plist{position:fixed; left:0; right:0; bottom:0; z-index:39; background:#fffdfa;
+.plist{position:fixed; left:0; right:0; bottom:0; z-index:39; background:var(--surface);
   border-top:1px solid var(--line); box-shadow:0 -4px 16px rgba(0,0,0,.08);
   transform:translateY(100%); transition:transform .25s; max-height:60vh; overflow-y:auto}
 .plist.show{transform:translateY(0)}
@@ -389,15 +405,15 @@ a:hover{color:var(--accent-soft)}
   padding:.8rem 1.2rem; border-bottom:1px solid var(--line); font-weight:600}
 .plist .pl-close{border:none; background:none; cursor:pointer; color:var(--ink-soft); font-size:1.2rem}
 .plist .pl-item{display:flex; align-items:center; gap:.6rem; padding:.65rem 1.2rem;
-  cursor:pointer; border-bottom:1px solid #f3f0ea; color:var(--ink-soft); font-size:.94em}
-.plist .pl-item:hover{background:#f7f4ee}
-.plist .pl-item.playing{color:var(--accent); font-weight:600; background:#faf5ec}
+  cursor:pointer; border-bottom:1px solid var(--line); color:var(--ink-soft); font-size:.94em}
+.plist .pl-item:hover{background:var(--surface-soft)}
+.plist .pl-item.playing{color:var(--accent); font-weight:600; background:var(--surface-soft)}
 .plist .pl-item .pl-dot{width:6px; height:6px; border-radius:50%; background:var(--accent-soft); flex:0 0 6px}
 .plist .pl-item.playing .pl-dot{background:var(--accent)}
 
 /* 元信息 */
 .meta{font-size:.85em; color:var(--ink-faint); margin:1.2rem 0 1.6rem; display:flex; flex-wrap:wrap; gap:.3rem .9rem}
-.meta .tag{background:#f3f0ea; padding:.05em .7em; border-radius:999px; font-size:.88em; color:var(--ink-soft)}
+.meta .tag{background:var(--surface-soft); padding:.05em .7em; border-radius:999px; font-size:.88em; color:var(--ink-soft)}
 .meta .src a{color:var(--accent-soft)}
 
 /* 欢迎页 */
@@ -419,12 +435,12 @@ a:hover{color:var(--accent-soft)}
 .hn-link{display:flex; align-items:center; gap:.4rem; padding:.42rem .7rem;
   border-radius:8px; color:var(--ink-soft); font-size:.95em; cursor:pointer;
   border:1px solid transparent; transition:all .15s}
-.hn-link:hover{background:#f3f0ea; color:var(--ink); border-color:var(--line)}
+.hn-link:hover{background:var(--surface-hover); color:var(--ink); border-color:var(--line)}
 .hn-link::before{content:""; width:5px; height:5px; border-radius:50%;
   background:var(--accent-soft); flex:0 0 5px; opacity:.6}
 .hn-link:hover::before{background:var(--accent); opacity:1}
 .hn-audio{cursor:pointer}
-.hn-audio.playing{color:var(--accent); font-weight:600; background:#faf5ec; border-color:var(--accent-soft)}
+.hn-audio.playing{color:var(--accent); font-weight:600; background:var(--surface-soft); border-color:var(--accent-soft)}
 .hn-audio.playing::before{background:var(--accent); opacity:1}
 .audio-list{margin-top:.5rem}
 .audio-list-title{font-size:.88em; color:var(--ink-faint); margin:1.2rem 0 .5rem; font-weight:600}
