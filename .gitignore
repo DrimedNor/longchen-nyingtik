@@ -14,3 +14,7 @@ quartz/cli/tui/dist/
 .turbo/
 .workbuddy/
 .pub_old6/
+dist/
+r2_upload.py
+build_site.log
+*.log
