@@ -261,23 +261,33 @@ PAGE_TEMPLATE = r"""<!DOCTYPE html>
 <title>@@SITE_TITLE@@</title>
 <style>
 :root{
-  /* —— 背景：浅红系 —— */
-  --bg:#fbf1ef;            /* 页面主背景，极浅暖红 */
-  --bg-2:#fcedea;          /* 区块/段落交替底色 */
-  --surface:#fff8f6;       /* 卡片/播放条/弹层表面（近白暖红） */
-  --surface-soft:#fae9e6;  /* 引用块/代码/标签/选中态的浅红底 */
-  --surface-hover:#f6e0dc; /* 悬停态浅红底 */
-  /* —— 文字层级 —— */
-  --ink:#722f37;           /* 主文字 / 标题：酱红 maroon（深红） */
-  --ink-soft:#8c4a52;      /* 次级文字：正文辅助、导航项（红褐） */
-  --ink-faint:#b0817d;     /* 三级文字：提示、面包屑、元信息（浅酱红） */
+  /* —— 背景：奶白 / 宣纸（白色=慈悲） —— */
+  --bg:#f6f1e6;            /* 页面主背景，温润宣纸色 */
+  --bg-2:#efe7d6;          /* 区块/段落交替底色 */
+  --surface:#fffdf8;       /* 卡片/面板表面（近白暖色，慈悲之白） */
+  --surface-soft:#f0e8d6;  /* 引用块/代码/标签/选中态的浅暖底 */
+  --surface-hover:#ebe1cb; /* 悬停态浅暖底 */
+  /* —— 文字层级（暖深棕，保证可读性） —— */
+  --ink:#3b2a22;           /* 主文字 / 标题：沉静深棕 */
+  --ink-soft:#6a4f43;      /* 次级文字：正文辅助、导航项 */
+  --ink-faint:#9b8475;     /* 三级文字：提示、面包屑、元信息 */
   /* —— 线条 —— */
-  --line:#f0d7d2;          /* 普通分割线 / 边框 */
-  --line-strong:#e6c2bc;   /* 强调分割线 */
-  /* —— 藏红主色系 —— */
-  --accent:#a3332e;        /* 藏红主色：链接 / 按钮 / 关键强调 */
-  --accent-soft:#c2554e;   /* 藏红浅色：悬停 / 次级强调（如目录名、进度） */
-  --accent-deep:#7e221e;   /* 藏红深色：按下 / 当前激活态 */
+  --line:#e2d6bf;          /* 普通分割线 / 边框 */
+  --line-strong:#cbb893;   /* 强调分割线（金褐） */
+  /* —— 主色：深红（护法·庄严·能量） —— */
+  --accent:#8a1f1c;        /* 主色：链接 / 按钮 / 关键强调 */
+  --accent-soft:#b0473f;   /* 浅红：悬停 / 次级强调 */
+  --accent-deep:#6e1614;   /* 深红：按下 / 当前激活态 */
+  /* —— 辅助色：金黄（尊贵·庄严） —— */
+  --gold:#b8893b;          /* 描边 / 修饰线 / 标题强调 */
+  --gold-soft:#d9b86a;     /* 浅金：悬停 / 高光 */
+  --gold-deep:#8a6320;     /* 深金：文字型强调 */
+  /* —— 强调色：绿松石（清净） —— */
+  --turq:#2f9b8f;          /* 进度条填充 / 播放中指示 */
+  --turq-soft:#5bb8ad;     /* 浅松石：悬停 */
+  /* —— 靛蓝（沉静·护法） —— */
+  --indigo:#2f3a5c;        /* 链接 / 次级强调 */
+  --indigo-soft:#4a577e;   /* 浅靛蓝：悬停 */
   --fs:1rem;
 }
 *{box-sizing:border-box}
@@ -293,8 +303,8 @@ a:hover{color:var(--accent-soft)}
 /* 顶栏 */
 .topbar{
   position:sticky; top:0; z-index:20; display:flex; align-items:center; gap:.8rem;
-  padding:.7rem 1.2rem; background:rgba(251,241,239,.9); backdrop-filter:blur(10px);
-  border-bottom:1px solid var(--line);
+  padding:.7rem 1.2rem; background:rgba(246,241,230,.92); backdrop-filter:blur(10px);
+  border-bottom:2px solid var(--gold);
 }
 .brand{font-size:1rem; font-weight:600; color:var(--ink); letter-spacing:.06em}
 .brand small{color:var(--ink-faint); font-weight:400; margin-left:.5em; letter-spacing:0}
@@ -323,7 +333,8 @@ a:hover{color:var(--accent-soft)}
 .nav a{display:block; padding:.4rem .6rem; border-radius:6px; color:var(--ink-soft);
   font-size:1.05rem; cursor:pointer}
 .nav a:hover{background:var(--surface-hover); color:var(--ink)}
-.nav a.active{background:var(--accent); color:#fff; text-decoration:none}
+.nav a.active{background:var(--accent); color:#fff; text-decoration:none;
+  box-shadow:inset 3px 0 0 var(--gold)}
 .nav .group-label{font-size:1rem; color:var(--ink-faint); letter-spacing:.1em;
   padding:.9rem .6rem .3rem; font-weight:600}
 /* 目录项：仅显示目录（不显示文章列表）；按层级区分字号/字重/颜色/缩进 */
@@ -331,20 +342,20 @@ a:hover{color:var(--accent-soft)}
   border-radius:6px; line-height:1.45; transition:background .15s}
 .nav .dir-name .dir-num{font-variant-numeric:tabular-nums; font-weight:700; color:inherit; flex:0 0 auto}
 .nav .dir-name .dir-label{flex:1; min-width:0; word-break:break-word}
-/* 层级配色：字体越大（层级越高）颜色越深 —— 一级最深 #5e1f26 → 四级最浅 #b0817d */
-.nav .dir-name[data-depth="0"]{font-size:1.7rem; font-weight:700; color:#5e1f26;
+/* 层级配色：字体越大（层级越高）颜色越深 —— 一级最深深红 → 二级深红 → 三级金黄 → 四级浅褐 */
+.nav .dir-name[data-depth="0"]{font-size:1.7rem; font-weight:700; color:#6e1614;
   padding:.55rem .5rem .3rem; letter-spacing:.02em}
-.nav .dir-name[data-depth="1"]{font-size:1.3rem; font-weight:600; color:#722f37;
+.nav .dir-name[data-depth="1"]{font-size:1.3rem; font-weight:600; color:#8a1f1c;
   padding:.5rem .5rem .25rem 1.2rem}
-.nav .dir-name[data-depth="2"]{font-size:1.08rem; font-weight:500; color:#9a4a52;
+.nav .dir-name[data-depth="2"]{font-size:1.08rem; font-weight:500; color:#b8893b;
   padding:.4rem .5rem .2rem 2.3rem}
-.nav .dir-name[data-depth="3"]{font-size:1rem; font-weight:500; color:#b0817d;
+.nav .dir-name[data-depth="3"]{font-size:1rem; font-weight:500; color:#9b8475;
   padding:.35rem .5rem .2rem 3.4rem}
 .nav .dir-name:hover{background:var(--surface-hover)}
 /* 移动端抽屉式侧栏的关闭按钮（仅移动端显示）与遮罩 */
 .sidebar-close{display:none; position:absolute; top:.5rem; right:.6rem; z-index:2;
   border:none; background:none; color:var(--ink-soft); font-size:1.5rem; line-height:1; cursor:pointer}
-.sidebar-overlay{position:fixed; inset:0; background:rgba(46,26,24,.28); z-index:14; display:none}
+.sidebar-overlay{position:fixed; inset:0; background:rgba(59,42,34,.3); z-index:14; display:none}
 .sidebar-overlay.show{display:block}
 
 /* 内容区 */
@@ -375,7 +386,7 @@ a:hover{color:var(--accent-soft)}
 .article .audio-jump{display:inline-block; border:1px solid var(--accent); color:var(--accent);
   padding:.3rem 1.1rem; border-radius:999px; font-size:.92em; margin:.4rem 0}
 .article .audio-jump:hover{background:var(--accent); color:#fff}
-.album-card{border:1px solid var(--line); border-radius:10px; padding:1.1rem 1.3rem;
+.album-card{border:1px solid var(--gold-soft); border-radius:10px; padding:1.1rem 1.3rem;
   margin:1.2rem 0; background:var(--surface-soft)}
 .album-card .t{font-weight:600; margin-bottom:.3rem}
 .album-card .d{color:var(--ink-soft); font-size:.92em}
@@ -392,54 +403,69 @@ a:hover{color:var(--accent-soft)}
 .breadcrumb .sep{color:var(--ink-faint); opacity:.5; padding:0 .1rem}
 .breadcrumb .cur{color:var(--ink); font-weight:600}
 
-/* 全局播放器（半屏） */
+/* 全局播放器（默认占据下三分之一屏） */
 .player{position:fixed; left:0; right:0; bottom:0; z-index:40; background:var(--surface);
-  border-top:1px solid var(--line); box-shadow:0 -4px 20px rgba(0,0,0,.12);
-  transform:translateY(100%); transition:transform .28s ease;
-  display:flex; flex-direction:column; height:50vh; min-height:340px; max-height:72vh}
+  border-top:3px solid var(--gold); box-shadow:0 -6px 24px rgba(59,42,34,.18);
+  transform:translateY(100%); transition:transform .28s ease, max-height .28s ease;
+  display:flex; flex-direction:column; height:auto; min-height:33vh; max-height:33vh;
+  padding-bottom:env(safe-area-inset-bottom,0)}
 .player.show{transform:translateY(0)}
-.player.collapsed{height:auto; min-height:0}
-.player .p-head{display:flex; align-items:center; justify-content:space-between;
-  padding:.7rem 1.2rem; border-bottom:1px solid var(--line); font-weight:600; color:var(--ink); flex:0 0 auto}
-.player .p-head .p-count{font-size:.8em; color:var(--ink-faint); font-weight:500; margin-left:.5em}
-.player .p-head-actions{display:flex; gap:.3rem}
-.player .p-iconbtn{border:none; background:none; cursor:pointer; color:var(--ink-soft);
-  font-size:1.25rem; width:2.4rem; height:2.4rem; border-radius:8px; line-height:1}
-.player .p-iconbtn:hover{background:var(--surface-hover)}
-.player .p-playlist{flex:1 1 auto; overflow-y:auto; -webkit-overflow-scrolling:touch; padding:.3rem 0}
-.player.collapsed .p-playlist{display:none}
+.player.pl-open{max-height:72vh}   /* 展开播放列表时自动增高，默认仅占据下 1/3 屏 */
+/* 第1行：状态栏 —— 正在播放：<当前音频名> */
+.player .p-status{padding:.85rem 1.3rem; font-size:1rem; color:var(--ink-soft);
+  text-align:center; border-bottom:1px solid var(--line); flex:0 0 auto; font-weight:500;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+.player .p-status b{color:var(--accent); font-weight:600}
+/* 第2行：控制按钮（上一首 ⏮ / 后退15秒 -15 / 播放 ▶ / 下一首 ⏭ / 前进15秒 +15） */
+.player .p-controls{display:flex; align-items:center; justify-content:center; gap:1rem;
+  padding:.9rem; flex:0 0 auto}
+.player .p-btn{border:none; background:none; cursor:pointer; color:var(--ink);
+  font-size:1.5rem; width:3.4rem; height:3.4rem; border-radius:50%; line-height:1;
+  display:flex; align-items:center; justify-content:center; transition:background .15s; font-weight:600}
+.player .p-btn:hover{background:var(--surface-hover)}
+.player .p-btn.p-play{width:4.4rem; height:4.4rem; background:var(--accent); color:#fff; font-size:1.6rem}
+.player .p-btn.p-play:hover{background:var(--accent-soft)}
+.player .p-btn.p-skip{font-size:1.05rem; color:var(--accent); border:1px solid var(--line); width:3.8rem; height:3.8rem}
+.player .p-btn.p-skip:hover{background:var(--surface-soft); border-color:var(--gold)}
+/* 第3行：进度条 + 两端分秒数字 */
+.player .p-time-row{display:flex; align-items:center; gap:.8rem; padding:0 1.3rem; flex:0 0 auto}
+.player .p-time{font-variant-numeric:tabular-nums; font-size:.85rem; color:var(--ink-faint);
+  flex:0 0 auto; min-width:3.2em; text-align:center}
+.player .p-progress{flex:1; height:8px; background:var(--line); border-radius:4px;
+  cursor:pointer; position:relative; touch-action:none}
+.player .p-progress .p-fill{position:absolute; left:0; top:0; bottom:0; background:var(--turq);
+  border-radius:4px; width:0%}
+.player .p-progress .p-thumb{position:absolute; top:50%; width:16px; height:16px; border-radius:50%;
+  background:#fff; border:2px solid var(--gold); transform:translate(-50%,-50%); left:0%}
+/* 第4行：播放列表开关（默认收起，点击展开） */
+.player .p-pl-row{display:flex; align-items:center; gap:.6rem; padding:.6rem 1.3rem;
+  flex:0 0 auto; border-top:1px solid var(--line)}
+.player .p-pl-toggle{border:1px solid var(--gold); background:var(--surface); color:var(--gold-deep);
+  cursor:pointer; font-size:.92rem; padding:.35rem .9rem; border-radius:999px;
+  display:inline-flex; align-items:center; gap:.35rem; font-family:inherit; transition:background .15s}
+.player .p-pl-toggle:hover{background:var(--surface-soft)}
+.player .p-pl-hint{font-size:.8rem; color:var(--ink-faint)}
+.player .p-pl-row .spacer{flex:1}
+.player .p-close{border:none; background:none; cursor:pointer; color:var(--ink-soft);
+  font-size:1.3rem; width:2.3rem; height:2.3rem; border-radius:8px; line-height:1}
+.player .p-close:hover{background:var(--surface-hover)}
+/* 播放列表（默认收起，点击展开） */
+.player .p-playlist{flex:1 1 auto; overflow-y:auto; -webkit-overflow-scrolling:touch;
+  padding:.3rem 0; display:none}
+.player .p-playlist.open{display:block}
 .player .pl-item{display:flex; align-items:center; gap:.8rem; padding:.85rem 1.4rem;
-  cursor:pointer; border-bottom:1px solid var(--line); color:var(--ink-soft); font-size:1.12em}
+  cursor:pointer; border-bottom:1px solid var(--line); color:var(--ink-soft); font-size:1.1em}
 .player .pl-item:hover{background:var(--surface-soft)}
 .player .pl-item.playing{color:var(--accent); font-weight:600; background:var(--surface-soft)}
 .player .pl-item .pl-idx{font-variant-numeric:tabular-nums; color:var(--ink-faint); flex:0 0 1.8em; text-align:right}
 .player .pl-item.playing .pl-idx{color:var(--accent)}
-.player .pl-item .pl-dot{width:7px; height:7px; border-radius:50%; background:var(--accent-soft); flex:0 0 7px}
-.player .pl-item.playing .pl-dot{background:var(--accent)}
-.player .p-controls{display:flex; align-items:center; justify-content:center; gap:1.2rem;
-  padding:1rem; flex:0 0 auto; border-top:1px solid var(--line)}
-.player .p-btn{border:none; background:none; cursor:pointer; color:var(--ink);
-  font-size:1.5rem; width:3.6rem; height:3.6rem; border-radius:50%; line-height:1;
-  display:flex; align-items:center; justify-content:center; transition:background .15s; font-weight:600}
-.player .p-btn:hover{background:var(--surface-hover)}
-.player .p-btn.p-play{width:4.6rem; height:4.6rem; background:var(--accent); color:#fff; font-size:1.6rem}
-.player .p-btn.p-play:hover{background:var(--accent-soft)}
-.player .p-btn.p-skip{font-size:1.15rem; color:var(--accent); border:1px solid var(--line); width:4rem; height:4rem}
-.player .p-btn.p-skip:hover{background:var(--surface-soft); border-color:var(--accent-soft)}
-.player .p-progress{height:8px; background:var(--line); border-radius:4px; margin:.2rem 1.4rem 0;
-  cursor:pointer; position:relative; flex:0 0 auto; touch-action:none}
-.player .p-progress .p-fill{position:absolute; left:0; top:0; bottom:0; background:var(--accent);
-  border-radius:4px; width:0%}
-.player .p-progress .p-thumb{position:absolute; top:50%; width:16px; height:16px; border-radius:50%;
-  background:#fff; border:2px solid var(--accent); transform:translate(-50%,-50%); left:0%}
-.player .p-status{padding:.75rem 1.4rem; font-size:.95em; color:var(--ink-soft); text-align:center;
-  border-top:1px solid var(--line); flex:0 0 auto; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
-.player .p-status b{color:var(--accent)}
+.player .pl-item .pl-dot{width:7px; height:7px; border-radius:50%; background:var(--turq-soft); flex:0 0 7px}
+.player .pl-item.playing .pl-dot{background:var(--turq)}
 /* 悬浮打开播放器按钮 */
 .player-launch{position:fixed; right:1.1rem; bottom:1.1rem; z-index:41;
   background:var(--accent); color:#fff; border:none; cursor:pointer;
   padding:.7rem 1.1rem; border-radius:999px; font-size:1rem; font-weight:600;
-  box-shadow:0 4px 14px rgba(0,0,0,.22); display:flex; align-items:center; gap:.4rem}
+  box-shadow:0 4px 14px rgba(59,42,34,.28); display:flex; align-items:center; gap:.4rem}
 .player-launch:hover{background:var(--accent-soft)}
 .player.show + .player-launch{display:none}
 
@@ -459,11 +485,11 @@ a:hover{color:var(--accent-soft)}
 .hn-sec-title{font-size:1.15em; font-weight:700; color:var(--ink); margin:0 0 .3rem;
   display:flex; align-items:center; gap:.5rem; letter-spacing:.02em}
 .hn-desc{color:var(--ink-faint); font-size:.88em; margin:0 0 .8rem}
-.hn-dir{font-size:.82em; color:#b0817d; font-weight:700; letter-spacing:.05em;
+.hn-dir{font-size:.82em; color:#9b8475; font-weight:700; letter-spacing:.05em;
   margin:.9rem 0 .35rem}
-.hn-dir[data-depth="0"]{margin-top:.5rem; font-size:1.05em; color:#5e1f26}
-.hn-dir[data-depth="1"]{margin-top:.7rem; font-size:.98em; color:#722f37; font-weight:600}
-.hn-dir[data-depth="2"]{margin-top:.55rem; font-size:.9em; color:#9a4a52; font-weight:500}
+.hn-dir[data-depth="0"]{margin-top:.5rem; font-size:1.05em; color:#6e1614}
+.hn-dir[data-depth="1"]{margin-top:.7rem; font-size:.98em; color:#8a1f1c; font-weight:600}
+.hn-dir[data-depth="2"]{margin-top:.55rem; font-size:.9em; color:#b8893b; font-weight:500}
 .hn-link{display:flex; align-items:center; gap:.4rem; padding:.42rem .7rem;
   border-radius:8px; color:var(--ink-soft); font-size:.95em; cursor:pointer;
   border:1px solid transparent; transition:all .15s}
@@ -490,7 +516,8 @@ a:hover{color:var(--accent-soft)}
   .sidebar-close{display:block}
   .content{padding:1.6rem 1.1rem 9rem}
   .welcome .big{font-size:1.7em}
-  .player{height:62vh; min-height:300px}
+  .player{height:auto; min-height:34vh; max-height:34vh}
+  .player.pl-open{max-height:80vh}
   .player .p-controls{gap:.7rem; padding:.85rem}
   .player .p-btn{width:3.2rem; height:3.2rem; font-size:1.35rem}
   .player .p-btn.p-play{width:3.9rem; height:3.9rem; font-size:1.45rem}
@@ -524,25 +551,33 @@ a:hover{color:var(--accent-soft)}
 <!-- 移动端：点击菜单外空白区域关闭侧栏 -->
 <div class="sidebar-overlay" id="sidebarOverlay"></div>
 
-<!-- 全局播放器（半屏） -->
+<!-- 全局播放器（默认占据下三分之一屏） -->
 <div class="player" id="player">
-  <div class="p-head">
-    <span>🎧 开示音频<span class="p-count" id="pCount"></span></span>
-    <span class="p-head-actions">
-      <button class="p-iconbtn" id="pToggle" title="收起 / 展开">▾</button>
-      <button class="p-iconbtn" id="pClose" title="关闭播放器">✕</button>
-    </span>
-  </div>
-  <div class="p-playlist" id="pPlaylist"></div>
+  <!-- 第1行：状态栏 -->
+  <div class="p-status" id="pStatus">暂未播放</div>
+  <!-- 第2行：控制按钮（上一首 / 后退15秒 / 播放 / 下一首 / 前进15秒） -->
   <div class="p-controls">
-    <button class="p-btn" id="pPlay" title="播放 / 暂停">▶</button>
     <button class="p-btn" id="pPrev" title="上一首">⏮</button>
-    <button class="p-btn" id="pNext" title="下一首">⏭</button>
     <button class="p-btn p-skip" id="pBack" title="后退 15 秒">-15</button>
+    <button class="p-btn p-play" id="pPlay" title="播放 / 暂停">▶</button>
+    <button class="p-btn" id="pNext" title="下一首">⏭</button>
     <button class="p-btn p-skip" id="pFwd" title="前进 15 秒">+15</button>
   </div>
-  <div class="p-progress" id="pProgress"><div class="p-fill" id="pFill"></div><div class="p-thumb" id="pThumb"></div></div>
-  <div class="p-status" id="pStatus">暂未播放</div>
+  <!-- 第3行：进度条 + 两端分秒数字 -->
+  <div class="p-time-row">
+    <span class="p-time" id="pTimeCur">0:00</span>
+    <div class="p-progress" id="pProgress"><div class="p-fill" id="pFill"></div><div class="p-thumb" id="pThumb"></div></div>
+    <span class="p-time" id="pTimeDur">0:00</span>
+  </div>
+  <!-- 第4行：播放列表开关（默认收起，点击展开） -->
+  <div class="p-pl-row">
+    <button class="p-pl-toggle" id="pPlToggle">📋 播放列表</button>
+    <span class="p-pl-hint" id="pPlHint">点击展开播放列表</span>
+    <span class="spacer"></span>
+    <button class="p-close" id="pClose" title="关闭播放器">✕</button>
+  </div>
+  <!-- 完整播放列表（点击开关展开） -->
+  <div class="p-playlist" id="pPlaylist"></div>
 </div>
 <button class="player-launch" id="playerLaunch">🎧 播放器</button>
 
@@ -811,8 +846,6 @@ function fmtTime(s){
 
 function showPlayer(){
   document.getElementById('player').classList.add('show');
-  document.getElementById('player').classList.remove('collapsed');
-  document.getElementById('pToggle').textContent = '▾';
 }
 function hidePlayer(){
   document.getElementById('player').classList.remove('show');
@@ -890,10 +923,12 @@ document.getElementById('pFwd').onclick = function(){
 };
 
 playerAudio.addEventListener('timeupdate', function(){
-  var pct = playerAudio.duration ? (playerAudio.currentTime / playerAudio.duration * 100) : 0;
+  var dur = playerAudio.duration || 0;
+  var pct = dur ? (playerAudio.currentTime / dur * 100) : 0;
   document.getElementById('pFill').style.width = pct + '%';
   document.getElementById('pThumb').style.left = pct + '%';
-  document.getElementById('pTime').textContent = fmtTime(playerAudio.currentTime) + ' / ' + fmtTime(playerAudio.duration);
+  document.getElementById('pTimeCur').textContent = fmtTime(playerAudio.currentTime);
+  document.getElementById('pTimeDur').textContent = fmtTime(dur);
 });
 playerAudio.addEventListener('ended', function(){
   // 自动连播下一首
@@ -912,6 +947,9 @@ function seekFromEvent(ev){
   var x = (ev.touches && ev.touches.length) ? ev.touches[0].clientX : ev.clientX;
   var ratio = Math.min(1, Math.max(0, (x - rect.left) / rect.width));
   playerAudio.currentTime = ratio * playerAudio.duration;
+  // 立即同步两端时间数字（拖动时反馈更顺滑）
+  document.getElementById('pTimeCur').textContent = fmtTime(playerAudio.currentTime);
+  document.getElementById('pTimeDur').textContent = fmtTime(playerAudio.duration);
 }
 pProg.addEventListener('mousedown', function(ev){ pDragging = true; seekFromEvent(ev); });
 pProg.addEventListener('touchstart', function(ev){ pDragging = true; seekFromEvent(ev); }, {passive:true});
@@ -934,19 +972,18 @@ function renderPlist(){
     it.onclick = function(){ playTrack(parseInt(it.dataset.idx, 10)); };
   });
 }
-// 收起 / 展开
-document.getElementById('pToggle').onclick = function(){
+// 播放列表：点击展开 / 收起（默认收起）
+document.getElementById('pPlToggle').onclick = function(){
   var p = document.getElementById('player');
-  var collapsed = p.classList.toggle('collapsed');
-  this.textContent = collapsed ? '▴' : '▾';
+  var open = p.classList.toggle('pl-open');
+  document.getElementById('pPlaylist').classList.toggle('open', open);
+  document.getElementById('pPlHint').textContent = open ? '点击收起播放列表' : '点击展开播放列表';
 };
 // 关闭播放器（音频继续后台播放，可用悬浮按钮重新打开）
 document.getElementById('pClose').onclick = hidePlayer;
-// 悬浮按钮：打开 / 展开播放器
+// 悬浮按钮：打开播放器
 document.getElementById('playerLaunch').onclick = function(){
   document.getElementById('player').classList.add('show');
-  document.getElementById('player').classList.remove('collapsed');
-  document.getElementById('pToggle').textContent = '▾';
 };
 
 // 顶栏品牌点击返回主页
@@ -987,7 +1024,6 @@ document.getElementById('sidebarClose').onclick = function(){ closeSidebar(); };
 document.getElementById('sidebarOverlay').onclick = function(){ closeSidebar(); };
 
 // ---- 初始化 ----
-document.getElementById('pCount').textContent = '（' + AUDIO_TRACKS.length + '）';
 renderNav();
 var home = TREE.children && TREE.children.find(function(c){ return c.is_index; });
 show(home ? home.slug : PAGES[0].slug);
