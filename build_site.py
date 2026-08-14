@@ -199,6 +199,9 @@ def discover_pages():
             fallback = re.sub(r"🔊\s*", "", f[:-3]).strip()
             title = meta.get("title") or fallback or rel
             title = title.strip('"').strip()
+            # Obsidian 文件名尾缀 "X/x" 仅标识未配置录音语音文件，发布页不显示该标记
+            # （slug 保留原文件名以维持站内 wikilink 一致，仅剥离展示用标题）
+            title = re.sub(r"[Xx]$", "", title).strip()
             slug = rel[:-3]
             slug = re.sub(r"🔊\s*", "", slug)
             slug = "/".join(seg.strip() for seg in slug.split("/"))
@@ -337,6 +340,8 @@ a:hover{color:var(--accent-soft)}
   box-shadow:inset 3px 0 0 var(--gold)}
 .nav .dir-name.active{background:var(--accent); color:#fff; text-decoration:none;
   box-shadow:inset 3px 0 0 var(--gold)}
+.nav .dir-name.active:hover{background:var(--accent); color:#fff; text-decoration:none;
+  box-shadow:inset 3px 0 0 var(--gold)}
 .nav .group-label{font-size:1rem; color:var(--ink-faint); letter-spacing:.1em;
   padding:.9rem .6rem .3rem; font-weight:600}
 /* 目录项：仅显示目录（不显示文章列表）；按层级区分字号/字重/颜色/缩进 */
@@ -463,6 +468,10 @@ a:hover{color:var(--accent-soft)}
 .player .pl-item.playing .pl-idx{color:var(--accent)}
 .player .pl-item .pl-dot{width:7px; height:7px; border-radius:50%; background:var(--turq-soft); flex:0 0 7px}
 .player .pl-item.playing .pl-dot{background:var(--turq)}
+/* 播放列表「正在播放」那一行右侧的关闭叉号 */
+.player .pl-close{margin-left:auto; border:none; background:none; cursor:pointer;
+  color:var(--ink-soft); font-size:1.15rem; line-height:1; padding:.1rem .4rem; border-radius:6px}
+.player .pl-close:hover{background:var(--surface-hover); color:var(--ink)}
 /* 悬浮打开播放器按钮 */
 .player-launch{position:fixed; right:1.1rem; bottom:1.1rem; z-index:41;
   background:var(--accent); color:#fff; border:none; cursor:pointer;
@@ -544,6 +553,12 @@ a:hover{color:var(--accent-soft)}
   .player .p-btn.p-play{width:3.9rem; height:3.9rem; font-size:1.45rem}
   .player .p-btn.p-skip{width:3.5rem; height:3.5rem; font-size:1.05rem}
   .player-launch{font-size:.9rem; padding:.6rem .9rem}
+  /* 移动端：避免右上角字号按钮挤压网站名 —— 隐藏「字号」字样、压缩药丸、品牌名省略号 */
+  .topbar{gap:.4rem; padding:.6rem .9rem}
+  .brand{flex:1 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:.92rem}
+  .fs-cap{display:none}
+  .fs-pill{padding:.05rem .15rem; gap:0}
+  .fs-pill button{width:1.7rem; height:1.7rem; font-size:.9rem}
 }
 </style>
 </head>
@@ -581,8 +596,8 @@ a:hover{color:var(--accent-soft)}
     <button class="p-btn" id="pPrev" title="上一首">⏮</button>
     <button class="p-btn p-skip" id="pBack" title="后退 15 秒">-15</button>
     <button class="p-btn p-play" id="pPlay" title="播放 / 暂停">▶</button>
-    <button class="p-btn" id="pNext" title="下一首">⏭</button>
     <button class="p-btn p-skip" id="pFwd" title="前进 15 秒">+15</button>
+    <button class="p-btn" id="pNext" title="下一首">⏭</button>
   </div>
   <!-- 第3行：进度条 + 两端分秒数字 -->
   <div class="p-time-row">
@@ -592,10 +607,9 @@ a:hover{color:var(--accent-soft)}
   </div>
   <!-- 第4行：播放列表开关（默认收起，点击展开） -->
   <div class="p-pl-row">
-    <button class="p-pl-toggle" id="pPlToggle">📋 播放列表</button>
-    <span class="p-pl-hint" id="pPlHint">点击展开播放列表</span>
+    <button class="p-pl-toggle" id="pPlToggle">📋 播放列表 <span class="p-pl-hint" id="pPlHint">点击展开播放列表</span></button>
     <span class="spacer"></span>
-    <button class="p-close" id="pClose" title="关闭播放器">✕</button>
+    <button class="p-close" id="pClose" title="关闭播放器" style="display:none">✕</button>
   </div>
   <!-- 完整播放列表（点击开关展开） -->
   <div class="p-playlist" id="pPlaylist"></div>
@@ -646,6 +660,23 @@ function firstPageUnder(pathPrefix){
 function cleanDirName(name){
   return name.replace(/^\d+(?:\.\d+)*\.?\s*/, '');
 }
+// 导航悬停底色：自适应每项文字颜色，保证文字与底色对比清晰、不融合
+function navTextRGB(el){
+  var c = getComputedStyle(el).color, m = c.match(/\d+/g);
+  return [+m[0], +m[1], +m[2]];
+}
+// 依据背景亮度返回对比足够的文字色（浅底→深棕，深底→白）
+function contrastInk(r, g, b){
+  var f = function(c){ c /= 255; return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); };
+  var L = 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b);
+  return L > 0.45 ? '#3b2a22' : '#ffffff';
+}
+// 比空闲底色更深的同色调色块（文字色混入 24% 到暖白底），既「更深」又自适应文字色
+function navHoverBg(el){
+  var rgb = navTextRGB(el);
+  var mix = function(x){ return Math.round(x * 0.24 + 245 * 0.76); };
+  return 'rgb(' + mix(rgb[0]) + ',' + mix(rgb[1]) + ',' + mix(rgb[2]) + ')';
+}
 function renderNav(){
   var nav = document.getElementById('nav');
   // 一级目录固定顺序（与首页导览一致）；其余新增目录按名称追加在末尾
@@ -694,6 +725,17 @@ function renderNav(){
   nav.innerHTML = arr.join('');
   nav.querySelectorAll('.dir-name').forEach(function(a){
     a.onclick = function(){ show(a.dataset.slug); closeSidebar(); };
+    // 悬停：按该项文字色生成更深色块并选配对比文字，松开即恢复
+    a.addEventListener('mouseenter', function(){
+      if (a.classList.contains('active')) return;
+      var m = navHoverBg(a).match(/\d+/g);
+      a.style.background = 'rgb(' + m[0] + ',' + m[1] + ',' + m[2] + ')';
+      a.style.color = contrastInk(+m[0], +m[1], +m[2]);
+    });
+    a.addEventListener('mouseleave', function(){
+      a.style.background = '';
+      a.style.color = '';
+    });
   });
 }
 
@@ -915,17 +957,20 @@ function fmtTime(s){
 function showPlayer(){
   document.getElementById('player').classList.add('show');
   document.getElementById('playerMini').classList.remove('show');
+  updateCloseBtn();
   refreshLaunch();
 }
 function hidePlayer(){
   document.getElementById('player').classList.remove('show');
   document.getElementById('playerMini').classList.remove('show');
+  updateCloseBtn();
   refreshLaunch();
 }
 // 折叠为底部迷你条：整屏播放器收起，音频继续后台播放
 function minimizePlayer(){
   document.getElementById('player').classList.remove('show');
   document.getElementById('playerMini').classList.add('show');
+  updateCloseBtn();
   updateMini();
   refreshLaunch();
 }
@@ -1057,15 +1102,31 @@ window.addEventListener('touchend', function(){ pDragging = false; pDragEl = nul
 function renderPlist(){
   var box = document.getElementById('pPlaylist');
   var arr = AUDIO_TRACKS.map(function(t, i){
-    return '<div class="pl-item' + (i === curIdx ? ' playing' : '') + '" data-idx="' + i + '">'
+    var playing = (i === curIdx);
+    // 关闭叉号放在「正在播放」那一行（要求：移至最上方正在播放行）
+    var closeBtn = playing ? '<button class="pl-close" title="关闭播放器">✕</button>' : '';
+    return '<div class="pl-item' + (playing ? ' playing' : '') + '" data-idx="' + i + '">'
       + '<span class="pl-idx">' + (i + 1) + '</span>'
       + '<span class="pl-dot"></span>'
-      + '<span class="pl-title">' + esc(t.title) + '</span></div>';
+      + '<span class="pl-title">' + esc(t.title) + '</span>'
+      + closeBtn + '</div>';
   });
   box.innerHTML = arr.join('');
+  updateCloseBtn();
   box.querySelectorAll('.pl-item').forEach(function(it){
-    it.onclick = function(){ playTrack(parseInt(it.dataset.idx, 10)); };
+    it.onclick = function(ev){
+      if (ev.target.closest('.pl-close')){
+        if (curIdx >= 0) minimizePlayer(); else hidePlayer();
+        return;
+      }
+      playTrack(parseInt(it.dataset.idx, 10));
+    };
   });
+}
+// 关闭叉号归属：有曲目播放时显示在「正在播放」那一行；无曲目时退回播放器头部
+function updateCloseBtn(){
+  var pc = document.getElementById('pClose');
+  if (pc) pc.style.display = (curIdx < 0) ? '' : 'none';
 }
 // 播放列表：点击展开 / 收起（默认收起）
 document.getElementById('pPlToggle').onclick = function(){
