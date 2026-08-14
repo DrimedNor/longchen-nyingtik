@@ -68,7 +68,7 @@ def inline(text):
             # 本地存在 → 播放按钮（触发全局播放器）；否则跳转昌列寺
             fname = target.split("/")[-1].strip()
             if fname in LOCAL_AUDIO:
-                return ('<button class="play-btn" data-audio="%s">▶ 播放本篇开示</button>'
+                return ('<button class="play-btn" data-audio="%s">▶ 播放</button>'
                         % html_mod.escape(fname, quote=True))
             return ('<a class="audio-jump" href="%s" target="_blank" rel="noopener">'
                     '🎧 收听音频（跳转昌列寺）</a>' % CHANGLESI_ALBUM)
@@ -339,13 +339,19 @@ a:hover{color:var(--accent-soft)}
 .nav a{display:block; padding:.4rem .6rem; border-radius:6px; color:var(--ink-soft);
   font-size:1.05rem; cursor:pointer}
 .nav a:hover{background:var(--surface-hover); color:var(--ink)}
-.nav a.active{background:var(--accent); color:#fff; text-decoration:none;
+/* 选中态：深红底 + 白字（反色高亮）。加 [data-depth] 提升特异性，压过 .dir-name[data-depth] 的层级配色，
+   确保鼠标移开后白字仍稳定显示，不回落到层级深红字（否则红底深红字几乎不可读）。 */
+.nav a.active,
+.nav a.active[data-depth]{background:var(--accent); color:#fff; text-decoration:none;
   box-shadow:inset 3px 0 0 var(--gold)}
-.nav a.active:hover{background:var(--accent); color:#fff; text-decoration:none;
+.nav a.active:hover,
+.nav a.active[data-depth]:hover{background:var(--accent); color:#fff; text-decoration:none;
   box-shadow:inset 3px 0 0 var(--gold)}
-.nav .dir-name.active{background:var(--accent); color:#fff; text-decoration:none;
+.nav .dir-name.active,
+.nav .dir-name.active[data-depth]{background:var(--accent); color:#fff; text-decoration:none;
   box-shadow:inset 3px 0 0 var(--gold)}
-.nav .dir-name.active:hover{background:var(--accent); color:#fff; text-decoration:none;
+.nav .dir-name.active:hover,
+.nav .dir-name.active[data-depth]:hover{background:var(--accent); color:#fff; text-decoration:none;
   box-shadow:inset 3px 0 0 var(--gold)}
 .nav .group-label{font-size:1rem; color:var(--ink-faint); letter-spacing:.1em;
   padding:.9rem .6rem .3rem; font-weight:600}
@@ -461,6 +467,11 @@ a:hover{color:var(--accent-soft)}
 .player .p-close{border:none; background:none; cursor:pointer; color:var(--ink-soft);
   font-size:1.3rem; width:2.3rem; height:2.3rem; border-radius:8px; line-height:1}
 .player .p-close:hover{background:var(--surface-hover)}
+/* 播放模式切换按钮（状态栏左侧胶囊）：点击在 顺序/逆序/随机/单曲循环 间循环，并显示当前模式 */
+.player .p-mode{border:1px solid var(--gold); background:var(--surface); color:var(--gold-deep);
+  cursor:pointer; font-size:.85rem; padding:.2rem .7rem; border-radius:999px;
+  display:inline-flex; align-items:center; gap:.3rem; font-family:inherit; white-space:nowrap; transition:background .15s}
+.player .p-mode:hover{background:var(--surface-soft)}
 /* 播放列表（默认收起，点击展开） */
 .player .p-playlist{flex:1 1 auto; overflow-y:auto; -webkit-overflow-scrolling:touch;
   padding:.3rem 0; display:none}
@@ -600,8 +611,9 @@ a:hover{color:var(--accent-soft)}
 
 <!-- 全局播放器（默认占据下三分之一屏） -->
 <div class="player" id="player">
-  <!-- 第1行：状态栏 + 关闭叉号（播放器右上角） -->
+  <!-- 第1行：状态栏（左：播放模式 / 中：当前音频名 / 右：关闭叉号） -->
   <div class="p-status" id="pStatus">
+    <button class="p-mode" id="pMode" title="播放模式：顺序 / 逆序 / 随机 / 单曲循环（点击切换）">🔁 顺序</button>
     <span class="p-status-text" id="pStatusText">暂未播放</span>
     <button class="p-close" id="pClose" title="关闭播放器">✕</button>
   </div>
@@ -990,6 +1002,37 @@ var playerAudio = new Audio();
 playerAudio.preload = 'none';
 var curIdx = -1;
 
+// ---- 播放模式：顺序 / 逆序 / 随机 / 单曲循环 ----
+var PLAY_MODES = ['顺序', '逆序', '随机', '单曲'];
+var PLAY_ICONS = { '顺序':'🔁', '逆序':'🔄', '随机':'🔀', '单曲':'🔂' };
+var playMode = 0;
+function curMode(){ return PLAY_MODES[playMode]; }
+// 自动连播时计算的下一首（wrap=false：到边界即停止；单曲循环返回当前以重播）
+function autoNext(cur){
+  var n = AUDIO_TRACKS.length; if (n === 0) return -1;
+  if (curMode() === '单曲') return cur;
+  if (curMode() === '随机'){ var r = cur; while (n > 1 && r === cur) r = Math.floor(Math.random() * n); return r; }
+  if (curMode() === '逆序'){ var p = cur - 1; return p >= 0 ? p : -1; }
+  var q = cur + 1; return q < n ? q : -1;            // 顺序
+}
+// 手动上一首 / 下一首（始终在列表内循环，便于连续切歌；逆序模式方向相反）
+function manualNext(cur){
+  var n = AUDIO_TRACKS.length; if (n === 0) return -1;
+  if (curMode() === '逆序'){ var p = cur - 1; return p >= 0 ? p : n - 1; }
+  if (curMode() === '随机'){ var r = cur; while (n > 1 && r === cur) r = Math.floor(Math.random() * n); return r; }
+  var q = cur + 1; return q < n ? q : 0;            // 顺序 / 单曲 均向前
+}
+function manualPrev(cur){
+  var n = AUDIO_TRACKS.length; if (n === 0) return -1;
+  if (curMode() === '逆序'){ var q = cur + 1; return q < n ? q : 0; }
+  if (curMode() === '随机'){ var r = cur; while (n > 1 && r === cur) r = Math.floor(Math.random() * n); return r; }
+  var p = cur - 1; return p >= 0 ? p : n - 1;       // 顺序 / 单曲 均向后
+}
+function updateModeBtn(){
+  var b = document.getElementById('pMode');
+  if (b) b.textContent = PLAY_ICONS[curMode()] + ' ' + curMode();
+}
+
 function fmtTime(s){
   if (!isFinite(s) || s < 0) s = 0;
   var m = Math.floor(s / 60), sec = Math.floor(s % 60);
@@ -1062,7 +1105,7 @@ function updatePlayBtns(){
       active = (srcName === b.dataset.audio);
     }
     b.classList.toggle('playing', active);
-    b.textContent = active ? '⏸ 正在播放' : '▶ 播放本篇开示';
+    b.textContent = active ? '⏸ 播放中' : '▶ 播放';
   });
   // 首页/音频资源页的音频列表项
   document.querySelectorAll('.hn-audio').forEach(function(a){
@@ -1080,12 +1123,12 @@ document.getElementById('pPlay').onclick = function(){
   else { playerAudio.pause(); this.textContent = '▶'; }
 };
 document.getElementById('pNext').onclick = function(){
-  if (curIdx < 0) playTrack(0);
-  else playTrack((curIdx + 1) % AUDIO_TRACKS.length);
+  if (curIdx < 0){ if (AUDIO_TRACKS.length) playTrack(0); return; }
+  var n = manualNext(curIdx); if (n >= 0) playTrack(n);
 };
 document.getElementById('pPrev').onclick = function(){
-  if (curIdx < 0) playTrack(0);
-  else playTrack((curIdx - 1 + AUDIO_TRACKS.length) % AUDIO_TRACKS.length);
+  if (curIdx < 0){ if (AUDIO_TRACKS.length) playTrack(0); return; }
+  var n = manualPrev(curIdx); if (n >= 0) playTrack(n);
 };
 // 快退 15 秒
 document.getElementById('pBack').onclick = function(){
@@ -1108,8 +1151,10 @@ playerAudio.addEventListener('timeupdate', function(){
   document.getElementById('pmFill').style.width = pct + '%';
 });
 playerAudio.addEventListener('ended', function(){
-  // 自动连播下一首
-  if (curIdx >= 0 && curIdx < AUDIO_TRACKS.length - 1) playTrack(curIdx + 1);
+  // 依据当前播放模式自动连播：单曲循环重播本曲；顺序到末曲停止；逆序到首曲停止；随机取下一首
+  if (curMode() === '单曲'){ playerAudio.currentTime = 0; playerAudio.play(); return; }
+  var n = autoNext(curIdx);
+  if (n >= 0) playTrack(n);
   else { document.getElementById('pPlay').textContent = '▶'; updateMini(); }
 });
 playerAudio.addEventListener('play', function(){ document.getElementById('pPlay').textContent = '⏸'; updateMini(); });
@@ -1165,6 +1210,11 @@ document.getElementById('pPlToggle').onclick = function(){
 document.getElementById('pClose').onclick = function(){
   if (curIdx >= 0) minimizePlayer();
   else hidePlayer();
+};
+// 播放模式切换：点击在 顺序 / 逆序 / 随机 / 单曲循环 间循环，并刷新按钮文案
+document.getElementById('pMode').onclick = function(){
+  playMode = (playMode + 1) % PLAY_MODES.length;
+  updateModeBtn();
 };
 // 悬浮按钮：打开播放器
 document.getElementById('playerLaunch').onclick = function(){
@@ -1224,6 +1274,7 @@ document.getElementById('sidebarOverlay').onclick = function(){ closeSidebar(); 
 
 // ---- 初始化 ----
 renderNav();
+updateModeBtn();
 var home = TREE.children && TREE.children.find(function(c){ return c.is_index; });
 show(home ? home.slug : PAGES[0].slug);
 
