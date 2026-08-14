@@ -329,16 +329,16 @@ a:hover{color:var(--accent-soft)}
 /* 目录项：仅显示目录（不显示文章列表）；按层级区分字号/字重/颜色/缩进 */
 .nav .dir-name{display:flex; align-items:baseline; gap:.55rem; cursor:pointer;
   border-radius:6px; line-height:1.45; transition:background .15s}
-.nav .dir-name .dir-num{font-variant-numeric:tabular-nums; font-weight:700; color:var(--accent); flex:0 0 auto}
+.nav .dir-name .dir-num{font-variant-numeric:tabular-nums; font-weight:700; color:inherit; flex:0 0 auto}
 .nav .dir-name .dir-label{flex:1; min-width:0; word-break:break-word}
-/* 一级：最大、藏红、加粗；二级：酱红、中字重、缩进；三级：红褐、弱字重、更深缩进 */
-.nav .dir-name[data-depth="0"]{font-size:1.7rem; font-weight:700; color:var(--accent);
+/* 层级配色：字体越大（层级越高）颜色越深 —— 一级最深 #5e1f26 → 四级最浅 #b0817d */
+.nav .dir-name[data-depth="0"]{font-size:1.7rem; font-weight:700; color:#5e1f26;
   padding:.55rem .5rem .3rem; letter-spacing:.02em}
-.nav .dir-name[data-depth="1"]{font-size:1.3rem; font-weight:600; color:var(--ink);
+.nav .dir-name[data-depth="1"]{font-size:1.3rem; font-weight:600; color:#722f37;
   padding:.5rem .5rem .25rem 1.2rem}
-.nav .dir-name[data-depth="2"]{font-size:1.08rem; font-weight:500; color:var(--ink-soft);
+.nav .dir-name[data-depth="2"]{font-size:1.08rem; font-weight:500; color:#9a4a52;
   padding:.4rem .5rem .2rem 2.3rem}
-.nav .dir-name[data-depth="3"]{font-size:1rem; font-weight:500; color:var(--ink-faint);
+.nav .dir-name[data-depth="3"]{font-size:1rem; font-weight:500; color:#b0817d;
   padding:.35rem .5rem .2rem 3.4rem}
 .nav .dir-name:hover{background:var(--surface-hover)}
 /* 移动端抽屉式侧栏的关闭按钮（仅移动端显示）与遮罩 */
@@ -446,11 +446,11 @@ a:hover{color:var(--accent-soft)}
 .hn-sec-title{font-size:1.15em; font-weight:700; color:var(--ink); margin:0 0 .3rem;
   display:flex; align-items:center; gap:.5rem; letter-spacing:.02em}
 .hn-desc{color:var(--ink-faint); font-size:.88em; margin:0 0 .8rem}
-.hn-dir{font-size:.82em; color:var(--accent); font-weight:700; letter-spacing:.05em;
+.hn-dir{font-size:.82em; color:#b0817d; font-weight:700; letter-spacing:.05em;
   margin:.9rem 0 .35rem}
-.hn-dir[data-depth="0"]{margin-top:.5rem; font-size:1.05em; color:var(--accent)}
-.hn-dir[data-depth="1"]{margin-top:.7rem; font-size:.98em; color:var(--ink); font-weight:600}
-.hn-dir[data-depth="2"]{margin-top:.55rem; font-size:.9em; color:var(--ink-soft); font-weight:500}
+.hn-dir[data-depth="0"]{margin-top:.5rem; font-size:1.05em; color:#5e1f26}
+.hn-dir[data-depth="1"]{margin-top:.7rem; font-size:.98em; color:#722f37; font-weight:600}
+.hn-dir[data-depth="2"]{margin-top:.55rem; font-size:.9em; color:#9a4a52; font-weight:500}
 .hn-link{display:flex; align-items:center; gap:.4rem; padding:.42rem .7rem;
   border-radius:8px; color:var(--ink-soft); font-size:.95em; cursor:pointer;
   border:1px solid transparent; transition:all .15s}
@@ -689,14 +689,19 @@ function renderBreadcrumb(p){
 }
 
 // ---- 首页导览：递归渲染目录树为可点击板块（同样统一层级序号）----
-function walkBlock(node, depth, parentNum){
+function walkBlock(node, prefix, depth, parentNum){
   var arr = [];
   var names = (node.dirs ? Object.keys(node.dirs) : []).slice().sort();
   names.forEach(function(name, idx){
     var sub = node.dirs[name];
     var num = parentNum ? (parentNum + '.' + (idx + 1)) : String(idx + 1);
+    var full = (prefix ? prefix + '/' : '') + name;
+    var target = full + '/index';
+    if (!bySlug[target]) target = firstPageUnder(full);
+    var hasSub = sub.dirs && Object.keys(sub.dirs).length;
+    if (!target && !hasSub) return;   // 空目录（无 index / 无首篇 / 无子目录）→ 跳过
     arr.push('<div class="hn-dir" data-depth="' + depth + '">' + esc(num) + '. ' + esc(cleanDirName(name)) + '</div>');
-    walkBlock(sub, depth + 1, num).forEach(function(x){ arr.push(x); });
+    walkBlock(sub, full, depth + 1, num).forEach(function(x){ arr.push(x); });
   });
   (node.children || []).forEach(function(c){
     if (c.type === 'page' && !c.is_index){
@@ -711,37 +716,45 @@ function walkBlock(node, depth, parentNum){
 
 function renderHomeNav(){
   var html = [];
-  // 板块一：上师开示
-  if (TREE.dirs['上师开示']){
-    html.push('<section class="hn-sec">');
-    html.push('<h2 class="hn-sec-title">📖 上师开示</h2>');
-    html.push('<p class="hn-desc">按主题整理的上师开示，点击标题直接阅读。</p>');
-    html.push('<ul class="hn-tips">'
-      + '<li>🔊 带有小喇叭标志的文章表示有配套音频，可直接点击收听；</li>'
-      + '<li>未带小喇叭标志的文章暂无音频，正在陆续添加中，敬请期待。</li>'
-      + '</ul>');
-    walkBlock(TREE.dirs['上师开示'], 0, '').forEach(function(x){ html.push(x); });
-    html.push('</section>');
-  }
-  // 板块二：音频资料（独立音频列表，点击直接播放）
-  html.push('<section class="hn-sec">');
-  html.push('<h2 class="hn-sec-title">🎧 音频资料</h2>');
-  html.push('<p class="hn-desc">文字转语音版开示，点击标题即可在当前页面直接收听，也可用底部播放器连播。</p>');
-  html.push('<p class="audio-note">因为服务器在国外，缓冲需要时间，请耐心等一会儿。</p>');
-  AUDIO_TRACKS.forEach(function(t, i){
-    html.push('<a class="hn-link hn-audio" data-idx="' + i + '">🔊 ' + esc(t.title) + '</a>');
+  // 每个顶层目录板块的定制元信息（未配置的目录使用默认图标/说明）
+  var META = {
+    '上师开示': {icon:'📖', title:'上师开示', desc:'按主题整理的上师开示，点击标题直接阅读。', tips:true},
+    '音频资源': {icon:'🎧', title:'音频资料', desc:'文字转语音版开示，点击标题即可在当前页面直接收听，也可用底部播放器连播。', audio:true, note:true},
+    '书籍': {icon:'📚', title:'书籍', desc:'精选读物与参考资料，点击进入查看。'}
+  };
+  // 固定首页板块顺序：已知板块优先，新增目录排在末尾
+  var ORDER = ['上师开示', '音频资源', '书籍', '龙钦宁提传承'];
+  var dirNames = Object.keys(TREE.dirs).sort(function(a, b){
+    var ia = ORDER.indexOf(a), ib = ORDER.indexOf(b);
+    if (ia < 0) ia = 99; if (ib < 0) ib = 99;
+    return ia - ib;
   });
-  html.push('<div class="album-card"><div class="t">《大圆满前行》有声书（226 集）</div>'
-    + '<div class="d">嘎玛仁波切译 · 昌列寺收录。因音频体积较大，点击前往昌列寺官网在线收听。</div>'
-    + '<a href="' + AUDIO_ALBUM + '" target="_blank" rel="noopener">前往昌列寺收听 ↗</a></div>');
-  html.push('</section>');
-  // 板块三：书籍
-  if (TREE.dirs['书籍']){
+  dirNames.forEach(function(dirName){
+    var node = TREE.dirs[dirName];
+    var hasSub = node.dirs && Object.keys(node.dirs).length;
+    var hasPages = node.children && node.children.length;
+    if (!hasSub && !hasPages) return;   // 完全无内容的顶层目录不显示在首页
+    var meta = META[dirName] || {icon:'📜', title:cleanDirName(dirName), desc:'点击进入查看相关内容。'};
     html.push('<section class="hn-sec">');
-    html.push('<h2 class="hn-sec-title">📚 书籍</h2>');
-    walkBlock(TREE.dirs['书籍'], 0, '').forEach(function(x){ html.push(x); });
+    html.push('<h2 class="hn-sec-title">' + meta.icon + ' ' + esc(meta.title) + '</h2>');
+    if (meta.desc) html.push('<p class="hn-desc">' + meta.desc + '</p>');
+    if (meta.tips){
+      html.push('<ul class="hn-tips"><li>🔊 带有小喇叭标志的文章表示有配套音频，可直接点击收听；</li>'
+        + '<li>未带小喇叭标志的文章暂无音频，正在陆续添加中，敬请期待。</li></ul>');
+    }
+    if (meta.audio){
+      if (meta.note) html.push('<p class="audio-note">因为服务器在国外，缓冲需要时间，请耐心等一会儿。</p>');
+      AUDIO_TRACKS.forEach(function(t, i){
+        html.push('<a class="hn-link hn-audio" data-idx="' + i + '">🔊 ' + esc(t.title) + '</a>');
+      });
+      html.push('<div class="album-card"><div class="t">《大圆满前行》有声书（226 集）</div>'
+        + '<div class="d">嘎玛仁波切译 · 昌列寺收录。因音频体积较大，点击前往昌列寺官网在线收听。</div>'
+        + '<a href="' + AUDIO_ALBUM + '" target="_blank" rel="noopener">前往昌列寺收听 ↗</a></div>');
+    } else {
+      walkBlock(node, dirName, 0, '').forEach(function(x){ html.push(x); });
+    }
     html.push('</section>');
-  }
+  });
   return '<div class="home-nav">' + html.join('') + '</div>';
 }
 
