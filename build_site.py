@@ -313,23 +313,26 @@ a:hover{color:var(--accent-soft)}
 /* 布局 */
 .layout{display:flex; min-height:calc(100vh - 53px)}
 .sidebar{
-  width:264px; flex:0 0 264px; border-right:1px solid var(--line); padding:1.3rem .9rem;
+  width:300px; flex:0 0 300px; border-right:1px solid var(--line); padding:1.6rem 1.1rem;
   overflow-y:auto; position:sticky; top:53px; height:calc(100vh - 53px); background:var(--bg);
 }
-.sidebar .search{width:100%; padding:.5rem .7rem; border:1px solid var(--line);
-  border-radius:8px; font-size:.9rem; background:#fff; color:var(--ink); margin-bottom:1rem;
+.sidebar .search{width:100%; padding:.6rem .8rem; border:1px solid var(--line);
+  border-radius:8px; font-size:1.05rem; background:#fff; color:var(--ink); margin-bottom:1.2rem;
   outline:none}
 .sidebar .search:focus{border-color:var(--accent-soft)}
-.nav a{display:block; padding:.32rem .55rem; border-radius:6px; color:var(--ink-soft);
-  font-size:.9rem; cursor:pointer}
+.nav a{display:block; padding:.4rem .6rem; border-radius:6px; color:var(--ink-soft);
+  font-size:1.05rem; cursor:pointer}
 .nav a:hover{background:var(--surface-hover); color:var(--ink)}
 .nav a.active{background:var(--accent); color:#fff; text-decoration:none}
-.nav .group-label{font-size:.75rem; color:var(--ink-faint); letter-spacing:.1em;
-  padding:.7rem .55rem .2rem; font-weight:600}
-.nav .dir-name{font-size:.78rem; color:var(--accent); padding:.55rem .55rem .1rem; font-weight:600}
+.nav .group-label{font-size:1rem; color:var(--ink-faint); letter-spacing:.1em;
+  padding:.9rem .6rem .3rem; font-weight:600}
+/* 目录项：仅显示目录，字体放大 ≥2 倍，点击跳转该目录首页 */
+.nav .dir-name{font-size:1.6rem; color:var(--accent); padding:.7rem .6rem .25rem; font-weight:600;
+  cursor:pointer; border-radius:6px; line-height:1.4}
+.nav .dir-name:hover{background:var(--surface-hover); color:var(--ink)}
 
 /* 内容区 */
-.content{flex:1; padding:2.6rem clamp(1.4rem, 6vw, 4.5rem) 6.5rem; max-width:820px; margin:0 auto}
+.content{flex:1; padding:2.6rem clamp(1.4rem, 6vw, 4.5rem) 9rem; max-width:820px; margin:0 auto}
 .article h1{font-size:1.85em; margin:.1rem 0 .7rem; line-height:1.35; font-weight:700}
 .article h2{font-size:1.3em; margin:1.7em 0 .6em; padding-bottom:.35em; border-bottom:1px solid var(--line); font-weight:600}
 .article h3{font-size:1.1em; margin:1.5em 0 .4em; font-weight:600}
@@ -378,23 +381,23 @@ a:hover{color:var(--accent-soft)}
   border-top:1px solid var(--line); box-shadow:0 -2px 12px rgba(0,0,0,.05);
   transform:translateY(100%); transition:transform .25s}
 .player.show{transform:translateY(0)}
-.player .p-bar{display:flex; align-items:center; gap:.7rem; padding:.55rem 1.2rem;
+.player .p-bar{display:flex; align-items:center; gap:1rem; padding:1rem 1.4rem;
   max-width:960px; margin:0 auto}
 .player .p-info{flex:1; min-width:0}
-.player .p-title{font-size:.92em; color:var(--ink); font-weight:600; white-space:nowrap;
+.player .p-title{font-size:1.25em; color:var(--ink); font-weight:600; white-space:nowrap;
   overflow:hidden; text-overflow:ellipsis}
-.player .p-sub{font-size:.78em; color:var(--ink-faint)}
-.player .p-progress{height:3px; background:var(--line); border-radius:2px; margin-top:.4rem; cursor:pointer; position:relative}
+.player .p-sub{font-size:.95em; color:var(--ink-faint)}
+.player .p-progress{height:4px; background:var(--line); border-radius:2px; margin-top:.5rem; cursor:pointer; position:relative}
 .player .p-progress .p-fill{position:absolute; left:0; top:0; bottom:0; background:var(--accent);
   border-radius:2px; width:0%}
 .player .p-btn{border:none; background:none; cursor:pointer; color:var(--ink);
-  font-size:1.15rem; width:2.4rem; height:2.4rem; border-radius:50%; line-height:1;
+  font-size:1.8rem; width:4rem; height:4rem; border-radius:50%; line-height:1;
   display:flex; align-items:center; justify-content:center; transition:background .15s}
 .player .p-btn:hover{background:var(--surface-hover)}
-.player .p-btn.p-play{width:2.9rem; height:2.9rem; background:var(--accent); color:#fff; font-size:1.1rem}
+.player .p-btn.p-play{width:4.8rem; height:4.8rem; background:var(--accent); color:#fff; font-size:1.6rem}
 .player .p-btn.p-play:hover{background:var(--accent-soft)}
-.player .p-time{font-size:.78em; color:var(--ink-faint); white-space:nowrap}
-.player .p-listbtn{font-size:1rem}
+.player .p-time{font-size:.95em; color:var(--ink-faint); white-space:nowrap}
+.player .p-listbtn{font-size:1.4rem}
 
 /* 播放列表弹层 */
 .plist{position:fixed; left:0; right:0; bottom:0; z-index:39; background:var(--surface);
@@ -404,8 +407,8 @@ a:hover{color:var(--accent-soft)}
 .plist .pl-head{display:flex; align-items:center; justify-content:space-between;
   padding:.8rem 1.2rem; border-bottom:1px solid var(--line); font-weight:600}
 .plist .pl-close{border:none; background:none; cursor:pointer; color:var(--ink-soft); font-size:1.2rem}
-.plist .pl-item{display:flex; align-items:center; gap:.6rem; padding:.65rem 1.2rem;
-  cursor:pointer; border-bottom:1px solid var(--line); color:var(--ink-soft); font-size:.94em}
+.plist .pl-item{display:flex; align-items:center; gap:.8rem; padding:1rem 1.4rem;
+  cursor:pointer; border-bottom:1px solid var(--line); color:var(--ink-soft); font-size:1.25em}
 .plist .pl-item:hover{background:var(--surface-soft)}
 .plist .pl-item.playing{color:var(--accent); font-weight:600; background:var(--surface-soft)}
 .plist .pl-item .pl-dot{width:6px; height:6px; border-radius:50%; background:var(--accent-soft); flex:0 0 6px}
@@ -440,10 +443,12 @@ a:hover{color:var(--accent-soft)}
   background:var(--accent-soft); flex:0 0 5px; opacity:.6}
 .hn-link:hover::before{background:var(--accent); opacity:1}
 .hn-audio{cursor:pointer}
+.hn-link.hn-audio{font-size:1.2em; padding:.85rem 1rem}
 .hn-audio.playing{color:var(--accent); font-weight:600; background:var(--surface-soft); border-color:var(--accent-soft)}
 .hn-audio.playing::before{background:var(--accent); opacity:1}
 .audio-list{margin-top:.5rem}
-.audio-list-title{font-size:.88em; color:var(--ink-faint); margin:1.2rem 0 .5rem; font-weight:600}
+.audio-list-title{font-size:.95em; color:var(--ink-faint); margin:1.2rem 0 .5rem; font-weight:600}
+.audio-note{color:var(--ink-soft); font-size:.95em; margin:.6rem 0 1rem; line-height:1.7}
 
 /* 移动端 */
 @media(max-width:760px){
@@ -451,9 +456,12 @@ a:hover{color:var(--accent-soft)}
   .sidebar{position:fixed; left:0; top:53px; bottom:0; transform:translateX(-100%);
     transition:transform .2s; z-index:15; width:260px; background:var(--bg)}
   .sidebar.open{transform:translateX(0)}
-  .content{padding:1.6rem 1.1rem 6rem}
+  .nav .dir-name{font-size:1.35rem}
+  .content{padding:1.6rem 1.1rem 9rem}
   .welcome .big{font-size:1.7em}
-  .player .p-bar{padding:.5rem .7rem; gap:.45rem}
+  .player .p-bar{padding:.7rem .8rem; gap:.5rem}
+  .player .p-btn{width:3.2rem; height:3.2rem; font-size:1.4rem}
+  .player .p-btn.p-play{width:3.8rem; height:3.8rem; font-size:1.3rem}
   .player .p-time{display:none}
   .player .p-sub{display:none}
 }
@@ -469,6 +477,7 @@ a:hover{color:var(--accent-soft)}
     <span class="fs-cap">字号</span>
     <button id="fsInc" title="放大字号">A+</button>
   </div>
+  <span id="hitStat" style="display:none; font-size:.82rem; color:var(--ink-faint); white-space:nowrap; margin-left:.4rem"></span>
 </div>
 
 <div class="layout">
@@ -484,7 +493,9 @@ a:hover{color:var(--accent-soft)}
   <div class="p-bar">
     <button class="p-btn" id="pListBtn" title="播放列表">☰</button>
     <button class="p-btn" id="pPrev" title="上一首">⏮</button>
+    <button class="p-btn" id="pBack" title="快退 15 秒">⏪</button>
     <button class="p-btn p-play" id="pPlay" title="播放/暂停">▶</button>
+    <button class="p-btn" id="pFwd" title="快进 15 秒">⏩</button>
     <button class="p-btn" id="pNext" title="下一首">⏭</button>
     <div class="p-info">
       <div class="p-title" id="pTitle">未播放</div>
@@ -523,25 +534,34 @@ applyFs();
 document.getElementById('fsInc').onclick = function(){ fsVal = Math.min(FS_MAX, fsVal + FS_STEP); applyFs(); };
 document.getElementById('fsDec').onclick = function(){ fsVal = Math.max(FS_MIN, fsVal - FS_STEP); applyFs(); };
 
-// ---- 渲染目录树 ----
+// ---- 渲染目录树（仅显示目录，不显示文章列表）----
+// 目录优先跳转到自身的 index 页；若无 index，则跳到该目录下第一篇开示；
+// 完全无内容的目录则不显示，避免出现无法点击的死项。
+function firstPageUnder(pathPrefix){
+  var list = PAGES.filter(function(p){
+    return p.slug.indexOf(pathPrefix + '/') === 0 && p.slug !== pathPrefix + '/index';
+  });
+  list.sort(function(a, b){ return a.slug < b.slug ? -1 : 1; });
+  return list.length ? list[0].slug : null;
+}
 function renderNav(){
   var nav = document.getElementById('nav');
-  function walk(node, htmlArr){
+  function walk(node, prefix, htmlArr){
     (node.dirs ? Object.keys(node.dirs) : []).forEach(function(name){
       var sub = node.dirs[name];
-      htmlArr.push('<div class="dir-name">' + esc(name) + '</div>');
-      walk(sub, htmlArr);
-    });
-    (node.children || []).forEach(function(c){
-      if (c.type === 'page'){
-        htmlArr.push('<a class="nav-link" data-slug="' + esc(c.slug) + '">' + esc(c.title) + '</a>');
+      var full = (prefix ? prefix + '/' : '') + name;
+      var target = full + '/index';
+      if (!bySlug[target]) target = firstPageUnder(full);
+      if (target){
+        htmlArr.push('<div class="dir-name" data-slug="' + esc(target) + '">' + esc(name) + '</div>');
+        walk(sub, full, htmlArr);
       }
     });
     return htmlArr;
   }
-  var arr = walk(TREE, []);
+  var arr = walk(TREE, '', []);
   nav.innerHTML = arr.join('');
-  nav.querySelectorAll('.nav-link').forEach(function(a){
+  nav.querySelectorAll('.dir-name').forEach(function(a){
     a.onclick = function(){ show(a.dataset.slug); closeSidebar(); };
   });
 }
@@ -671,6 +691,7 @@ function renderHomeNav(){
   html.push('<section class="hn-sec">');
   html.push('<h2 class="hn-sec-title">🎧 音频资料</h2>');
   html.push('<p class="hn-desc">文字转语音版开示，点击标题即可在当前页面直接收听，也可用底部播放器连播。</p>');
+  html.push('<p class="audio-note">因为服务器在国外，缓冲需要时间，请耐心等一会儿。</p>');
   AUDIO_TRACKS.forEach(function(t, i){
     html.push('<a class="hn-link hn-audio" data-idx="' + i + '">🔊 ' + esc(t.title) + '</a>');
   });
@@ -694,7 +715,9 @@ function renderAudioList(){
   var items = AUDIO_TRACKS.map(function(t, i){
     return '<a class="hn-link hn-audio" data-idx="' + i + '">🔊 ' + esc(t.title) + '</a>';
   }).join('');
-  return '<div class="audio-list"><div class="audio-list-title">全部开示音频（' + AUDIO_TRACKS.length + ' 篇）</div>' + items + '</div>';
+  return '<div class="audio-list"><div class="audio-list-title">全部开示音频（' + AUDIO_TRACKS.length + ' 篇）</div>'
+    + '<p class="audio-note">因为服务器在国外，缓冲需要时间，请耐心等一会儿。</p>'
+    + items + '</div>';
 }
 
 function matchByTitle(t){
@@ -783,6 +806,16 @@ document.getElementById('pPrev').onclick = function(){
   if (curIdx < 0) playTrack(0);
   else playTrack((curIdx - 1 + AUDIO_TRACKS.length) % AUDIO_TRACKS.length);
 };
+// 快退 15 秒
+document.getElementById('pBack').onclick = function(){
+  if (curIdx < 0) return;
+  playerAudio.currentTime = Math.max(0, playerAudio.currentTime - 15);
+};
+// 快进 15 秒
+document.getElementById('pFwd').onclick = function(){
+  if (curIdx < 0 || !playerAudio.duration) return;
+  playerAudio.currentTime = Math.min(playerAudio.duration, playerAudio.currentTime + 15);
+};
 
 playerAudio.addEventListener('timeupdate', function(){
   var pct = playerAudio.duration ? (playerAudio.currentTime / playerAudio.duration * 100) : 0;
@@ -859,6 +892,40 @@ document.getElementById('menuBtn').onclick = function(){
 renderNav();
 var home = TREE.children && TREE.children.find(function(c){ return c.is_index; });
 show(home ? home.slug : PAGES[0].slug);
+
+// ---- 网页打开次数统计（仅作者/管理员可见）----
+// 说明：纯静态站无法做登录鉴权。此处用免注册的公开计数 API 累加打开次数，
+// 但仅在 URL 带管理员密钥（如 ?admin=longchen-admin）时才显示数字；
+// 首次用密钥访问后会记住（localStorage），之后直接可见。密钥请自行修改。
+var ADMIN_SECRET = 'longchen-admin';
+var HIT_NS = 'longchen-nyingtik', HIT_KEY = 'page-views';
+function isAdmin(){
+  try {
+    if (new URLSearchParams(location.search).get('admin') === ADMIN_SECRET){
+      localStorage.setItem('longchen-admin', '1');
+      return true;
+    }
+    return localStorage.getItem('longchen-admin') === '1';
+  } catch(e){ return false; }
+}
+function trackVisit(){
+  // 每次打开页面异步 +1（不阻塞页面；统计服务不可达时静默失败）
+  try {
+    fetch('https://api.countapi.xyz/hit/' + HIT_NS + '/' + HIT_KEY, {cache:'no-store'}).catch(function(){});
+  } catch(e){}
+}
+function showHitStat(){
+  var box = document.getElementById('hitStat');
+  if (!box) return;
+  box.style.display = 'inline-block';
+  box.textContent = '网页打开次数：加载中…';
+  fetch('https://api.countapi.xyz/get/' + HIT_NS + '/' + HIT_KEY, {cache:'no-store'})
+    .then(function(r){ return r.json(); })
+    .then(function(d){ box.textContent = '网页打开次数：' + (d.value != null ? d.value : 0); })
+    .catch(function(){ box.textContent = '网页打开次数：—（统计服务暂不可达）'; });
+}
+if (isAdmin()) showHitStat();
+trackVisit();
 </script>
 </body>
 </html>
