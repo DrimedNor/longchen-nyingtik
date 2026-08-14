@@ -338,6 +338,8 @@ a:hover{color:var(--accent-soft)}
 .nav a:hover{background:var(--surface-hover); color:var(--ink)}
 .nav a.active{background:var(--accent); color:#fff; text-decoration:none;
   box-shadow:inset 3px 0 0 var(--gold)}
+.nav a.active:hover{background:var(--accent); color:#fff; text-decoration:none;
+  box-shadow:inset 3px 0 0 var(--gold)}
 .nav .dir-name.active{background:var(--accent); color:#fff; text-decoration:none;
   box-shadow:inset 3px 0 0 var(--gold)}
 .nav .dir-name.active:hover{background:var(--accent); color:#fff; text-decoration:none;
@@ -418,10 +420,11 @@ a:hover{color:var(--accent-soft)}
   padding-bottom:env(safe-area-inset-bottom,0)}
 .player.show{transform:translateY(0)}
 .player.pl-open{max-height:72vh}   /* 展开播放列表时自动增高，默认仅占据下 1/3 屏 */
-/* 第1行：状态栏 —— 正在播放：<当前音频名> */
-.player .p-status{padding:.85rem 1.3rem; font-size:1rem; color:var(--ink-soft);
-  text-align:center; border-bottom:1px solid var(--line); flex:0 0 auto; font-weight:500;
-  white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+/* 第1行：状态栏（左：当前音频名 / 右：关闭叉号） */
+.player .p-status{display:flex; align-items:center; gap:.6rem; padding:.85rem 1.3rem;
+  font-size:1rem; color:var(--ink-soft); border-bottom:1px solid var(--line); flex:0 0 auto}
+.player .p-status-text{flex:1; min-width:0; text-align:center; white-space:nowrap;
+  overflow:hidden; text-overflow:ellipsis; font-weight:500}
 .player .p-status b{color:var(--accent); font-weight:600}
 /* 第2行：控制按钮（上一首 ⏮ / 后退15秒 -15 / 播放 ▶ / 下一首 ⏭ / 前进15秒 +15） */
 .player .p-controls{display:flex; align-items:center; justify-content:center; gap:1rem;
@@ -444,15 +447,14 @@ a:hover{color:var(--accent-soft)}
   border-radius:4px; width:0%}
 .player .p-progress .p-thumb{position:absolute; top:50%; width:16px; height:16px; border-radius:50%;
   background:#fff; border:2px solid var(--gold); transform:translate(-50%,-50%); left:0%}
-/* 第4行：播放列表开关（默认收起，点击展开） */
-.player .p-pl-row{display:flex; align-items:center; gap:.6rem; padding:.6rem 1.3rem;
+/* 第4行：播放列表开关（居中、默认收起，点击展开） */
+.player .p-pl-row{display:flex; align-items:center; justify-content:center; gap:.6rem; padding:.6rem 1.3rem;
   flex:0 0 auto; border-top:1px solid var(--line)}
 .player .p-pl-toggle{border:1px solid var(--gold); background:var(--surface); color:var(--gold-deep);
   cursor:pointer; font-size:.92rem; padding:.35rem .9rem; border-radius:999px;
   display:inline-flex; align-items:center; gap:.35rem; font-family:inherit; transition:background .15s}
 .player .p-pl-toggle:hover{background:var(--surface-soft)}
 .player .p-pl-hint{font-size:.8rem; color:var(--ink-faint)}
-.player .p-pl-row .spacer{flex:1}
 .player .p-close{border:none; background:none; cursor:pointer; color:var(--ink-soft);
   font-size:1.3rem; width:2.3rem; height:2.3rem; border-radius:8px; line-height:1}
 .player .p-close:hover{background:var(--surface-hover)}
@@ -468,10 +470,6 @@ a:hover{color:var(--accent-soft)}
 .player .pl-item.playing .pl-idx{color:var(--accent)}
 .player .pl-item .pl-dot{width:7px; height:7px; border-radius:50%; background:var(--turq-soft); flex:0 0 7px}
 .player .pl-item.playing .pl-dot{background:var(--turq)}
-/* 播放列表「正在播放」那一行右侧的关闭叉号 */
-.player .pl-close{margin-left:auto; border:none; background:none; cursor:pointer;
-  color:var(--ink-soft); font-size:1.15rem; line-height:1; padding:.1rem .4rem; border-radius:6px}
-.player .pl-close:hover{background:var(--surface-hover); color:var(--ink)}
 /* 悬浮打开播放器按钮 */
 .player-launch{position:fixed; right:1.1rem; bottom:1.1rem; z-index:41;
   background:var(--accent); color:#fff; border:none; cursor:pointer;
@@ -589,8 +587,11 @@ a:hover{color:var(--accent-soft)}
 
 <!-- 全局播放器（默认占据下三分之一屏） -->
 <div class="player" id="player">
-  <!-- 第1行：状态栏 -->
-  <div class="p-status" id="pStatus">暂未播放</div>
+  <!-- 第1行：状态栏 + 关闭叉号（播放器右上角） -->
+  <div class="p-status" id="pStatus">
+    <span class="p-status-text" id="pStatusText">暂未播放</span>
+    <button class="p-close" id="pClose" title="关闭播放器">✕</button>
+  </div>
   <!-- 第2行：控制按钮（上一首 / 后退15秒 / 播放 / 下一首 / 前进15秒） -->
   <div class="p-controls">
     <button class="p-btn" id="pPrev" title="上一首">⏮</button>
@@ -605,11 +606,9 @@ a:hover{color:var(--accent-soft)}
     <div class="p-progress" id="pProgress"><div class="p-fill" id="pFill"></div><div class="p-thumb" id="pThumb"></div></div>
     <span class="p-time" id="pTimeDur">0:00</span>
   </div>
-  <!-- 第4行：播放列表开关（默认收起，点击展开） -->
+  <!-- 第4行：播放列表开关（居中、默认收起，点击展开） -->
   <div class="p-pl-row">
     <button class="p-pl-toggle" id="pPlToggle">📋 播放列表 <span class="p-pl-hint" id="pPlHint">点击展开播放列表</span></button>
-    <span class="spacer"></span>
-    <button class="p-close" id="pClose" title="关闭播放器" style="display:none">✕</button>
   </div>
   <!-- 完整播放列表（点击开关展开） -->
   <div class="p-playlist" id="pPlaylist"></div>
@@ -957,20 +956,17 @@ function fmtTime(s){
 function showPlayer(){
   document.getElementById('player').classList.add('show');
   document.getElementById('playerMini').classList.remove('show');
-  updateCloseBtn();
   refreshLaunch();
 }
 function hidePlayer(){
   document.getElementById('player').classList.remove('show');
   document.getElementById('playerMini').classList.remove('show');
-  updateCloseBtn();
   refreshLaunch();
 }
 // 折叠为底部迷你条：整屏播放器收起，音频继续后台播放
 function minimizePlayer(){
   document.getElementById('player').classList.remove('show');
   document.getElementById('playerMini').classList.add('show');
-  updateCloseBtn();
   updateMini();
   refreshLaunch();
 }
@@ -993,7 +989,7 @@ function playTrack(idx){
   var t = AUDIO_TRACKS[idx];
   playerAudio.src = t.src;
   playerAudio.play();
-  document.getElementById('pStatus').innerHTML = '正在播放：<b>' + esc(t.title) + '</b>';
+  document.getElementById('pStatusText').innerHTML = '正在播放：<b>' + esc(t.title) + '</b>';
   document.getElementById('pPlay').textContent = '⏸';
   showPlayer();
   renderPlist();
@@ -1103,30 +1099,17 @@ function renderPlist(){
   var box = document.getElementById('pPlaylist');
   var arr = AUDIO_TRACKS.map(function(t, i){
     var playing = (i === curIdx);
-    // 关闭叉号放在「正在播放」那一行（要求：移至最上方正在播放行）
-    var closeBtn = playing ? '<button class="pl-close" title="关闭播放器">✕</button>' : '';
     return '<div class="pl-item' + (playing ? ' playing' : '') + '" data-idx="' + i + '">'
       + '<span class="pl-idx">' + (i + 1) + '</span>'
       + '<span class="pl-dot"></span>'
-      + '<span class="pl-title">' + esc(t.title) + '</span>'
-      + closeBtn + '</div>';
+      + '<span class="pl-title">' + esc(t.title) + '</span></div>';
   });
   box.innerHTML = arr.join('');
-  updateCloseBtn();
   box.querySelectorAll('.pl-item').forEach(function(it){
     it.onclick = function(ev){
-      if (ev.target.closest('.pl-close')){
-        if (curIdx >= 0) minimizePlayer(); else hidePlayer();
-        return;
-      }
       playTrack(parseInt(it.dataset.idx, 10));
     };
   });
-}
-// 关闭叉号归属：有曲目播放时显示在「正在播放」那一行；无曲目时退回播放器头部
-function updateCloseBtn(){
-  var pc = document.getElementById('pClose');
-  if (pc) pc.style.display = (curIdx < 0) ? '' : 'none';
 }
 // 播放列表：点击展开 / 收起（默认收起）
 document.getElementById('pPlToggle').onclick = function(){
