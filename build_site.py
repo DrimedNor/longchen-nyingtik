@@ -192,6 +192,9 @@ def discover_pages():
         for f in sorted(files):
             if not f.endswith(".md"):
                 continue
+            if f == "本次更新内容.md":
+                # 首页「本次更新内容」区块的源文件：仅作内容展示，不进入导航/目录树/普通页面
+                continue
             full = os.path.join(dirpath, f)
             rel = os.path.relpath(full, CONTENT_DIR).replace("\\", "/")
             txt = open(full, encoding="utf-8").read()
@@ -534,6 +537,16 @@ a:hover{color:var(--accent-soft)}
 .audio-note{color:var(--ink-soft); font-size:.95em; margin:.6rem 0 1rem; line-height:1.7}
 .hn-tips{margin:.4rem 0 1rem; padding-left:1.2rem; list-style:disc}
 .hn-tips li{color:var(--ink-soft); font-size:.9em; line-height:1.7; margin:.3rem 0}
+/* 首页「本次更新内容」区块：与代码/导航结构清晰区分的独立内容展示区 */
+.home-update{border:1px solid var(--gold-soft); border-left:4px solid var(--accent);
+  border-radius:12px; padding:1.1rem 1.4rem; margin:1.6rem 0; background:var(--surface-soft)}
+.home-update .hn-sec-title{margin-top:0}
+.home-update h3{font-size:1.05em; color:var(--gold-deep); margin:1.2em 0 .4em; font-weight:600}
+.home-update ul{margin:.4em 0 .8em 1.4em; padding:0}
+.home-update li{margin:.35em 0}
+.home-update .play-btn{margin:.2rem 0 .2rem 0}
+.dir-children{margin-top:.6rem}
+.dir-children .hn-link{font-size:1.02em}
 
 /* 移动端 */
 @media(max-width:760px){
@@ -629,6 +642,7 @@ var PAGES = @@PAGES_JSON@@;
 var TREE = @@TREE_JSON@@;
 var AUDIO_ALBUM = @@AUDIO_ALBUM_JSON@@;
 var AUDIO_TRACKS = @@AUDIO_TRACKS_JSON@@;
+var HOME_UPDATE_HTML = @@HOME_UPDATE_JSON@@;   // 首页「本次更新内容」区块（纯用户资料，不含技术调整）
 
 var bySlug = {};
 PAGES.forEach(function(p){ bySlug[p.slug] = p; });
@@ -753,11 +767,18 @@ function show(slug){
   if (isHome){
     inner = '<div class="welcome"><div class="big">' + esc(SITE_TITLE) + '</div>'
           + '<div class="welcome-sub">龙钦宁提资料库 · 学习整理与分享</div></div>'
+          + '<section class="hn-sec home-update"><h2 class="hn-sec-title">📌 本次更新内容</h2>'
+          + HOME_UPDATE_HTML + '</section>'
           + p.html + renderHomeNav();
   }
-  // 音频资源页 → 附加独立音频列表
+  // 目录 landing 页（非首页 index）：自动聚合展示其下文章列表
+  if (p.is_index && p.slug !== 'index'){
+    inner += renderDirChildren(p.slug);
+  }
+  // 音频资源页 → 附加独立音频列表（子文件夹 index 仅显示该组音频）
   if (p.is_index && p.slug.indexOf('音频资源') === 0){
-    inner += renderAudioList();
+    var grp = (p.slug === '音频资源/index') ? null : (p.slug.split('/')[1] || null);
+    inner += renderAudioList(grp);
   }
   var crumb = renderBreadcrumb(p);
   document.getElementById('content').innerHTML = '<div class="article">' + crumb + inner + '</div>';
@@ -913,18 +934,40 @@ function renderHomeNav(){
   return '<div class="home-nav">' + html.join('') + '</div>';
 }
 
-// ---- 音频资源页：独立音频列表（按文件夹分组）----
-function renderAudioList(){
+// ---- 目录 landing 页：聚合展示其下全部文章（不含子目录 index 自身）----
+function renderDirChildren(dirSlug){
+  var items = [];
+  PAGES.forEach(function(p){
+    if (p.is_index) return;
+    if (p.slug.indexOf(dirSlug + '/') === 0){
+      var hasAudio = p.html.indexOf('play-btn') >= 0;
+      items.push('<a class="hn-link" data-page="' + esc(p.slug) + '">'
+        + esc(p.title) + (hasAudio ? ' 🔊' : '') + '</a>');
+    }
+  });
+  if (!items.length) return '';
+  return '<div class="dir-children"><div class="audio-list-title">本目录文章（' + items.length + ' 篇）</div>'
+    + items.join('') + '</div>';
+}
+
+// ---- 音频资源页：独立音频列表（按文件夹分组；可传入 groupFilter 仅显示某一组）----
+function renderAudioList(groupFilter){
   if (!AUDIO_TRACKS.length) return '';
   var groups = {};
   AUDIO_TRACKS.forEach(function(t, i){
     var g = t.group || '其他音频';
+    if (groupFilter && g !== groupFilter) return;
     (groups[g] = groups[g] || []).push({t: t, i: i});
   });
-  var html = '<div class="audio-list"><div class="audio-list-title">全部开示音频（' + AUDIO_TRACKS.length + ' 篇）</div>'
+  var count = 0;
+  Object.keys(groups).forEach(function(g){ count += groups[g].length; });
+  var title = groupFilter
+    ? ('「' + cleanDirName(groupFilter) + '」音频（' + count + ' 篇）')
+    : ('全部开示音频（' + AUDIO_TRACKS.length + ' 篇）');
+  var html = '<div class="audio-list"><div class="audio-list-title">' + title + '</div>'
     + '<p class="audio-note">因为服务器在国外，缓冲需要时间，请耐心等一会儿。</p>';
   Object.keys(groups).forEach(function(g){
-    html += '<div class="audio-group-title">' + esc(g) + '</div>';
+    if (!groupFilter) html += '<div class="audio-group-title">' + esc(cleanDirName(g)) + '</div>';
     groups[g].forEach(function(o){
       html += '<a class="hn-link hn-audio" data-idx="' + o.i + '">🔊 ' + esc(o.t.title) + '</a>';
     });
@@ -1240,6 +1283,15 @@ def main():
             break
 
     tree = build_tree(pages)
+
+    # 首页「本次更新内容」区块：读取独立内容源文件并渲染（仅用户资料，不含技术调整）
+    home_update_html = ""
+    upd_path = os.path.join(CONTENT_DIR, "本次更新内容.md")
+    if os.path.exists(upd_path):
+        upd_txt = open(upd_path, encoding="utf-8").read()
+        _, upd_body = parse_frontmatter(upd_txt)
+        home_update_html = md_to_html(upd_body)
+
     site_title = "龙的传人｜Longchen Nyingtik"
     for p in pages:
         if p["slug"] == "index" and p["meta"].get("title"):
@@ -1288,6 +1340,7 @@ def main():
     html_out = html_out.replace("@@AUDIO_TRACKS_JSON@@", json.dumps(audio_tracks, ensure_ascii=False))
     html_out = html_out.replace("@@PAGES_JSON@@", json.dumps(pages, ensure_ascii=False))
     html_out = html_out.replace("@@TREE_JSON@@", json.dumps(tree, ensure_ascii=False))
+    html_out = html_out.replace("@@HOME_UPDATE_JSON@@", json.dumps(home_update_html, ensure_ascii=False))
     html_out = html_out.replace("@@SITE_TITLE@@", site_title)
 
     os.makedirs(DIST_DIR, exist_ok=True)
