@@ -1,5 +1,5 @@
 ---
-title: 龙的传人
+title: 龙的传人｜Longchen Nyingtik
 homepage: true
 ---
 > **龙钦宁提资料库**

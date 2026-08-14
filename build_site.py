@@ -471,6 +471,24 @@ a:hover{color:var(--accent-soft)}
 .player-launch:hover{background:var(--accent-soft)}
 .player.show + .player-launch{display:none}
 
+/* 底部迷你条：关闭整屏播放器但音频仍在播放时，常驻一行 */
+.player-mini{position:fixed; left:0; right:0; bottom:0; z-index:39; display:none;
+  align-items:center; gap:.7rem; padding:.5rem .9rem;
+  background:var(--surface); border-top:1px solid var(--line);
+  box-shadow:0 -2px 12px rgba(59,42,34,.10)}
+.player-mini.show{display:flex}
+.player-mini .pm-btn{border:none; background:none; cursor:pointer; color:var(--ink);
+  font-size:1.1rem; width:2.4rem; height:2.4rem; border-radius:50%; flex:0 0 auto;
+  display:flex; align-items:center; justify-content:center}
+.player-mini .pm-btn:hover{background:var(--surface-hover)}
+.player-mini .pm-name{font-size:.92rem; color:var(--ink); font-weight:600;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis; flex:0 1 auto; max-width:42%}
+.player-mini .pm-progress{flex:1 1 auto; height:6px; background:var(--line);
+  border-radius:3px; position:relative; cursor:pointer; overflow:hidden}
+.player-mini .pm-fill{position:absolute; left:0; top:0; bottom:0;
+  background:var(--turq); border-radius:3px; width:0}
+.player-mini .pm-expand{flex:0 0 auto}
+
 /* 元信息 */
 .meta{font-size:.85em; color:var(--ink-faint); margin:1.2rem 0 1.6rem; display:flex; flex-wrap:wrap; gap:.3rem .9rem}
 .meta .tag{background:var(--surface-soft); padding:.05em .7em; border-radius:999px; font-size:.88em; color:var(--ink-soft)}
@@ -505,6 +523,7 @@ a:hover{color:var(--accent-soft)}
 .hn-audio.playing::before{background:var(--accent); opacity:1}
 .audio-list{margin-top:.5rem}
 .audio-list-title{font-size:.95em; color:var(--ink-faint); margin:1.2rem 0 .5rem; font-weight:600}
+.audio-group-title{font-size:.82em; color:var(--gold-deep); font-weight:700; letter-spacing:.04em; margin:1rem 0 .35rem; padding-left:.2rem; border-left:3px solid var(--gold); padding-left:.5rem}
 .audio-note{color:var(--ink-soft); font-size:.95em; margin:.6rem 0 1rem; line-height:1.7}
 .hn-tips{margin:.4rem 0 1rem; padding-left:1.2rem; list-style:disc}
 .hn-tips li{color:var(--ink-soft); font-size:.9em; line-height:1.7; margin:.3rem 0}
@@ -582,6 +601,14 @@ a:hover{color:var(--accent-soft)}
   <div class="p-playlist" id="pPlaylist"></div>
 </div>
 <button class="player-launch" id="playerLaunch">🎧 播放器</button>
+
+<!-- 底部迷你条：关闭播放器但仍在播放时，常驻显示当前音频名 + 进度 -->
+<div class="player-mini" id="playerMini">
+  <button class="pm-btn" id="pmPlay" title="播放 / 暂停">⏸</button>
+  <span class="pm-name" id="pmName">暂未播放</span>
+  <div class="pm-progress" id="pmProgress"><div class="pm-fill" id="pmFill"></div></div>
+  <button class="pm-btn" id="pmExpand" title="展开播放器">↗</button>
+</div>
 
 <script>
 var SITE_TITLE = @@SITE_TITLE_JSON@@;
@@ -845,15 +872,24 @@ function renderHomeNav(){
   return '<div class="home-nav">' + html.join('') + '</div>';
 }
 
-// ---- 音频资源页：独立音频列表 ----
+// ---- 音频资源页：独立音频列表（按文件夹分组）----
 function renderAudioList(){
   if (!AUDIO_TRACKS.length) return '';
-  var items = AUDIO_TRACKS.map(function(t, i){
-    return '<a class="hn-link hn-audio" data-idx="' + i + '">🔊 ' + esc(t.title) + '</a>';
-  }).join('');
-  return '<div class="audio-list"><div class="audio-list-title">全部开示音频（' + AUDIO_TRACKS.length + ' 篇）</div>'
-    + '<p class="audio-note">因为服务器在国外，缓冲需要时间，请耐心等一会儿。</p>'
-    + items + '</div>';
+  var groups = {};
+  AUDIO_TRACKS.forEach(function(t, i){
+    var g = t.group || '其他音频';
+    (groups[g] = groups[g] || []).push({t: t, i: i});
+  });
+  var html = '<div class="audio-list"><div class="audio-list-title">全部开示音频（' + AUDIO_TRACKS.length + ' 篇）</div>'
+    + '<p class="audio-note">因为服务器在国外，缓冲需要时间，请耐心等一会儿。</p>';
+  Object.keys(groups).forEach(function(g){
+    html += '<div class="audio-group-title">' + esc(g) + '</div>';
+    groups[g].forEach(function(o){
+      html += '<a class="hn-link hn-audio" data-idx="' + o.i + '">🔊 ' + esc(o.t.title) + '</a>';
+    });
+  });
+  html += '</div>';
+  return html;
 }
 
 function matchByTitle(t){
@@ -878,9 +914,32 @@ function fmtTime(s){
 
 function showPlayer(){
   document.getElementById('player').classList.add('show');
+  document.getElementById('playerMini').classList.remove('show');
+  refreshLaunch();
 }
 function hidePlayer(){
   document.getElementById('player').classList.remove('show');
+  document.getElementById('playerMini').classList.remove('show');
+  refreshLaunch();
+}
+// 折叠为底部迷你条：整屏播放器收起，音频继续后台播放
+function minimizePlayer(){
+  document.getElementById('player').classList.remove('show');
+  document.getElementById('playerMini').classList.add('show');
+  updateMini();
+  refreshLaunch();
+}
+// 悬浮「🎧 播放器」按钮：播放器或迷你条显示时隐藏，否则显示
+function refreshLaunch(){
+  var pShown = document.getElementById('player').classList.contains('show');
+  var mShown = document.getElementById('playerMini').classList.contains('show');
+  document.getElementById('playerLaunch').style.display = (pShown || mShown) ? 'none' : '';
+}
+// 同步迷你条上的音频名与播放/暂停图标
+function updateMini(){
+  var name = (curIdx >= 0 && AUDIO_TRACKS[curIdx]) ? AUDIO_TRACKS[curIdx].title : '暂未播放';
+  document.getElementById('pmName').textContent = name;
+  document.getElementById('pmPlay').textContent = playerAudio.paused ? '▶' : '⏸';
 }
 
 function playTrack(idx){
@@ -894,6 +953,7 @@ function playTrack(idx){
   showPlayer();
   renderPlist();
   updatePlayBtns();
+  updateMini();
 }
 
 function playByAudio(fname){
@@ -961,21 +1021,24 @@ playerAudio.addEventListener('timeupdate', function(){
   document.getElementById('pThumb').style.left = pct + '%';
   document.getElementById('pTimeCur').textContent = fmtTime(playerAudio.currentTime);
   document.getElementById('pTimeDur').textContent = fmtTime(dur);
+  document.getElementById('pmFill').style.width = pct + '%';
 });
 playerAudio.addEventListener('ended', function(){
   // 自动连播下一首
   if (curIdx >= 0 && curIdx < AUDIO_TRACKS.length - 1) playTrack(curIdx + 1);
-  else { document.getElementById('pPlay').textContent = '▶'; }
+  else { document.getElementById('pPlay').textContent = '▶'; updateMini(); }
 });
-playerAudio.addEventListener('play', function(){ document.getElementById('pPlay').textContent = '⏸'; });
-playerAudio.addEventListener('pause', function(){ document.getElementById('pPlay').textContent = '▶'; });
+playerAudio.addEventListener('play', function(){ document.getElementById('pPlay').textContent = '⏸'; updateMini(); });
+playerAudio.addEventListener('pause', function(){ document.getElementById('pPlay').textContent = '▶'; updateMini(); });
 
-// 进度条：支持点击与拖动跳转
+// 进度条：支持点击与拖动跳转（progEl 缺省为整屏播放器进度条）
 var pProg = document.getElementById('pProgress');
 var pDragging = false;
-function seekFromEvent(ev){
+var pDragEl = null;
+function seekFromEvent(ev, progEl){
+  var el = progEl || pDragEl || pProg;
   if (curIdx < 0 || !playerAudio.duration) return;
-  var rect = pProg.getBoundingClientRect();
+  var rect = el.getBoundingClientRect();
   var x = (ev.touches && ev.touches.length) ? ev.touches[0].clientX : ev.clientX;
   var ratio = Math.min(1, Math.max(0, (x - rect.left) / rect.width));
   playerAudio.currentTime = ratio * playerAudio.duration;
@@ -983,12 +1046,12 @@ function seekFromEvent(ev){
   document.getElementById('pTimeCur').textContent = fmtTime(playerAudio.currentTime);
   document.getElementById('pTimeDur').textContent = fmtTime(playerAudio.duration);
 }
-pProg.addEventListener('mousedown', function(ev){ pDragging = true; seekFromEvent(ev); });
-pProg.addEventListener('touchstart', function(ev){ pDragging = true; seekFromEvent(ev); }, {passive:true});
+pProg.addEventListener('mousedown', function(ev){ pDragging = true; pDragEl = pProg; seekFromEvent(ev); });
+pProg.addEventListener('touchstart', function(ev){ pDragging = true; pDragEl = pProg; seekFromEvent(ev); }, {passive:true});
 window.addEventListener('mousemove', function(ev){ if (pDragging) seekFromEvent(ev); });
 window.addEventListener('touchmove', function(ev){ if (pDragging) seekFromEvent(ev); }, {passive:true});
-window.addEventListener('mouseup', function(){ pDragging = false; });
-window.addEventListener('touchend', function(){ pDragging = false; });
+window.addEventListener('mouseup', function(){ pDragging = false; pDragEl = null; });
+window.addEventListener('touchend', function(){ pDragging = false; pDragEl = null; });
 
 // 播放列表（内嵌于半屏播放器顶部）
 function renderPlist(){
@@ -1011,12 +1074,29 @@ document.getElementById('pPlToggle').onclick = function(){
   document.getElementById('pPlaylist').classList.toggle('open', open);
   document.getElementById('pPlHint').textContent = open ? '点击收起播放列表' : '点击展开播放列表';
 };
-// 关闭播放器（音频继续后台播放，可用悬浮按钮重新打开）
-document.getElementById('pClose').onclick = hidePlayer;
+// 关闭叉号：若正在播放（已选曲目）则折叠为底部迷你条，音频继续后台播放；否则完全关闭
+document.getElementById('pClose').onclick = function(){
+  if (curIdx >= 0) minimizePlayer();
+  else hidePlayer();
+};
 // 悬浮按钮：打开播放器
 document.getElementById('playerLaunch').onclick = function(){
   document.getElementById('player').classList.add('show');
+  document.getElementById('playerMini').classList.remove('show');
+  refreshLaunch();
 };
+// 迷你条：播放/暂停
+document.getElementById('pmPlay').onclick = function(){
+  if (curIdx < 0 && AUDIO_TRACKS.length) playTrack(0);
+  else if (playerAudio.paused) playerAudio.play();
+  else playerAudio.pause();
+};
+// 迷你条：展开回整屏播放器
+document.getElementById('pmExpand').onclick = showPlayer;
+// 迷你条进度条：点击跳转
+var pmProg = document.getElementById('pmProgress');
+pmProg.addEventListener('mousedown', function(ev){ seekFromEvent(ev, pmProg); });
+pmProg.addEventListener('touchstart', function(ev){ seekFromEvent(ev, pmProg); }, {passive:true});
 
 // 顶栏品牌点击返回主页
 document.getElementById('brandHome').onclick = function(){ show('index'); };
@@ -1116,7 +1196,7 @@ def main():
             break
 
     tree = build_tree(pages)
-    site_title = "龙的传人"
+    site_title = "龙的传人｜Longchen Nyingtik"
     for p in pages:
         if p["slug"] == "index" and p["meta"].get("title"):
             site_title = p["meta"]["title"]
@@ -1133,6 +1213,30 @@ def main():
                 "src": "audio/" + quote(fname),
                 "file": fname,
             })
+
+    # 计算某音频所属分组（其父文件夹名），用于音频资源页分组展示
+    def audio_group(fname):
+        path = LOCAL_AUDIO.get(fname)
+        if not path:
+            return ""
+        rel = os.path.relpath(os.path.dirname(path), CONTENT_DIR)
+        parts = [x for x in rel.split(os.sep) if x and x != "."]
+        return parts[-1] if parts else ""
+    # 补充未被任何页面引用的本地音频（如《上师开示》《上师赞歌》整文件夹），使其也能列出并可播放
+    seen = set(t["file"] for t in audio_tracks)
+    for fname in sorted(LOCAL_AUDIO.keys()):
+        if fname in seen:
+            continue
+        title = fname[:-4] if fname.lower().endswith(".mp3") else fname
+        audio_tracks.append({
+            "title": title,
+            "slug": "",
+            "src": "audio/" + quote(fname),
+            "file": fname,
+        })
+    # 为每条 track 标注分组
+    for t in audio_tracks:
+        t["group"] = audio_group(t["file"])
 
     html_out = PAGE_TEMPLATE
     html_out = html_out.replace("@@SITE_TITLE_JSON@@", json.dumps(site_title, ensure_ascii=False))
