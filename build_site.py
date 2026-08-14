@@ -392,43 +392,56 @@ a:hover{color:var(--accent-soft)}
 .breadcrumb .sep{color:var(--ink-faint); opacity:.5; padding:0 .1rem}
 .breadcrumb .cur{color:var(--ink); font-weight:600}
 
-/* 全局播放条 */
+/* 全局播放器（半屏） */
 .player{position:fixed; left:0; right:0; bottom:0; z-index:40; background:var(--surface);
-  border-top:1px solid var(--line); box-shadow:0 -2px 12px rgba(0,0,0,.05);
-  transform:translateY(100%); transition:transform .25s}
+  border-top:1px solid var(--line); box-shadow:0 -4px 20px rgba(0,0,0,.12);
+  transform:translateY(100%); transition:transform .28s ease;
+  display:flex; flex-direction:column; height:50vh; min-height:340px; max-height:72vh}
 .player.show{transform:translateY(0)}
-.player .p-bar{display:flex; align-items:center; gap:1rem; padding:1rem 1.4rem;
-  max-width:960px; margin:0 auto}
-.player .p-info{flex:1; min-width:0}
-.player .p-title{font-size:1.25em; color:var(--ink); font-weight:600; white-space:nowrap;
-  overflow:hidden; text-overflow:ellipsis}
-.player .p-sub{font-size:.95em; color:var(--ink-faint)}
-.player .p-progress{height:4px; background:var(--line); border-radius:2px; margin-top:.5rem; cursor:pointer; position:relative}
-.player .p-progress .p-fill{position:absolute; left:0; top:0; bottom:0; background:var(--accent);
-  border-radius:2px; width:0%}
+.player.collapsed{height:auto; min-height:0}
+.player .p-head{display:flex; align-items:center; justify-content:space-between;
+  padding:.7rem 1.2rem; border-bottom:1px solid var(--line); font-weight:600; color:var(--ink); flex:0 0 auto}
+.player .p-head .p-count{font-size:.8em; color:var(--ink-faint); font-weight:500; margin-left:.5em}
+.player .p-head-actions{display:flex; gap:.3rem}
+.player .p-iconbtn{border:none; background:none; cursor:pointer; color:var(--ink-soft);
+  font-size:1.25rem; width:2.4rem; height:2.4rem; border-radius:8px; line-height:1}
+.player .p-iconbtn:hover{background:var(--surface-hover)}
+.player .p-playlist{flex:1 1 auto; overflow-y:auto; -webkit-overflow-scrolling:touch; padding:.3rem 0}
+.player.collapsed .p-playlist{display:none}
+.player .pl-item{display:flex; align-items:center; gap:.8rem; padding:.85rem 1.4rem;
+  cursor:pointer; border-bottom:1px solid var(--line); color:var(--ink-soft); font-size:1.12em}
+.player .pl-item:hover{background:var(--surface-soft)}
+.player .pl-item.playing{color:var(--accent); font-weight:600; background:var(--surface-soft)}
+.player .pl-item .pl-idx{font-variant-numeric:tabular-nums; color:var(--ink-faint); flex:0 0 1.8em; text-align:right}
+.player .pl-item.playing .pl-idx{color:var(--accent)}
+.player .pl-item .pl-dot{width:7px; height:7px; border-radius:50%; background:var(--accent-soft); flex:0 0 7px}
+.player .pl-item.playing .pl-dot{background:var(--accent)}
+.player .p-controls{display:flex; align-items:center; justify-content:center; gap:1.2rem;
+  padding:1rem; flex:0 0 auto; border-top:1px solid var(--line)}
 .player .p-btn{border:none; background:none; cursor:pointer; color:var(--ink);
-  font-size:1.8rem; width:4rem; height:4rem; border-radius:50%; line-height:1;
-  display:flex; align-items:center; justify-content:center; transition:background .15s}
+  font-size:1.5rem; width:3.6rem; height:3.6rem; border-radius:50%; line-height:1;
+  display:flex; align-items:center; justify-content:center; transition:background .15s; font-weight:600}
 .player .p-btn:hover{background:var(--surface-hover)}
-.player .p-btn.p-play{width:4.8rem; height:4.8rem; background:var(--accent); color:#fff; font-size:1.6rem}
+.player .p-btn.p-play{width:4.6rem; height:4.6rem; background:var(--accent); color:#fff; font-size:1.6rem}
 .player .p-btn.p-play:hover{background:var(--accent-soft)}
-.player .p-time{font-size:.95em; color:var(--ink-faint); white-space:nowrap}
-.player .p-listbtn{font-size:1.4rem}
-
-/* 播放列表弹层 */
-.plist{position:fixed; left:0; right:0; bottom:0; z-index:39; background:var(--surface);
-  border-top:1px solid var(--line); box-shadow:0 -4px 16px rgba(0,0,0,.08);
-  transform:translateY(100%); transition:transform .25s; max-height:60vh; overflow-y:auto}
-.plist.show{transform:translateY(0)}
-.plist .pl-head{display:flex; align-items:center; justify-content:space-between;
-  padding:.8rem 1.2rem; border-bottom:1px solid var(--line); font-weight:600}
-.plist .pl-close{border:none; background:none; cursor:pointer; color:var(--ink-soft); font-size:1.2rem}
-.plist .pl-item{display:flex; align-items:center; gap:.8rem; padding:1rem 1.4rem;
-  cursor:pointer; border-bottom:1px solid var(--line); color:var(--ink-soft); font-size:1.25em}
-.plist .pl-item:hover{background:var(--surface-soft)}
-.plist .pl-item.playing{color:var(--accent); font-weight:600; background:var(--surface-soft)}
-.plist .pl-item .pl-dot{width:6px; height:6px; border-radius:50%; background:var(--accent-soft); flex:0 0 6px}
-.plist .pl-item.playing .pl-dot{background:var(--accent)}
+.player .p-btn.p-skip{font-size:1.15rem; color:var(--accent); border:1px solid var(--line); width:4rem; height:4rem}
+.player .p-btn.p-skip:hover{background:var(--surface-soft); border-color:var(--accent-soft)}
+.player .p-progress{height:8px; background:var(--line); border-radius:4px; margin:.2rem 1.4rem 0;
+  cursor:pointer; position:relative; flex:0 0 auto; touch-action:none}
+.player .p-progress .p-fill{position:absolute; left:0; top:0; bottom:0; background:var(--accent);
+  border-radius:4px; width:0%}
+.player .p-progress .p-thumb{position:absolute; top:50%; width:16px; height:16px; border-radius:50%;
+  background:#fff; border:2px solid var(--accent); transform:translate(-50%,-50%); left:0%}
+.player .p-status{padding:.75rem 1.4rem; font-size:.95em; color:var(--ink-soft); text-align:center;
+  border-top:1px solid var(--line); flex:0 0 auto; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+.player .p-status b{color:var(--accent)}
+/* 悬浮打开播放器按钮 */
+.player-launch{position:fixed; right:1.1rem; bottom:1.1rem; z-index:41;
+  background:var(--accent); color:#fff; border:none; cursor:pointer;
+  padding:.7rem 1.1rem; border-radius:999px; font-size:1rem; font-weight:600;
+  box-shadow:0 4px 14px rgba(0,0,0,.22); display:flex; align-items:center; gap:.4rem}
+.player-launch:hover{background:var(--accent-soft)}
+.player.show + .player-launch{display:none}
 
 /* 元信息 */
 .meta{font-size:.85em; color:var(--ink-faint); margin:1.2rem 0 1.6rem; display:flex; flex-wrap:wrap; gap:.3rem .9rem}
@@ -477,11 +490,12 @@ a:hover{color:var(--accent-soft)}
   .sidebar-close{display:block}
   .content{padding:1.6rem 1.1rem 9rem}
   .welcome .big{font-size:1.7em}
-  .player .p-bar{padding:.7rem .8rem; gap:.5rem}
-  .player .p-btn{width:3.2rem; height:3.2rem; font-size:1.4rem}
-  .player .p-btn.p-play{width:3.8rem; height:3.8rem; font-size:1.3rem}
-  .player .p-time{display:none}
-  .player .p-sub{display:none}
+  .player{height:62vh; min-height:300px}
+  .player .p-controls{gap:.7rem; padding:.85rem}
+  .player .p-btn{width:3.2rem; height:3.2rem; font-size:1.35rem}
+  .player .p-btn.p-play{width:3.9rem; height:3.9rem; font-size:1.45rem}
+  .player .p-btn.p-skip{width:3.5rem; height:3.5rem; font-size:1.05rem}
+  .player-launch{font-size:.9rem; padding:.6rem .9rem}
 }
 </style>
 </head>
@@ -510,29 +524,27 @@ a:hover{color:var(--accent-soft)}
 <!-- 移动端：点击菜单外空白区域关闭侧栏 -->
 <div class="sidebar-overlay" id="sidebarOverlay"></div>
 
-<!-- 全局播放条 -->
+<!-- 全局播放器（半屏） -->
 <div class="player" id="player">
-  <div class="p-bar">
-    <button class="p-btn" id="pListBtn" title="播放列表">☰</button>
-    <button class="p-btn" id="pPrev" title="上一首">⏮</button>
-    <button class="p-btn" id="pBack" title="快退 15 秒">⏪</button>
-    <button class="p-btn p-play" id="pPlay" title="播放/暂停">▶</button>
-    <button class="p-btn" id="pFwd" title="快进 15 秒">⏩</button>
-    <button class="p-btn" id="pNext" title="下一首">⏭</button>
-    <div class="p-info">
-      <div class="p-title" id="pTitle">未播放</div>
-      <div class="p-sub" id="pSub"></div>
-      <div class="p-progress" id="pProgress"><div class="p-fill" id="pFill"></div></div>
-    </div>
-    <span class="p-time" id="pTime">0:00 / 0:00</span>
+  <div class="p-head">
+    <span>🎧 开示音频<span class="p-count" id="pCount"></span></span>
+    <span class="p-head-actions">
+      <button class="p-iconbtn" id="pToggle" title="收起 / 展开">▾</button>
+      <button class="p-iconbtn" id="pClose" title="关闭播放器">✕</button>
+    </span>
   </div>
+  <div class="p-playlist" id="pPlaylist"></div>
+  <div class="p-controls">
+    <button class="p-btn" id="pPlay" title="播放 / 暂停">▶</button>
+    <button class="p-btn" id="pPrev" title="上一首">⏮</button>
+    <button class="p-btn" id="pNext" title="下一首">⏭</button>
+    <button class="p-btn p-skip" id="pBack" title="后退 15 秒">-15</button>
+    <button class="p-btn p-skip" id="pFwd" title="前进 15 秒">+15</button>
+  </div>
+  <div class="p-progress" id="pProgress"><div class="p-fill" id="pFill"></div><div class="p-thumb" id="pThumb"></div></div>
+  <div class="p-status" id="pStatus">暂未播放</div>
 </div>
-
-<!-- 播放列表弹层 -->
-<div class="plist" id="plist">
-  <div class="pl-head"><span>🎧 开示音频列表</span><button class="pl-close" id="plClose">✕</button></div>
-  <div id="plItems"></div>
-</div>
+<button class="player-launch" id="playerLaunch">🎧 播放器</button>
 
 <script>
 var SITE_TITLE = @@SITE_TITLE_JSON@@;
@@ -799,7 +811,11 @@ function fmtTime(s){
 
 function showPlayer(){
   document.getElementById('player').classList.add('show');
-  document.getElementById('plist').classList.remove('show');
+  document.getElementById('player').classList.remove('collapsed');
+  document.getElementById('pToggle').textContent = '▾';
+}
+function hidePlayer(){
+  document.getElementById('player').classList.remove('show');
 }
 
 function playTrack(idx){
@@ -808,8 +824,7 @@ function playTrack(idx){
   var t = AUDIO_TRACKS[idx];
   playerAudio.src = t.src;
   playerAudio.play();
-  document.getElementById('pTitle').textContent = t.title;
-  document.getElementById('pSub').textContent = '第 ' + (idx + 1) + ' / ' + AUDIO_TRACKS.length + ' 篇';
+  document.getElementById('pStatus').innerHTML = '正在播放：<b>' + esc(t.title) + '</b>';
   document.getElementById('pPlay').textContent = '⏸';
   showPlayer();
   renderPlist();
@@ -877,6 +892,7 @@ document.getElementById('pFwd').onclick = function(){
 playerAudio.addEventListener('timeupdate', function(){
   var pct = playerAudio.duration ? (playerAudio.currentTime / playerAudio.duration * 100) : 0;
   document.getElementById('pFill').style.width = pct + '%';
+  document.getElementById('pThumb').style.left = pct + '%';
   document.getElementById('pTime').textContent = fmtTime(playerAudio.currentTime) + ' / ' + fmtTime(playerAudio.duration);
 });
 playerAudio.addEventListener('ended', function(){
@@ -887,33 +903,50 @@ playerAudio.addEventListener('ended', function(){
 playerAudio.addEventListener('play', function(){ document.getElementById('pPlay').textContent = '⏸'; });
 playerAudio.addEventListener('pause', function(){ document.getElementById('pPlay').textContent = '▶'; });
 
-// 进度条点击跳转
-document.getElementById('pProgress').onclick = function(ev){
+// 进度条：支持点击与拖动跳转
+var pProg = document.getElementById('pProgress');
+var pDragging = false;
+function seekFromEvent(ev){
   if (curIdx < 0 || !playerAudio.duration) return;
-  var rect = this.getBoundingClientRect();
-  var ratio = (ev.clientX - rect.left) / rect.width;
+  var rect = pProg.getBoundingClientRect();
+  var x = (ev.touches && ev.touches.length) ? ev.touches[0].clientX : ev.clientX;
+  var ratio = Math.min(1, Math.max(0, (x - rect.left) / rect.width));
   playerAudio.currentTime = ratio * playerAudio.duration;
-};
+}
+pProg.addEventListener('mousedown', function(ev){ pDragging = true; seekFromEvent(ev); });
+pProg.addEventListener('touchstart', function(ev){ pDragging = true; seekFromEvent(ev); }, {passive:true});
+window.addEventListener('mousemove', function(ev){ if (pDragging) seekFromEvent(ev); });
+window.addEventListener('touchmove', function(ev){ if (pDragging) seekFromEvent(ev); }, {passive:true});
+window.addEventListener('mouseup', function(){ pDragging = false; });
+window.addEventListener('touchend', function(){ pDragging = false; });
 
-// 播放列表弹层
+// 播放列表（内嵌于半屏播放器顶部）
 function renderPlist(){
-  var box = document.getElementById('plItems');
+  var box = document.getElementById('pPlaylist');
   var arr = AUDIO_TRACKS.map(function(t, i){
     return '<div class="pl-item' + (i === curIdx ? ' playing' : '') + '" data-idx="' + i + '">'
-      + '<span class="pl-dot"></span><span>' + esc(t.title) + '</span></div>';
+      + '<span class="pl-idx">' + (i + 1) + '</span>'
+      + '<span class="pl-dot"></span>'
+      + '<span class="pl-title">' + esc(t.title) + '</span></div>';
   });
   box.innerHTML = arr.join('');
   box.querySelectorAll('.pl-item').forEach(function(it){
     it.onclick = function(){ playTrack(parseInt(it.dataset.idx, 10)); };
   });
 }
-document.getElementById('pListBtn').onclick = function(){
-  var pl = document.getElementById('plist');
-  pl.classList.toggle('show');
-  if (pl.classList.contains('show')) renderPlist();
+// 收起 / 展开
+document.getElementById('pToggle').onclick = function(){
+  var p = document.getElementById('player');
+  var collapsed = p.classList.toggle('collapsed');
+  this.textContent = collapsed ? '▴' : '▾';
 };
-document.getElementById('plClose').onclick = function(){
-  document.getElementById('plist').classList.remove('show');
+// 关闭播放器（音频继续后台播放，可用悬浮按钮重新打开）
+document.getElementById('pClose').onclick = hidePlayer;
+// 悬浮按钮：打开 / 展开播放器
+document.getElementById('playerLaunch').onclick = function(){
+  document.getElementById('player').classList.add('show');
+  document.getElementById('player').classList.remove('collapsed');
+  document.getElementById('pToggle').textContent = '▾';
 };
 
 // 顶栏品牌点击返回主页
@@ -954,6 +987,7 @@ document.getElementById('sidebarClose').onclick = function(){ closeSidebar(); };
 document.getElementById('sidebarOverlay').onclick = function(){ closeSidebar(); };
 
 // ---- 初始化 ----
+document.getElementById('pCount').textContent = '（' + AUDIO_TRACKS.length + '）';
 renderNav();
 var home = TREE.children && TREE.children.find(function(c){ return c.is_index; });
 show(home ? home.slug : PAGES[0].slug);
