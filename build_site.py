@@ -572,20 +572,28 @@ function cleanDirName(name){
 }
 function renderNav(){
   var nav = document.getElementById('nav');
-  // 递归渲染目录：按同级字母序稳定排序；统一计算层级序号 1 / 1.1 / 1.1.1…
+  // 递归渲染目录：按同级字母序稳定排序；一级目录不带编号，二级起统一编号 1 / 1.1（最多 3 层）
   function walk(node, prefix, parentNum, depth, htmlArr){
+    if (depth > 2) return htmlArr;   // 控制在 3 个层级（depth 0 / 1 / 2）
     var names = (node.dirs ? Object.keys(node.dirs) : []).slice().sort();
     names.forEach(function(name, idx){
       var sub = node.dirs[name];
-      var num = parentNum ? (parentNum + '.' + (idx + 1)) : String(idx + 1);
       var full = (prefix ? prefix + '/' : '') + name;
       var target = full + '/index';
       if (!bySlug[target]) target = firstPageUnder(full);
       if (target){
-        htmlArr.push('<div class="dir-name" data-depth="' + depth + '" data-slug="' + esc(target) + '">'
-          + '<span class="dir-num">' + esc(num) + '</span>'
-          + '<span class="dir-label">' + esc(cleanDirName(name)) + '</span></div>');
-        walk(sub, full, num, depth + 1, htmlArr);
+        if (depth === 0){
+          // 一级目录：仅显示汉字，不带任何编号
+          htmlArr.push('<div class="dir-name" data-depth="0" data-slug="' + esc(target) + '">'
+            + '<span class="dir-label">' + esc(cleanDirName(name)) + '</span></div>');
+          walk(sub, full, '', depth + 1, htmlArr);   // 一级不贡献编号前缀
+        } else {
+          var num = parentNum ? (parentNum + '.' + (idx + 1)) : String(idx + 1);
+          htmlArr.push('<div class="dir-name" data-depth="' + depth + '" data-slug="' + esc(target) + '">'
+            + '<span class="dir-num">' + esc(num) + '</span>'
+            + '<span class="dir-label">' + esc(cleanDirName(name)) + '</span></div>');
+          walk(sub, full, num, depth + 1, htmlArr);
+        }
       }
     });
     return htmlArr;
