@@ -335,6 +335,8 @@ a:hover{color:var(--accent-soft)}
 .nav a:hover{background:var(--surface-hover); color:var(--ink)}
 .nav a.active{background:var(--accent); color:#fff; text-decoration:none;
   box-shadow:inset 3px 0 0 var(--gold)}
+.nav .dir-name.active{background:var(--accent); color:#fff; text-decoration:none;
+  box-shadow:inset 3px 0 0 var(--gold)}
 .nav .group-label{font-size:1rem; color:var(--ink-faint); letter-spacing:.1em;
   padding:.9rem .6rem .3rem; font-weight:600}
 /* 目录项：仅显示目录（不显示文章列表）；按层级区分字号/字重/颜色/缩进 */
@@ -619,10 +621,19 @@ function cleanDirName(name){
 }
 function renderNav(){
   var nav = document.getElementById('nav');
-  // 递归渲染目录：按同级字母序稳定排序；一级目录不带编号，二级起统一编号 1 / 1.1（最多 3 层）
+  // 一级目录固定顺序（与首页导览一致）；其余新增目录按名称追加在末尾
+  var TOP_ORDER = ['上师开示', '龙钦宁提传承', '音频资源', '书籍', '更新日志'];
+  function topKey(name){ var i = TOP_ORDER.indexOf(name); return i < 0 ? 1000 : i; }
+  // 递归渲染目录：一级目录不带编号，二级起统一编号 1 / 1.1（最多 3 层）
   function walk(node, prefix, parentNum, depth, htmlArr){
     if (depth > 2) return htmlArr;   // 控制在 3 个层级（depth 0 / 1 / 2）
-    var names = (node.dirs ? Object.keys(node.dirs) : []).slice().sort();
+    var names = (node.dirs ? Object.keys(node.dirs) : []).slice();
+    if (depth === 0){
+      // 一级目录按指定顺序（TOP_ORDER），保证侧栏与首页导览顺序一致
+      names.sort(function(a, b){ return topKey(a) - topKey(b); });
+    } else {
+      names.sort();   // 子层级按名称稳定排序
+    }
     names.forEach(function(name, idx){
       var sub = node.dirs[name];
       var full = (prefix ? prefix + '/' : '') + name;
@@ -646,6 +657,13 @@ function renderNav(){
     return htmlArr;
   }
   var arr = walk(TREE, '', '', 0, []);
+  // 顶层独立页面（如「更新日志」）：排在目录之后，作为同级导航项，点击直达页面
+  (TREE.children || []).forEach(function(c){
+    if (c.type === 'page' && !c.is_index){
+      arr.push('<div class="dir-name" data-depth="0" data-slug="' + esc(c.slug) + '">'
+        + '<span class="dir-label">' + esc(cleanDirName(c.title)) + '</span></div>');
+    }
+  });
   nav.innerHTML = arr.join('');
   nav.querySelectorAll('.dir-name').forEach(function(a){
     a.onclick = function(){ show(a.dataset.slug); closeSidebar(); };
@@ -676,7 +694,7 @@ function show(slug){
   var crumb = renderBreadcrumb(p);
   document.getElementById('content').innerHTML = '<div class="article">' + crumb + inner + '</div>';
   document.getElementById('pageCrumbs').textContent = p.is_index ? '' : (' / ' + p.title);
-  document.querySelectorAll('.nav-link').forEach(function(a){
+  document.querySelectorAll('.nav a, .nav .dir-name').forEach(function(a){
     a.classList.toggle('active', a.dataset.slug === slug);
   });
   document.querySelectorAll('.wikilink').forEach(function(a){
@@ -731,6 +749,9 @@ function renderBreadcrumb(p){
     crumbs.push('<span class="sep">›</span><a class="crumb" data-page="' + esc(sectionSlug) + '">' + esc(parts[0]) + '</a>');
   } else if (sectionSlug && bySlug[sectionSlug] && parts.length === 1 && p.slug !== 'index'){
     crumbs.push('<span class="sep">›</span><span class="cur">' + esc(parts[0]) + '</span>');
+  } else if (p.slug !== 'index' && parts.length === 1){
+    // 顶层独立页面（如「更新日志」）：无父级 index，直接显示当前页标题
+    crumbs.push('<span class="sep">›</span><span class="cur">' + esc(p.title) + '</span>');
   }
   // 中间目录层级（不可点击，仅展示）
   for (var i = 1; i < parts.length - 1; i++){
@@ -774,11 +795,12 @@ function renderHomeNav(){
   // 每个顶层目录板块的定制元信息（未配置的目录使用默认图标/说明）
   var META = {
     '上师开示': {icon:'📖', title:'上师开示', desc:'按主题整理的上师开示，点击标题直接阅读。', tips:true},
+    '龙钦宁提传承': {icon:'🐉', title:'龙钦宁提传承', desc:'龙钦宁提传承相关资料与祖师传记，点击进入查看。'},
     '音频资源': {icon:'🎧', title:'音频资料', desc:'文字转语音版开示，点击标题即可在当前页面直接收听，也可用底部播放器连播。', audio:true, note:true},
     '书籍': {icon:'📚', title:'书籍', desc:'精选读物与参考资料，点击进入查看。'}
   };
-  // 固定首页板块顺序：已知板块优先，新增目录排在末尾
-  var ORDER = ['上师开示', '音频资源', '书籍', '龙钦宁提传承'];
+  // 固定首页板块顺序：一级目录按指定顺序，其余新增目录排在末尾
+  var ORDER = ['上师开示', '龙钦宁提传承', '音频资源', '书籍'];
   var dirNames = Object.keys(TREE.dirs).sort(function(a, b){
     var ia = ORDER.indexOf(a), ib = ORDER.indexOf(b);
     if (ia < 0) ia = 99; if (ib < 0) ib = 99;
@@ -809,6 +831,16 @@ function renderHomeNav(){
       walkBlock(node, dirName, 0, '').forEach(function(x){ html.push(x); });
     }
     html.push('</section>');
+  });
+  // 顶层独立页面（如「更新日志」）作为末位板块，与目录板块保持一致的视觉层级
+  (TREE.children || []).forEach(function(c){
+    if (c.type === 'page' && !c.is_index){
+      html.push('<section class="hn-sec">');
+      html.push('<h2 class="hn-sec-title">📝 ' + esc(c.title) + '</h2>');
+      html.push('<p class="hn-desc">记录网站历次版本更新的关键内容，点击查看发版历史。</p>');
+      html.push('<a class="hn-link" data-page="' + esc(c.slug) + '">' + esc(c.title) + '</a>');
+      html.push('</section>');
+    }
   });
   return '<div class="home-nav">' + html.join('') + '</div>';
 }
