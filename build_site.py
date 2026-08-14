@@ -326,10 +326,26 @@ a:hover{color:var(--accent-soft)}
 .nav a.active{background:var(--accent); color:#fff; text-decoration:none}
 .nav .group-label{font-size:1rem; color:var(--ink-faint); letter-spacing:.1em;
   padding:.9rem .6rem .3rem; font-weight:600}
-/* 目录项：仅显示目录，字体放大 ≥2 倍，点击跳转该目录首页 */
-.nav .dir-name{font-size:1.6rem; color:var(--accent); padding:.7rem .6rem .25rem; font-weight:600;
-  cursor:pointer; border-radius:6px; line-height:1.4}
-.nav .dir-name:hover{background:var(--surface-hover); color:var(--ink)}
+/* 目录项：仅显示目录（不显示文章列表）；按层级区分字号/字重/颜色/缩进 */
+.nav .dir-name{display:flex; align-items:baseline; gap:.55rem; cursor:pointer;
+  border-radius:6px; line-height:1.45; transition:background .15s}
+.nav .dir-name .dir-num{font-variant-numeric:tabular-nums; font-weight:700; color:var(--accent); flex:0 0 auto}
+.nav .dir-name .dir-label{flex:1; min-width:0; word-break:break-word}
+/* 一级：最大、藏红、加粗；二级：酱红、中字重、缩进；三级：红褐、弱字重、更深缩进 */
+.nav .dir-name[data-depth="0"]{font-size:1.7rem; font-weight:700; color:var(--accent);
+  padding:.55rem .5rem .3rem; letter-spacing:.02em}
+.nav .dir-name[data-depth="1"]{font-size:1.3rem; font-weight:600; color:var(--ink);
+  padding:.5rem .5rem .25rem 1.2rem}
+.nav .dir-name[data-depth="2"]{font-size:1.08rem; font-weight:500; color:var(--ink-soft);
+  padding:.4rem .5rem .2rem 2.3rem}
+.nav .dir-name[data-depth="3"]{font-size:1rem; font-weight:500; color:var(--ink-faint);
+  padding:.35rem .5rem .2rem 3.4rem}
+.nav .dir-name:hover{background:var(--surface-hover)}
+/* 移动端抽屉式侧栏的关闭按钮（仅移动端显示）与遮罩 */
+.sidebar-close{display:none; position:absolute; top:.5rem; right:.6rem; z-index:2;
+  border:none; background:none; color:var(--ink-soft); font-size:1.5rem; line-height:1; cursor:pointer}
+.sidebar-overlay{position:fixed; inset:0; background:rgba(46,26,24,.28); z-index:14; display:none}
+.sidebar-overlay.show{display:block}
 
 /* 内容区 */
 .content{flex:1; padding:2.6rem clamp(1.4rem, 6vw, 4.5rem) 9rem; max-width:820px; margin:0 auto}
@@ -430,11 +446,11 @@ a:hover{color:var(--accent-soft)}
 .hn-sec-title{font-size:1.15em; font-weight:700; color:var(--ink); margin:0 0 .3rem;
   display:flex; align-items:center; gap:.5rem; letter-spacing:.02em}
 .hn-desc{color:var(--ink-faint); font-size:.88em; margin:0 0 .8rem}
-.hn-dir{font-size:.82em; color:var(--accent); font-weight:600; letter-spacing:.05em;
-  margin:.85rem 0 .35rem}
-.hn-dir[data-depth="0"]{margin-top:.4rem; font-size:.88em}
-.hn-dir[data-depth="1"]{margin-top:.7rem}
-.hn-dir[data-depth="2"]{margin-top:.55rem; color:var(--ink-soft); font-weight:500}
+.hn-dir{font-size:.82em; color:var(--accent); font-weight:700; letter-spacing:.05em;
+  margin:.9rem 0 .35rem}
+.hn-dir[data-depth="0"]{margin-top:.5rem; font-size:1.05em; color:var(--accent)}
+.hn-dir[data-depth="1"]{margin-top:.7rem; font-size:.98em; color:var(--ink); font-weight:600}
+.hn-dir[data-depth="2"]{margin-top:.55rem; font-size:.9em; color:var(--ink-soft); font-weight:500}
 .hn-link{display:flex; align-items:center; gap:.4rem; padding:.42rem .7rem;
   border-radius:8px; color:var(--ink-soft); font-size:.95em; cursor:pointer;
   border:1px solid transparent; transition:all .15s}
@@ -449,6 +465,8 @@ a:hover{color:var(--accent-soft)}
 .audio-list{margin-top:.5rem}
 .audio-list-title{font-size:.95em; color:var(--ink-faint); margin:1.2rem 0 .5rem; font-weight:600}
 .audio-note{color:var(--ink-soft); font-size:.95em; margin:.6rem 0 1rem; line-height:1.7}
+.hn-tips{margin:.4rem 0 1rem; padding-left:1.2rem; list-style:disc}
+.hn-tips li{color:var(--ink-soft); font-size:.9em; line-height:1.7; margin:.3rem 0}
 
 /* 移动端 */
 @media(max-width:760px){
@@ -456,7 +474,7 @@ a:hover{color:var(--accent-soft)}
   .sidebar{position:fixed; left:0; top:53px; bottom:0; transform:translateX(-100%);
     transition:transform .2s; z-index:15; width:260px; background:var(--bg)}
   .sidebar.open{transform:translateX(0)}
-  .nav .dir-name{font-size:1.35rem}
+  .sidebar-close{display:block}
   .content{padding:1.6rem 1.1rem 9rem}
   .welcome .big{font-size:1.7em}
   .player .p-bar{padding:.7rem .8rem; gap:.5rem}
@@ -482,11 +500,15 @@ a:hover{color:var(--accent-soft)}
 
 <div class="layout">
   <aside class="sidebar" id="sidebar">
+    <button class="sidebar-close" id="sidebarClose" title="关闭菜单">✕</button>
     <input class="search" id="search" type="text" placeholder="搜索…">
     <nav class="nav" id="nav"></nav>
   </aside>
   <main class="content" id="content"></main>
 </div>
+
+<!-- 移动端：点击菜单外空白区域关闭侧栏 -->
+<div class="sidebar-overlay" id="sidebarOverlay"></div>
 
 <!-- 全局播放条 -->
 <div class="player" id="player">
@@ -544,22 +566,31 @@ function firstPageUnder(pathPrefix){
   list.sort(function(a, b){ return a.slug < b.slug ? -1 : 1; });
   return list.length ? list[0].slug : null;
 }
+// 去掉目录名前方自带的层级序号（如 "1. "、"1.1 "、"4."），改用统一计算序号避免重复
+function cleanDirName(name){
+  return name.replace(/^\d+(?:\.\d+)*\.?\s*/, '');
+}
 function renderNav(){
   var nav = document.getElementById('nav');
-  function walk(node, prefix, htmlArr){
-    (node.dirs ? Object.keys(node.dirs) : []).forEach(function(name){
+  // 递归渲染目录：按同级字母序稳定排序；统一计算层级序号 1 / 1.1 / 1.1.1…
+  function walk(node, prefix, parentNum, depth, htmlArr){
+    var names = (node.dirs ? Object.keys(node.dirs) : []).slice().sort();
+    names.forEach(function(name, idx){
       var sub = node.dirs[name];
+      var num = parentNum ? (parentNum + '.' + (idx + 1)) : String(idx + 1);
       var full = (prefix ? prefix + '/' : '') + name;
       var target = full + '/index';
       if (!bySlug[target]) target = firstPageUnder(full);
       if (target){
-        htmlArr.push('<div class="dir-name" data-slug="' + esc(target) + '">' + esc(name) + '</div>');
-        walk(sub, full, htmlArr);
+        htmlArr.push('<div class="dir-name" data-depth="' + depth + '" data-slug="' + esc(target) + '">'
+          + '<span class="dir-num">' + esc(num) + '</span>'
+          + '<span class="dir-label">' + esc(cleanDirName(name)) + '</span></div>');
+        walk(sub, full, num, depth + 1, htmlArr);
       }
     });
     return htmlArr;
   }
-  var arr = walk(TREE, '', []);
+  var arr = walk(TREE, '', '', 0, []);
   nav.innerHTML = arr.join('');
   nav.querySelectorAll('.dir-name').forEach(function(a){
     a.onclick = function(){ show(a.dataset.slug); closeSidebar(); };
@@ -657,14 +688,15 @@ function renderBreadcrumb(p){
   return '<div class="breadcrumb">' + crumbs.join('') + '</div>';
 }
 
-// ---- 首页导览：递归渲染目录树为可点击板块 ----
-function walkBlock(node, depth){
+// ---- 首页导览：递归渲染目录树为可点击板块（同样统一层级序号）----
+function walkBlock(node, depth, parentNum){
   var arr = [];
-  var childDirs = node.dirs ? Object.keys(node.dirs) : [];
-  childDirs.forEach(function(name){
+  var names = (node.dirs ? Object.keys(node.dirs) : []).slice().sort();
+  names.forEach(function(name, idx){
     var sub = node.dirs[name];
-    arr.push('<div class="hn-dir" data-depth="' + depth + '">' + esc(name) + '</div>');
-    walkBlock(sub, depth + 1).forEach(function(x){ arr.push(x); });
+    var num = parentNum ? (parentNum + '.' + (idx + 1)) : String(idx + 1);
+    arr.push('<div class="hn-dir" data-depth="' + depth + '">' + esc(num) + '. ' + esc(cleanDirName(name)) + '</div>');
+    walkBlock(sub, depth + 1, num).forEach(function(x){ arr.push(x); });
   });
   (node.children || []).forEach(function(c){
     if (c.type === 'page' && !c.is_index){
@@ -684,7 +716,11 @@ function renderHomeNav(){
     html.push('<section class="hn-sec">');
     html.push('<h2 class="hn-sec-title">📖 上师开示</h2>');
     html.push('<p class="hn-desc">按主题整理的上师开示，点击标题直接阅读。</p>');
-    walkBlock(TREE.dirs['上师开示'], 0).forEach(function(x){ html.push(x); });
+    html.push('<ul class="hn-tips">'
+      + '<li>🔊 带有小喇叭标志的文章表示有配套音频，可直接点击收听；</li>'
+      + '<li>未带小喇叭标志的文章暂无音频，正在陆续添加中，敬请期待。</li>'
+      + '</ul>');
+    walkBlock(TREE.dirs['上师开示'], 0, '').forEach(function(x){ html.push(x); });
     html.push('</section>');
   }
   // 板块二：音频资料（独立音频列表，点击直接播放）
@@ -703,7 +739,7 @@ function renderHomeNav(){
   if (TREE.dirs['书籍']){
     html.push('<section class="hn-sec">');
     html.push('<h2 class="hn-sec-title">📚 书籍</h2>');
-    walkBlock(TREE.dirs['书籍'], 0).forEach(function(x){ html.push(x); });
+    walkBlock(TREE.dirs['书籍'], 0, '').forEach(function(x){ html.push(x); });
     html.push('</section>');
   }
   return '<div class="home-nav">' + html.join('') + '</div>';
@@ -883,10 +919,18 @@ document.getElementById('search').addEventListener('input', function(){
 });
 
 // ---- 侧栏开合 ----
-function closeSidebar(){ document.getElementById('sidebar').classList.remove('open'); }
+function closeSidebar(){
+  document.getElementById('sidebar').classList.remove('open');
+  document.getElementById('sidebarOverlay').classList.remove('show');
+}
 document.getElementById('menuBtn').onclick = function(){
-  document.getElementById('sidebar').classList.toggle('open');
+  var s = document.getElementById('sidebar'), o = document.getElementById('sidebarOverlay');
+  var open = s.classList.toggle('open');
+  o.classList.toggle('show', open);
 };
+// 关闭按钮 & 点击菜单外空白区域均可关闭抽屉
+document.getElementById('sidebarClose').onclick = function(){ closeSidebar(); };
+document.getElementById('sidebarOverlay').onclick = function(){ closeSidebar(); };
 
 // ---- 初始化 ----
 renderNav();
