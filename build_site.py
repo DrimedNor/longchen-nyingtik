@@ -432,7 +432,7 @@ a:hover{color:var(--accent-soft)}
 /* 第1行：状态栏（左：当前音频名 / 右：关闭叉号） */
 .player .p-status{display:flex; align-items:center; gap:.6rem; padding:.85rem 1.3rem;
   font-size:1rem; color:var(--ink-soft); border-bottom:1px solid var(--line); flex:0 0 auto}
-.player .p-status-text{flex:1; min-width:0; text-align:center; white-space:nowrap;
+.player .p-status-text{flex:1; min-width:0; text-align:left; white-space:nowrap;
   overflow:hidden; text-overflow:ellipsis; font-weight:500}
 .player .p-status b{color:var(--accent); font-weight:600}
 /* 第2行：控制按钮（上一首 ⏮ / 后退15秒 -15 / 播放 ▶ / 下一首 ⏭ / 前进15秒 +15） */
@@ -456,12 +456,15 @@ a:hover{color:var(--accent-soft)}
   border-radius:4px; width:0%}
 .player .p-progress .p-thumb{position:absolute; top:50%; width:16px; height:16px; border-radius:50%;
   background:#fff; border:2px solid var(--gold); transform:translate(-50%,-50%); left:0%}
-/* 第4行：播放列表开关（居中、默认收起，点击展开） */
-.player .p-pl-row{display:flex; align-items:center; justify-content:center; gap:.6rem; padding:.6rem 1.3rem;
-  flex:0 0 auto; border-top:1px solid var(--line)}
+/* 第4行：播放模式 + 播放列表 同一行（两端对齐，空隙均衡；播放列表按钮不再居中） */
+.player .p-footer{display:flex; align-items:center; justify-content:space-between; gap:.6rem;
+  padding:.6rem 1.3rem; flex:0 0 auto; border-top:1px solid var(--line)}
+.player .p-footer .p-mode{margin:0; flex:0 0 auto}
+.player .p-footer .p-pl-toggle{margin:0; flex:0 0 auto}
 .player .p-pl-toggle{border:1px solid var(--gold); background:var(--surface); color:var(--gold-deep);
   cursor:pointer; font-size:.92rem; padding:.35rem .9rem; border-radius:999px;
-  display:inline-flex; align-items:center; gap:.35rem; font-family:inherit; transition:background .15s}
+  display:inline-flex; align-items:center; gap:.35rem; font-family:inherit; transition:background .15s;
+  white-space:nowrap}
 .player .p-pl-toggle:hover{background:var(--surface-soft)}
 .player .p-pl-hint{font-size:.8rem; color:var(--ink-faint)}
 .player .p-close{border:none; background:none; cursor:pointer; color:var(--ink-soft);
@@ -581,6 +584,8 @@ a:hover{color:var(--accent-soft)}
   .fs-cap{display:none}
   .fs-pill{padding:.05rem .15rem; gap:0}
   .fs-pill button{width:1.7rem; height:1.7rem; font-size:.9rem}
+  .player .p-footer{gap:.4rem; padding:.55rem .9rem}
+  .player .p-pl-hint{display:none}
 }
 </style>
 </head>
@@ -611,9 +616,8 @@ a:hover{color:var(--accent-soft)}
 
 <!-- 全局播放器（默认占据下三分之一屏） -->
 <div class="player" id="player">
-  <!-- 第1行：状态栏（左：播放模式 / 中：当前音频名 / 右：关闭叉号） -->
+  <!-- 第1行：状态栏（左：当前音频名 / 右：关闭叉号） -->
   <div class="p-status" id="pStatus">
-    <button class="p-mode" id="pMode" title="播放模式：顺序 / 逆序 / 随机 / 单曲循环（点击切换）">🔁 顺序</button>
     <span class="p-status-text" id="pStatusText">暂未播放</span>
     <button class="p-close" id="pClose" title="关闭播放器">✕</button>
   </div>
@@ -631,8 +635,9 @@ a:hover{color:var(--accent-soft)}
     <div class="p-progress" id="pProgress"><div class="p-fill" id="pFill"></div><div class="p-thumb" id="pThumb"></div></div>
     <span class="p-time" id="pTimeDur">0:00</span>
   </div>
-  <!-- 第4行：播放列表开关（居中、默认收起，点击展开） -->
-  <div class="p-pl-row">
+  <!-- 第4行：播放模式 + 播放列表 同一行（两端对齐，空隙均衡） -->
+  <div class="p-footer">
+    <button class="p-mode" id="pMode" title="播放模式：顺序 / 逆序 / 随机 / 单曲循环（点击切换）">🔁 顺序</button>
     <button class="p-pl-toggle" id="pPlToggle">📋 播放列表 <span class="p-pl-hint" id="pPlHint">点击展开播放列表</span></button>
   </div>
   <!-- 完整播放列表（点击开关展开） -->
@@ -795,9 +800,20 @@ function show(slug){
   var crumb = renderBreadcrumb(p);
   document.getElementById('content').innerHTML = '<div class="article">' + crumb + inner + '</div>';
   document.getElementById('pageCrumbs').textContent = p.is_index ? '' : (' / ' + p.title);
-  document.querySelectorAll('.nav a, .nav .dir-name').forEach(function(a){
-    a.classList.toggle('active', a.dataset.slug === slug);
+  // 目录选中态：仅高亮「层级最深」的匹配项。
+  // 当父目录（大标题，如「1 为何修行」）与子目录（如「1.1 诸行无常」）解析到同一页面
+  // （data-slug 相同，父目录无自身内容、只含该子目录时会发生）时，只点亮子文件夹，
+  // 避免点击子文件夹时连带上方大标题一并反色高亮。
+  var _navItems = document.querySelectorAll('.nav a, .nav .dir-name');
+  var _best = null, _bestDepth = -1;
+  _navItems.forEach(function(a){
+    a.classList.remove('active');
+    if (a.dataset.slug === slug){
+      var d = parseInt(a.dataset.depth || '0', 10);
+      if (d > _bestDepth){ _bestDepth = d; _best = a; }
+    }
   });
+  if (_best) _best.classList.add('active');
   document.querySelectorAll('.wikilink').forEach(function(a){
     a.onclick = function(ev){
       ev.preventDefault();

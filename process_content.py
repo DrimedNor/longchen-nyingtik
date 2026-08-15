@@ -9,6 +9,8 @@ process_content.py — 批处理 content/ 下全部文章，统一完成三件�
      （wikilink 形式 [[slug|title]]，由 build_site.py 渲染为站内链接）。
 约定：
   - 跳过特殊文件：本次更新内容.md、更新日志.md、所有 index.md（目录落地页）。
+  - 仅处理文件名标注 🔊 符号的文章（已定稿、已放置配套音频）；
+    未放置音频（文件名无 🔊）的文件暂不处理，待补录音频后再统一处理。
   - 跳过 Obsidian 进行中的重命名文件：以「X.md」结尾者（如「xxxX.md」），
     约定不改动用户尚未定稿的文章，待其去掉 X 后再统一处理。
   - 幂等：已有 author/tags 不覆盖；已含「相关主题文章推荐」则不重复插入。
@@ -219,6 +221,10 @@ def collect_articles():
             if not f.endswith(".md"):
                 continue
             if f in SKIP_FILES or f == "index.md":
+                continue
+            # 仅处理文件名标注 🔊 符号的文章（已定稿、已放置配套音频）；
+            # 未放置音频（文件名无 🔊）的文件暂不处理。
+            if "🔊" not in f:
                 continue
             # 跳过 Obsidian 进行中的重命名文件（约定：不触碰 X 后缀，
             # 例如「xxxX.md」），避免改动用户尚未定稿的文章。
