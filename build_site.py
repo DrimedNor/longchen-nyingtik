@@ -585,7 +585,8 @@ a:hover{color:var(--accent-soft)}
   .fs-pill{padding:.05rem .15rem; gap:0}
   .fs-pill button{width:1.7rem; height:1.7rem; font-size:.9rem}
   .player .p-footer{gap:.4rem; padding:.55rem .9rem}
-  .player .p-pl-hint{display:none}
+  .player .p-pl-toggle{font-size:.82rem; padding:.3rem .7rem}
+  .player .p-pl-hint{font-size:.74rem}
 }
 </style>
 </head>
@@ -637,8 +638,8 @@ a:hover{color:var(--accent-soft)}
   </div>
   <!-- 第4行：播放模式 + 播放列表 同一行（两端对齐，空隙均衡） -->
   <div class="p-footer">
-    <button class="p-mode" id="pMode" title="播放模式：顺序 / 逆序 / 随机 / 单曲循环（点击切换）">🔁 顺序</button>
     <button class="p-pl-toggle" id="pPlToggle">📋 播放列表 <span class="p-pl-hint" id="pPlHint">点击展开播放列表</span></button>
+    <button class="p-mode" id="pMode" title="播放模式：顺序 / 逆序 / 随机 / 单曲循环（点击切换）">🔁 顺序</button>
   </div>
   <!-- 完整播放列表（点击开关展开） -->
   <div class="p-playlist" id="pPlaylist"></div>
