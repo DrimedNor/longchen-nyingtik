@@ -796,7 +796,10 @@ function show(slug){
   // 音频资源页 → 附加独立音频列表（子文件夹 index 仅显示该组音频）
   if (p.is_index && p.slug.indexOf('音频资源') === 0){
     var grp = (p.slug === '音频资源/index') ? null : (p.slug.split('/')[1] || null);
-    inner += renderAudioList(grp);
+    // 若该子文件夹 index 已在正文中自带音频播放列表（含 .play-btn，即按文章目录结构
+    // 手工整理的列表），则不再重复附加自动列表，避免同一批音频出现两套播放按钮。
+    var _curated = grp && p.html.indexOf('class="play-btn"') !== -1;
+    if (!_curated) inner += renderAudioList(grp);
   }
   var crumb = renderBreadcrumb(p);
   document.getElementById('content').innerHTML = '<div class="article">' + crumb + inner + '</div>';
