@@ -661,6 +661,7 @@ var TREE = @@TREE_JSON@@;
 var AUDIO_ALBUM = @@AUDIO_ALBUM_JSON@@;
 var AUDIO_TRACKS = @@AUDIO_TRACKS_JSON@@;
 var HOME_UPDATE_HTML = @@HOME_UPDATE_JSON@@;   // 首页「本次更新内容」区块（纯用户资料，不含技术调整）
+var HOME_UPDATE_DATE = "@@HOME_UPDATE_DATE@@"; // 首页公告区标题用的更新日期（取自内容文件 frontmatter date 字段）
 
 var bySlug = {};
 PAGES.forEach(function(p){ bySlug[p.slug] = p; });
@@ -785,7 +786,7 @@ function show(slug){
   if (isHome){
     inner = '<div class="welcome"><div class="big">' + esc(SITE_TITLE) + '</div>'
           + '<div class="welcome-sub">龙钦宁提资料库 · 学习整理与分享</div></div>'
-          + '<section class="hn-sec home-update"><h2 class="hn-sec-title">📌 本次更新内容</h2>'
+          + '<section class="hn-sec home-update"><h2 class="hn-sec-title">最近更新 · ' + HOME_UPDATE_DATE + '</h2>'
           + HOME_UPDATE_HTML + '</section>'
           + p.html + renderHomeNav();
   }
@@ -1357,11 +1358,14 @@ def main():
 
     # 首页「本次更新内容」区块：读取独立内容源文件并渲染（仅用户资料，不含技术调整）
     home_update_html = ""
+    home_update_date = ""
     upd_path = os.path.join(CONTENT_DIR, "本次更新内容.md")
     if os.path.exists(upd_path):
         upd_txt = open(upd_path, encoding="utf-8").read()
-        _, upd_body = parse_frontmatter(upd_txt)
+        upd_meta, upd_body = parse_frontmatter(upd_txt)
         home_update_html = md_to_html(upd_body)
+        # 公告区标题日期：优先取 frontmatter 的 date 字段（如 2026-08-18），无则回退空串
+        home_update_date = (upd_meta.get("date") or "").strip()
 
     site_title = "龙的传人｜Longchen Nyingtik"
     for p in pages:
@@ -1415,6 +1419,7 @@ def main():
     html_out = html_out.replace("@@PAGES_JSON@@", json.dumps(pages, ensure_ascii=False))
     html_out = html_out.replace("@@TREE_JSON@@", json.dumps(tree, ensure_ascii=False))
     html_out = html_out.replace("@@HOME_UPDATE_JSON@@", json.dumps(home_update_html, ensure_ascii=False))
+    html_out = html_out.replace("@@HOME_UPDATE_DATE@@", home_update_date)
     html_out = html_out.replace("@@SITE_TITLE@@", site_title)
 
     os.makedirs(DIST_DIR, exist_ok=True)
