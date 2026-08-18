@@ -1368,18 +1368,13 @@ def main():
         if p["slug"] == "index" and p["meta"].get("title"):
             site_title = p["meta"]["title"]
 
-    # 生成音频轨道列表：每篇带本地音频的文章，对应一个 track（标题=文章标题，src=audio/文件名）
-    audio_tracks = []
+    # 生成音频轨道列表：以本地 mp3 为唯一来源，每条 mp3 仅收录一次（避免聚合页/文章页重复引用产生重复轨道）
+    # title = mp3 文件名（去 .mp3，即音频真实名称，不再误用包含引用的页面标题）；slug = 引用它的文章页（优先非聚合页）
+    ref_map = {}  # fname -> [(slug, page_title), ...]
     for p in pages:
         for m in re.finditer(r'data-audio="([^"]+)"', p["html"]):
             fname = m.group(1)
-            title = fname[:-4] if fname.lower().endswith(".mp3") else fname
-            audio_tracks.append({
-                "title": p["title"] or title,
-                "slug": p["slug"],
-                "src": "audio/" + quote(fname),
-                "file": fname,
-            })
+            ref_map.setdefault(fname, []).append((p["slug"], p["title"]))
 
     # 计算某音频所属分组（其父文件夹名），用于音频资源页分组展示
     def audio_group(fname):
@@ -1389,21 +1384,29 @@ def main():
         rel = os.path.relpath(os.path.dirname(path), CONTENT_DIR)
         parts = [x for x in rel.split(os.sep) if x and x != "."]
         return parts[-1] if parts else ""
-    # 补充未被任何页面引用的本地音频（如《上师开示》《上师赞歌》整文件夹），使其也能列出并可播放
-    seen = set(t["file"] for t in audio_tracks)
+
+    AGG_PREFIXES = ("音频资源",)
+    AGG_SLUGS = ("本次更新内容",)
+    audio_tracks = []
     for fname in sorted(LOCAL_AUDIO.keys()):
-        if fname in seen:
-            continue
         title = fname[:-4] if fname.lower().endswith(".mp3") else fname
-        audio_tracks.append({
+        refs = ref_map.get(fname, [])
+        slug = ""
+        for s, _pt in refs:
+            if s and s not in AGG_SLUGS and not s.startswith(AGG_PREFIXES):
+                slug = s
+                break
+        if not slug and refs:
+            slug = refs[0][0]
+        t = {
             "title": title,
-            "slug": "",
+            "slug": slug,
             "src": "audio/" + quote(fname),
             "file": fname,
-        })
-    # 为每条 track 标注分组
-    for t in audio_tracks:
-        t["group"] = audio_group(t["file"])
+        }
+        t["group"] = audio_group(fname)
+        audio_tracks.append(t)
+
 
     html_out = PAGE_TEMPLATE
     html_out = html_out.replace("@@SITE_TITLE_JSON@@", json.dumps(site_title, ensure_ascii=False))
