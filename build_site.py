@@ -475,6 +475,20 @@ a:hover{color:var(--accent-soft)}
   cursor:pointer; font-size:.85rem; padding:.2rem .7rem; border-radius:999px;
   display:inline-flex; align-items:center; gap:.3rem; font-family:inherit; white-space:nowrap; transition:background .15s}
 .player .p-mode:hover{background:var(--surface-soft)}
+/* 倍速按钮（位于播放模式右侧，与播放模式同款胶囊样式） */
+.player .p-footer-left{display:flex; align-items:center; gap:.55rem}
+.player .p-speed-wrap{position:relative; display:inline-flex}
+.player .p-speed{border:1px solid var(--gold); background:var(--surface); color:var(--gold-deep);
+  cursor:pointer; font-size:.85rem; padding:.2rem .7rem; border-radius:999px;
+  display:inline-flex; align-items:center; gap:.3rem; font-family:inherit; white-space:nowrap; transition:background .15s}
+.player .p-speed:hover{background:var(--surface-soft)}
+.player .p-speed-menu{position:absolute; bottom:calc(100% + 8px); left:0; z-index:50;
+  background:var(--surface); border:1px solid var(--line); border-radius:12px; padding:.3rem;
+  box-shadow:0 -6px 20px rgba(59,42,34,.18); min-width:7.5rem}
+.player .p-speed-menu .sp-item{padding:.45rem .7rem; border-radius:8px; font-size:.9rem; color:var(--ink-soft);
+  cursor:pointer; white-space:nowrap; transition:background .15s}
+.player .p-speed-menu .sp-item:hover{background:var(--surface-soft)}
+.player .p-speed-menu .sp-item.active{color:var(--accent); font-weight:600; background:var(--surface-soft)}
 /* 播放列表（默认收起，点击展开） */
 .player .p-playlist{flex:1 1 auto; overflow-y:auto; -webkit-overflow-scrolling:touch;
   padding:.3rem 0; display:none}
@@ -512,6 +526,19 @@ a:hover{color:var(--accent-soft)}
 .player-mini .pm-fill{position:absolute; left:0; top:0; bottom:0;
   background:var(--turq); border-radius:3px; width:0}
 .player-mini .pm-expand{flex:0 0 auto}
+/* 迷你条倍速按钮（紧凑胶囊，位于展开按钮左侧） */
+.player-mini .pm-speed-wrap{position:relative; display:inline-flex}
+.player-mini .pm-speed{border:1px solid var(--gold); background:var(--surface); color:var(--gold-deep);
+  cursor:pointer; font-size:.78rem; padding:.1rem .5rem; border-radius:999px; font-family:inherit;
+  white-space:nowrap; line-height:1.6; flex:0 0 auto}
+.player-mini .pm-speed:hover{background:var(--surface-soft)}
+.player-mini .pm-speed-menu{position:absolute; bottom:calc(100% + 8px); right:0; z-index:50;
+  background:var(--surface); border:1px solid var(--line); border-radius:12px; padding:.3rem;
+  box-shadow:0 -6px 20px rgba(59,42,34,.18); min-width:6.5rem}
+.player-mini .pm-speed-menu .sp-item{padding:.4rem .6rem; border-radius:8px; font-size:.85rem; color:var(--ink-soft);
+  cursor:pointer; white-space:nowrap; transition:background .15s}
+.player-mini .pm-speed-menu .sp-item:hover{background:var(--surface-soft)}
+.player-mini .pm-speed-menu .sp-item.active{color:var(--accent); font-weight:600; background:var(--surface-soft)}
 
 /* 元信息 */
 .meta{font-size:.85em; color:var(--ink-faint); margin:1.2rem 0 1.6rem; display:flex; flex-wrap:wrap; gap:.3rem .9rem}
@@ -638,8 +665,21 @@ a:hover{color:var(--accent-soft)}
   </div>
   <!-- 第4行：播放模式 + 播放列表 同一行（两端对齐，空隙均衡） -->
   <div class="p-footer">
+    <div class="p-footer-left">
+      <button class="p-mode" id="pMode" title="播放模式：顺序 / 逆序 / 随机 / 单曲循环（点击切换）">🔁 顺序</button>
+      <span class="p-speed-wrap">
+        <button class="p-speed" id="pSpeed" title="播放速度（点击选择倍速）">倍速 1x</button>
+        <div class="p-speed-menu" id="pSpeedMenu" style="display:none">
+          <div class="sp-item" data-rate="0.5">0.5x</div>
+          <div class="sp-item" data-rate="0.75">0.75x</div>
+          <div class="sp-item" data-rate="1">1x（默认）</div>
+          <div class="sp-item" data-rate="1.25">1.25x</div>
+          <div class="sp-item" data-rate="1.5">1.5x</div>
+          <div class="sp-item" data-rate="2">2x</div>
+        </div>
+      </span>
+    </div>
     <button class="p-pl-toggle" id="pPlToggle">📋 播放列表 <span class="p-pl-hint" id="pPlHint">点击展开播放列表</span></button>
-    <button class="p-mode" id="pMode" title="播放模式：顺序 / 逆序 / 随机 / 单曲循环（点击切换）">🔁 顺序</button>
   </div>
   <!-- 完整播放列表（点击开关展开） -->
   <div class="p-playlist" id="pPlaylist"></div>
@@ -651,6 +691,17 @@ a:hover{color:var(--accent-soft)}
   <button class="pm-btn" id="pmPlay" title="播放 / 暂停">⏸</button>
   <span class="pm-name" id="pmName">暂未播放</span>
   <div class="pm-progress" id="pmProgress"><div class="pm-fill" id="pmFill"></div></div>
+  <span class="pm-speed-wrap">
+    <button class="pm-speed" id="pmSpeed" title="播放速度（点击选择倍速）">1x</button>
+    <div class="pm-speed-menu" id="pmSpeedMenu" style="display:none">
+      <div class="sp-item" data-rate="0.5">0.5x</div>
+      <div class="sp-item" data-rate="0.75">0.75x</div>
+      <div class="sp-item" data-rate="1">1x（默认）</div>
+      <div class="sp-item" data-rate="1.25">1.25x</div>
+      <div class="sp-item" data-rate="1.5">1.5x</div>
+      <div class="sp-item" data-rate="2">2x</div>
+    </div>
+  </span>
   <button class="pm-btn" id="pmExpand" title="展开播放器">↗</button>
 </div>
 
@@ -1022,6 +1073,8 @@ function matchByTitle(t){
 var playerAudio = new Audio();
 playerAudio.preload = 'none';
 var curIdx = -1;
+var SPEEDS = [0.5, 0.75, 1, 1.25, 1.5, 2];   // 倍速预设档位
+var speedIdx = 2;                              // 默认 1x
 
 // ---- 播放模式：顺序 / 逆序 / 随机 / 单曲循环 ----
 var PLAY_MODES = ['顺序', '逆序', '随机', '单曲'];
@@ -1095,6 +1148,7 @@ function playTrack(idx){
   curIdx = idx;
   var t = AUDIO_TRACKS[idx];
   playerAudio.src = t.src;
+  playerAudio.playbackRate = SPEEDS[speedIdx];
   playerAudio.play();
   document.getElementById('pStatusText').innerHTML = '正在播放：<b>' + esc(t.title) + '</b>';
   document.getElementById('pPlay').textContent = '⏸';
@@ -1237,6 +1291,47 @@ document.getElementById('pMode').onclick = function(){
   playMode = (playMode + 1) % PLAY_MODES.length;
   updateModeBtn();
 };
+// ---- 播放速度（倍速）：点击按钮弹出菜单，选中档位实时生效 ----
+function applySpeed(){
+  var r = SPEEDS[speedIdx];
+  playerAudio.playbackRate = r;                 // 实时改变音频播放速率
+  var pb = document.getElementById('pSpeed');
+  if (pb) pb.textContent = '倍速 ' + r + 'x';    // 按钮显示当前倍速值
+  var mb = document.getElementById('pmSpeed');
+  if (mb) mb.textContent = r + 'x';
+  document.querySelectorAll('.sp-item').forEach(function(el){
+    el.classList.toggle('active', parseFloat(el.getAttribute('data-rate')) === r);
+  });
+}
+function closeAllSpeedMenus(){
+  document.querySelectorAll('.p-speed-menu, .pm-speed-menu').forEach(function(m){ m.style.display = 'none'; });
+}
+document.getElementById('pSpeed').onclick = function(e){
+  e.stopPropagation();
+  var menu = document.getElementById('pSpeedMenu');
+  var open = menu.style.display === 'block';
+  closeAllSpeedMenus();
+  if (!open) menu.style.display = 'block';
+};
+document.getElementById('pmSpeed').onclick = function(e){
+  e.stopPropagation();
+  var menu = document.getElementById('pmSpeedMenu');
+  var open = menu.style.display === 'block';
+  closeAllSpeedMenus();
+  if (!open) menu.style.display = 'block';
+};
+document.querySelectorAll('.p-speed-menu .sp-item, .pm-speed-menu .sp-item').forEach(function(el){
+  el.addEventListener('click', function(e){
+    e.stopPropagation();
+    var i = SPEEDS.indexOf(parseFloat(el.getAttribute('data-rate')));
+    if (i >= 0) speedIdx = i;
+    applySpeed();
+    closeAllSpeedMenus();
+  });
+});
+document.addEventListener('click', closeAllSpeedMenus);
+document.addEventListener('keydown', function(e){ if (e.key === 'Escape') closeAllSpeedMenus(); });
+applySpeed();   // 初始化按钮文案与默认高亮
 // 悬浮按钮：打开播放器
 document.getElementById('playerLaunch').onclick = function(){
   document.getElementById('player').classList.add('show');
