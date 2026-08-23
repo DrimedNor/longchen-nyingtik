@@ -475,14 +475,13 @@ a:hover{color:var(--accent-soft)}
   cursor:pointer; font-size:.85rem; padding:.2rem .7rem; border-radius:999px;
   display:inline-flex; align-items:center; gap:.3rem; font-family:inherit; white-space:nowrap; transition:background .15s}
 .player .p-mode:hover{background:var(--surface-soft)}
-/* 倍速按钮（位于播放模式右侧，与播放模式同款胶囊样式） */
-.player .p-footer-left{display:flex; align-items:center; gap:.55rem}
+/* 倍速按钮（位于播放器底部最右侧，与播放模式同款胶囊样式） */
 .player .p-speed-wrap{position:relative; display:inline-flex}
 .player .p-speed{border:1px solid var(--gold); background:var(--surface); color:var(--gold-deep);
   cursor:pointer; font-size:.85rem; padding:.2rem .7rem; border-radius:999px;
   display:inline-flex; align-items:center; gap:.3rem; font-family:inherit; white-space:nowrap; transition:background .15s}
 .player .p-speed:hover{background:var(--surface-soft)}
-.player .p-speed-menu{position:absolute; bottom:calc(100% + 8px); left:0; z-index:50;
+.player .p-speed-menu{position:absolute; bottom:calc(100% + 8px); right:0; z-index:50;
   background:var(--surface); border:1px solid var(--line); border-radius:12px; padding:.3rem;
   box-shadow:0 -6px 20px rgba(59,42,34,.18); min-width:7.5rem}
 .player .p-speed-menu .sp-item{padding:.45rem .7rem; border-radius:8px; font-size:.9rem; color:var(--ink-soft);
@@ -663,23 +662,21 @@ a:hover{color:var(--accent-soft)}
     <div class="p-progress" id="pProgress"><div class="p-fill" id="pFill"></div><div class="p-thumb" id="pThumb"></div></div>
     <span class="p-time" id="pTimeDur">0:00</span>
   </div>
-  <!-- 第4行：播放模式 + 播放列表 同一行（两端对齐，空隙均衡） -->
+  <!-- 第4行：播放列表(最左) + 播放模式/调整顺序(中) + 倍速(最右) -->
   <div class="p-footer">
-    <div class="p-footer-left">
-      <button class="p-mode" id="pMode" title="播放模式：顺序 / 逆序 / 随机 / 单曲循环（点击切换）">🔁 顺序</button>
-      <span class="p-speed-wrap">
-        <button class="p-speed" id="pSpeed" title="播放速度（点击选择倍速）">倍速 1x</button>
-        <div class="p-speed-menu" id="pSpeedMenu" style="display:none">
-          <div class="sp-item" data-rate="0.5">0.5x</div>
-          <div class="sp-item" data-rate="0.75">0.75x</div>
-          <div class="sp-item" data-rate="1">1x（默认）</div>
-          <div class="sp-item" data-rate="1.25">1.25x</div>
-          <div class="sp-item" data-rate="1.5">1.5x</div>
-          <div class="sp-item" data-rate="2">2x</div>
-        </div>
-      </span>
-    </div>
     <button class="p-pl-toggle" id="pPlToggle">📋 播放列表 <span class="p-pl-hint" id="pPlHint">点击展开播放列表</span></button>
+    <button class="p-mode" id="pMode" title="播放模式：顺序 / 逆序 / 随机 / 单曲循环（点击切换）">🔁 顺序</button>
+    <span class="p-speed-wrap">
+      <button class="p-speed" id="pSpeed" title="播放速度（点击选择倍速）">倍速 1x</button>
+      <div class="p-speed-menu" id="pSpeedMenu" style="display:none">
+        <div class="sp-item" data-rate="0.5">0.5x</div>
+        <div class="sp-item" data-rate="0.75">0.75x</div>
+        <div class="sp-item" data-rate="1">1x（默认）</div>
+        <div class="sp-item" data-rate="1.25">1.25x</div>
+        <div class="sp-item" data-rate="1.5">1.5x</div>
+        <div class="sp-item" data-rate="2">2x</div>
+      </div>
+    </span>
   </div>
   <!-- 完整播放列表（点击开关展开） -->
   <div class="p-playlist" id="pPlaylist"></div>
