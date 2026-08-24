@@ -68,8 +68,13 @@ def inline(text):
             # 本地存在 → 播放按钮（触发全局播放器）；否则跳转昌列寺
             fname = target.split("/")[-1].strip()
             if fname in LOCAL_AUDIO:
-                return ('<button class="play-btn" data-audio="%s">▶ 播放</button>'
-                        % html_mod.escape(fname, quote=True))
+                # 显示音频「名字」（去扩展名、去 TTS 音色尾缀如 _云扬），再附播放按钮
+                base = fname[:-4] if fname.lower().endswith(".mp3") else fname
+                aname = re.sub(r"_云扬$", "", base)
+                return ('<span class="audio-name">%s</span>'
+                        '<button class="play-btn" data-audio="%s">▶ 播放</button>'
+                        % (html_mod.escape(aname, quote=True),
+                           html_mod.escape(fname, quote=True)))
             return ('<a class="audio-jump" href="%s" target="_blank" rel="noopener">'
                     '🎧 收听音频（跳转昌列寺）</a>' % CHANGLESI_ALBUM)
         # 内部链接 -> data-page 锚点
@@ -218,6 +223,23 @@ def discover_pages():
                 "meta": meta,
                 "html": md_to_html(body),
             })
+    # 给「上师开示」非索引文章页（未配音频）自动追加角标；零维护：补 [[xxx.mp3]] 后本段跳过
+    _AP_BANNER = ('<aside class="audio-pending">🎧 <b>音频制作中</b> · '
+                  '本文文字版已上线，音频版正在整理，欢迎随缘预定下一篇。</aside>')
+    for pg in pages:
+        d = pg.get("dir") or ""
+        slug_v = pg.get("slug") or ""
+        if pg.get("is_index") or not d.startswith("上师开示/"):
+            continue
+        if "data-audio=" in pg.get("html", ""):
+            continue
+        html = pg["html"]
+        # 在首个 </h1> 之后插入角标；如无 h1，则插到开头
+        if "</h1>" in html:
+            html = html.replace("</h1>", "</h1>\n" + _AP_BANNER, 1)
+        else:
+            html = _AP_BANNER + html
+        pg["html"] = html
     return pages
 
 
@@ -398,9 +420,21 @@ a:hover{color:var(--accent-soft)}
 /* 音频 */
 .article .play-btn{display:inline-flex; align-items:center; gap:.4rem; border:1px solid var(--accent);
   color:var(--accent); background:#fff; padding:.42rem 1.2rem; border-radius:999px;
-  font-size:.95em; cursor:pointer; margin:.5rem 0; transition:all .15s; font-family:inherit}
+  font-size:.95em; cursor:pointer; margin:.15rem 0 .25rem; transition:all .15s; font-family:inherit}
 .article .play-btn:hover{background:var(--accent); color:#fff}
 .article .play-btn.playing{background:var(--accent); color:#fff}
+.article .audio-name{display:block; font-weight:600; color:var(--ink);
+  margin:.1rem 0 .45rem; font-size:1.02em; line-height:1.4}
+/* 音频条目：让 <li> 成浅卡条，淡化 disc 项符；用 :has() 精准只命中含播放按钮的列表 */
+.article li:has(.play-btn){list-style:none; margin-left:-1.1em;
+  padding:.55em .85em; border:1px solid var(--line); border-left:3px solid var(--accent-soft);
+  border-radius:8px; background:var(--surface-soft)}
+/* 文字页「音频制作中」角标（柔和金色边卡片，零维护：配上 [[xxx.mp3]] 即消失） */
+.article .audio-pending{margin:.2rem 0 1.2rem; padding:.7rem 1rem;
+  border:1px dashed var(--gold); border-left:3px solid var(--gold);
+  background:rgba(212,175,55,.06); color:var(--gold-deep);
+  border-radius:6px; font-size:.95em; line-height:1.5}
+.article .audio-pending b{color:var(--gold-deep); font-weight:600}
 .article .audio-jump{display:inline-block; border:1px solid var(--accent); color:var(--accent);
   padding:.3rem 1.1rem; border-radius:999px; font-size:.92em; margin:.4rem 0}
 .article .audio-jump:hover{background:var(--accent); color:#fff}
