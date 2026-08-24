@@ -1561,6 +1561,11 @@ def main():
         shutil.copy2(src, os.path.join(audio_dir, fname))
         copied += 1
 
+    # 复制 Cloudflare Pages 的 _headers（缓存/安全策略）到 dist/ 根；仓库无此文件时跳过
+    _headers_src = os.path.join(os.path.dirname(os.path.abspath(__file__)), "cloudflare", "_headers")
+    if os.path.exists(_headers_src):
+        shutil.copy2(_headers_src, os.path.join(DIST_DIR, "_headers"))
+
     print("已生成: %s" % out_path)
     print("文章数: %d" % len(pages))
     print("本地音频复制: %d 个" % copied)
