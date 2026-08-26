@@ -9,10 +9,10 @@ title: 音频资源
 
 ### 音频资料打包下载链接
 
-上师开示
+1. 上师开示 https://www.alipan.com/s/AFVcSc8xtoJ 点击链接保存，或者复制本段内容，打开「阿里云盘」APP ，无需下载极速在线查看，视频原画倍速播放。
 
-上师赞歌
+2. 上师法音 https://www.alipan.com/s/r7cDFCYNifU 点击链接保存，或者复制本段内容，打开「阿里云盘」APP ，无需下载极速在线查看，视频原画倍速播放。
+3. 上师赞歌 https://www.alipan.com/s/kqfDZWSaSak 点击链接保存，或者复制本段内容，打开「阿里云盘」APP ，无需下载极速在线查看，视频原画倍速播放。
 
-上师法音
 
 

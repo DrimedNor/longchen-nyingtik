@@ -19,6 +19,7 @@ import json
 import html as html_mod
 import shutil
 import sys
+import time
 from urllib.parse import quote
 
 CONTENT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "content")
@@ -48,6 +49,25 @@ def parse_frontmatter(text):
                         val = [t.strip() for t in re.sub(r"[\[\]]", "", val).split(",") if t.strip()]
                     meta[key] = val
     return meta, body
+
+
+# ---------------------------------------------------------------- 目录名去序号 / 音频文件夹路径
+def clean_dir_name(name):
+    """去掉目录名前方自带的层级序号（如 "1. "、"1.1 "、"4."）。"""
+    return re.sub(r'^\d+(?:\.\d+)*\.?\s*', '', name)
+
+
+def audio_folder_rel(fname):
+    """返回 mp3 相对「音频资源」目录的完整文件夹路径（如 "2. 上师法音/2.1 仪轨与经文"）。
+    用于音频资源页按文件夹层级分组、以及折叠导航中按文件夹归属音频。"""
+    path = LOCAL_AUDIO.get(fname)
+    if not path:
+        return ""
+    rel = os.path.relpath(os.path.dirname(path), CONTENT_DIR)
+    parts = [x for x in rel.split(os.sep) if x and x != "."]
+    if parts and parts[0] == "音频资源":
+        parts = parts[1:]
+    return "/".join(parts)
 
 
 # ---------------------------------------------------------------- inline markdown
@@ -81,6 +101,25 @@ def inline(text):
         slug = target.strip()
         return ('<a class="wikilink" data-page="%s">%s</a>'
                 % (html_mod.escape(slug, quote=True), html_mod.escape(label)))
+    # Obsidian 嵌入图片 ![[image.png|width]] —— 构建时复制到 dist/assets/，此处生成 <img>
+    def _embed(m):
+        target = m.group(1)
+        parts = target.split("|")
+        fname = parts[0].strip()
+        width = parts[1].strip() if len(parts) > 1 else ""
+        # 在 content/ 下查找图片文件
+        img_src = None
+        for _dp, _dn, _fn in os.walk(CONTENT_DIR):
+            if fname in _fn:
+                rel = os.path.relpath(os.path.join(_dp, fname), CONTENT_DIR).replace("\\", "/")
+                img_src = "assets/" + rel
+                break
+        if img_src:
+            w = ' width="%s"' % html_mod.escape(width, quote=True) if width else ""
+            return '<img src="%s"%s alt="%s" loading="lazy">' % (
+                html_mod.escape(img_src, quote=True), w, html_mod.escape(fname))
+        return ""  # 图片不存在则隐藏
+    text = re.sub(r"!\[\[([^\]]+)\]\]", _embed, text)
     text = re.sub(r"\[\[([^\]]+)\]\]", _wl, text)
     # 普通 markdown 链接
     text = re.sub(r"\[([^\]]+)\]\((https?://[^)\s]+)\)",
@@ -101,7 +140,20 @@ def md_to_html(body):
     def flush_list():
         nonlocal list_buf
         if list_buf:
-            out.append("<ul>" + "".join("<li>%s</li>" % inline(x) for x in list_buf) + "</ul>")
+            items = []
+            for x in list_buf:
+                # 支持列表项内的标题（如 "- ### 《书名》"）：遇到标题先关闭当前列表，渲染标题后再继续
+                m_head = re.match(r"^(#{1,6})\s+(.*)$", x)
+                if m_head:
+                    if items:
+                        out.append("<ul>" + "".join("<li>%s</li>" % inline(i) for i in items) + "</ul>")
+                        items = []
+                    lvl = len(m_head.group(1))
+                    out.append("<h%d>%s</h%d>" % (lvl, inline(m_head.group(2)), lvl))
+                else:
+                    items.append(x)
+            if items:
+                out.append("<ul>" + "".join("<li>%s</li>" % inline(i) for i in items) + "</ul>")
             list_buf = []
 
     def flush_quote():
@@ -223,23 +275,8 @@ def discover_pages():
                 "meta": meta,
                 "html": md_to_html(body),
             })
-    # 给「上师开示」非索引文章页（未配音频）自动追加角标；零维护：补 [[xxx.mp3]] 后本段跳过
-    _AP_BANNER = ('<aside class="audio-pending">🎧 <b>音频制作中</b> · '
-                  '本文文字版已上线，音频版正在整理，欢迎随缘预定下一篇。</aside>')
-    for pg in pages:
-        d = pg.get("dir") or ""
-        slug_v = pg.get("slug") or ""
-        if pg.get("is_index") or not d.startswith("上师开示/"):
-            continue
-        if "data-audio=" in pg.get("html", ""):
-            continue
-        html = pg["html"]
-        # 在首个 </h1> 之后插入角标；如无 h1，则插到开头
-        if "</h1>" in html:
-            html = html.replace("</h1>", "</h1>\n" + _AP_BANNER, 1)
-        else:
-            html = _AP_BANNER + html
-        pg["html"] = html
+    # 规则：未经用户确认，不得自动给文章添加任何角标/提示文字（含"音频制作中"等）。
+    # 如需添加此类提示，必须先与用户确认文案后再手动添加。
     return pages
 
 
@@ -286,6 +323,7 @@ PAGE_TEMPLATE = r"""<!DOCTYPE html>
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='20' fill='%238a1f1c'/%3E%3Ctext x='50' y='68' font-size='52' font-family='serif' font-weight='bold' text-anchor='middle' fill='%23d9b86a'%3E%E9%BE%99%3C/text%3E%3C/svg%3E">
 <title>@@SITE_TITLE@@</title>
 <style>
 :root{
@@ -318,6 +356,29 @@ PAGE_TEMPLATE = r"""<!DOCTYPE html>
   --indigo-soft:#4a577e;   /* 浅靛蓝：悬停 */
   --fs:1rem;
 }
+/* 暗色模式：深棕底 + 藏红/金黄调整亮度，保证可读性 */
+[data-theme="dark"]{
+  --bg:#1a1410;
+  --bg-2:#221a14;
+  --surface:#2a2018;
+  --surface-soft:#332820;
+  --surface-hover:#3d3028;
+  --ink:#e8dcc8;
+  --ink-soft:#b8a890;
+  --ink-faint:#8a7a68;
+  --line:#3d3028;
+  --line-strong:#5a4a38;
+  --accent:#c44a42;
+  --accent-soft:#d46a60;
+  --accent-deep:#a03028;
+  --gold:#d9a84a;
+  --gold-soft:#e8c068;
+  --gold-deep:#b88830;
+  --turq:#4ab8a8;
+  --turq-soft:#6ad0c0;
+  --indigo:#6a7ab0;
+  --indigo-soft:#8a9ad0;
+}
 *{box-sizing:border-box}
 html,body{margin:0;padding:0}
 body{
@@ -347,6 +408,10 @@ a:hover{color:var(--accent-soft)}
   font-size:.95rem; width:1.9rem; height:1.9rem; border-radius:999px; line-height:1}
 .fs-pill button:hover{background:var(--bg); color:var(--ink)}
 .fs-pill .fs-cap{font-size:.7rem; color:var(--ink-faint); padding:0 .15rem}
+/* 暗色模式切换按钮 */
+.theme-toggle{width:2rem; height:2rem; font-size:1rem; border:1px solid var(--line);
+  background:var(--surface); color:var(--ink-soft); border-radius:999px; cursor:pointer; margin-left:.3rem; line-height:1}
+.theme-toggle:hover{background:var(--surface-hover); color:var(--ink)}
 
 /* 布局 */
 .layout{display:flex; min-height:calc(100vh - 53px)}
@@ -392,6 +457,46 @@ a:hover{color:var(--accent-soft)}
 .nav .dir-name[data-depth="3"]{font-size:1rem; font-weight:500; color:#9b8475;
   padding:.35rem .5rem .2rem 3.4rem}
 .nav .dir-name:hover{background:var(--surface-hover)}
+/* 手风琴折叠导航：一级标题常驻，子层级默认收起，点头部展开/收起（可多开互不干扰） */
+.nav .nav-sec{margin:0}
+.nav .nav-sec-head{display:flex; align-items:baseline; gap:.4rem; cursor:pointer;
+  border-radius:6px; line-height:1.45; transition:background .15s}
+.nav .nav-sec-head .nav-chev{flex:0 0 auto; font-size:.72em; color:var(--gold-deep);
+  width:1em; text-align:center; transition:transform .18s}
+.nav .nav-sec-head .nav-chev-none{visibility:hidden}
+.nav .nav-sec.open > .nav-sec-head .nav-chev{transform:rotate(90deg)}
+.nav .nav-sec-head .dir-label{flex:1; min-width:0; word-break:break-word}
+/* 层级配色与旧目录一致：一级最深深红 → 二级深红 → 三级金黄 → 四级浅褐 */
+.nav .nav-sec[data-depth="0"] > .nav-sec-head{font-size:1.7rem; font-weight:700; color:#6e1614;
+  padding:.55rem .5rem .3rem; letter-spacing:.02em}
+.nav .nav-sec[data-depth="1"] > .nav-sec-head{font-size:1.3rem; font-weight:600; color:#8a1f1c;
+  padding:.5rem .5rem .25rem 1.2rem}
+.nav .nav-sec[data-depth="2"] > .nav-sec-head{font-size:1.08rem; font-weight:500; color:#b8893b;
+  padding:.4rem .5rem .2rem 2.3rem}
+.nav .nav-sec[data-depth="3"] > .nav-sec-head{font-size:1rem; font-weight:500; color:#9b8475;
+  padding:.35rem .5rem .2rem 3.4rem}
+.nav .nav-sec-head:hover{background:var(--surface-hover)}
+.nav .nav-sec-head.active,
+.nav .nav-sec-head.active[data-depth]{background:var(--accent)!important; color:#fff!important;
+  box-shadow:inset 3px 0 0 var(--gold)}
+.nav .nav-sec-head.active .nav-chev,
+.nav .nav-sec-head.active .dir-label{color:inherit!important}
+.nav .nav-sec-children{margin-top:.1rem}
+.nav .nav-sec-body{display:none}
+.nav .nav-sec.open > .nav-sec-body{display:block; padding-bottom:.1rem}
+/* 折叠导航内的直属音频条目：左侧金色细线指示归属层级 */
+.nav .nav-audio-list{margin:.3rem 0 .45rem 2.2rem; border-left:2px solid var(--gold-soft);
+  padding:.15rem 0 .15rem .5rem}
+.nav .nav-audio-list .hn-audio{display:block; font-size:.95rem; padding:.32rem .5rem;
+  border-radius:6px; color:var(--ink-soft)}
+.nav .nav-audio-list .hn-audio:hover{background:var(--surface-hover); color:var(--ink)}
+.nav .nav-audio-list .hn-audio.playing{color:var(--accent); font-weight:600; background:var(--surface-soft)}
+/* 搜索结果 */
+.nav .search-result{display:block; padding:.5rem .6rem; border-radius:6px; color:var(--ink); text-decoration:none}
+.nav .search-result:hover{background:var(--surface-hover)}
+.nav .sr-title{display:block; font-size:1.02rem; font-weight:600; color:var(--ink)}
+.nav .sr-snip{display:block; font-size:.85rem; color:var(--ink-faint); margin-top:.2rem; line-height:1.5}
+.search-hl{background:var(--gold-soft); color:var(--accent-deep); font-weight:600; padding:0 .15em; border-radius:2px}
 /* 移动端抽屉式侧栏的关闭按钮（仅移动端显示）与遮罩 */
 .sidebar-close{display:none; position:absolute; top:.5rem; right:.6rem; z-index:2;
   border:none; background:none; color:var(--ink-soft); font-size:1.5rem; line-height:1; cursor:pointer}
@@ -648,6 +753,16 @@ a:hover{color:var(--accent-soft)}
   .player .p-pl-toggle{font-size:.82rem; padding:.3rem .7rem}
   .player .p-pl-hint{font-size:.74rem}
 }
+/* 页脚 */
+.site-footer{border-top:1px solid var(--line); background:var(--surface-soft); padding:1.2rem 1rem; margin-top:2rem}
+.footer-inner{max-width:820px; margin:0 auto; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:.5rem; font-size:.85rem; color:var(--ink-faint)}
+.footer-copy{color:var(--ink-soft)}
+.footer-build{color:var(--ink-faint)}
+/* 回到顶部按钮 */
+.back-top{position:fixed; right:1.2rem; bottom:5.5rem; width:2.6rem; height:2.6rem; border-radius:50%;
+  background:var(--accent); color:#fff; border:none; font-size:1.2rem; cursor:pointer; opacity:0;
+  transition:opacity .3s; box-shadow:0 2px 8px rgba(0,0,0,.2); z-index:20}
+.back-top:hover{background:var(--accent-deep)}
 </style>
 </head>
 <body>
@@ -660,6 +775,7 @@ a:hover{color:var(--accent-soft)}
     <span class="fs-cap">字号</span>
     <button id="fsInc" title="放大字号">A+</button>
   </div>
+  <button id="themeToggle" class="theme-toggle" title="切换暗色/浅色模式">🌙</button>
   <span id="hitStat" style="display:none; font-size:.82rem; color:var(--ink-faint); white-space:nowrap; margin-left:.4rem"></span>
 </div>
 
@@ -737,6 +853,12 @@ a:hover{color:var(--accent-soft)}
 </div>
 
 <script>
+// ---- Service Worker 注册：音频离线缓存 + 页面更新策略（sw.js 由构建时复制到 dist 根） ----
+if ('serviceWorker' in navigator){
+  window.addEventListener('load', function(){
+    navigator.serviceWorker.register('sw.js').catch(function(e){ console.warn('SW 注册失败:', e); });
+  });
+}
 var SITE_TITLE = @@SITE_TITLE_JSON@@;
 var PAGES = @@PAGES_JSON@@;
 var TREE = @@TREE_JSON@@;
@@ -759,6 +881,23 @@ function applyFs(){
 applyFs();
 document.getElementById('fsInc').onclick = function(){ fsVal = Math.min(FS_MAX, fsVal + FS_STEP); applyFs(); };
 document.getElementById('fsDec').onclick = function(){ fsVal = Math.max(FS_MIN, fsVal - FS_STEP); applyFs(); };
+
+// ---- 暗色模式切换（localStorage 记忆 + prefers-color-scheme 自动适配）----
+var THEME_KEY = 'longchen-theme';
+var savedTheme = localStorage.getItem(THEME_KEY);
+if (!savedTheme){
+  savedTheme = (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
+}
+function applyTheme(theme){
+  document.documentElement.setAttribute('data-theme', theme);
+  document.getElementById('themeToggle').textContent = theme === 'dark' ? '☀️' : '🌙';
+  localStorage.setItem(THEME_KEY, theme);
+}
+applyTheme(savedTheme);
+document.getElementById('themeToggle').onclick = function(){
+  var cur = document.documentElement.getAttribute('data-theme');
+  applyTheme(cur === 'dark' ? 'light' : 'dark');
+};
 
 // ---- 渲染目录树（仅显示目录，不显示文章列表）----
 // 目录优先跳转到自身的 index 页；若无 index，则跳到该目录下第一篇开示；
@@ -796,60 +935,90 @@ function renderNav(){
   // 一级目录固定顺序（与首页导览一致）；其余新增目录按名称追加在末尾
   var TOP_ORDER = ['上师开示', '龙钦宁提传承', '音频资源', '书籍', '更新日志'];
   function topKey(name){ var i = TOP_ORDER.indexOf(name); return i < 0 ? 1000 : i; }
-  // 递归渲染目录：一级目录不带编号，二级起统一编号 1 / 1.1（最多 3 层）
-  function walk(node, prefix, parentNum, depth, htmlArr){
-    if (depth > 2) return htmlArr;   // 控制在 3 个层级（depth 0 / 1 / 2）
+  // 某文件夹（完整路径，如 "音频资源/2. 上师法音"）直属的音频条目；只匹配直接归属，不含子文件夹
+  function navAudioList(full){
+    if (!full || full.indexOf('音频资源/') !== 0) return '';
+    var key = full.slice('音频资源/'.length);
+    var items = [];
+    AUDIO_TRACKS.forEach(function(t, i){
+      if ((t.folder || '') === key){
+        items.push('<a class="hn-link hn-audio" data-idx="' + i + '">🔊 ' + esc(t.title) + '</a>');
+      }
+    });
+    return items.join('');
+  }
+  // 递归渲染手风琴：每个有内容的目录 = 一个可折叠小节；正文 = 子目录小节 + 直属音频
+  // 默认只展示一级标题（一级始终可见），子层级收起，点击一级展开
+  function walk(node, prefix, depth){
+    if (depth > 2) return '';   // 控制在 3 个层级（depth 0 / 1 / 2）
     var names = (node.dirs ? Object.keys(node.dirs) : []).slice();
-    if (depth === 0){
-      // 一级目录按指定顺序（TOP_ORDER），保证侧栏与首页导览顺序一致
-      names.sort(function(a, b){ return topKey(a) - topKey(b); });
-    } else {
-      names.sort();   // 子层级按名称稳定排序
-    }
-    names.forEach(function(name, idx){
+    if (depth === 0) names.sort(function(a, b){ return topKey(a) - topKey(b); });
+    else names.sort();
+    var out = '';
+    names.forEach(function(name){
       var sub = node.dirs[name];
       var full = (prefix ? prefix + '/' : '') + name;
       var target = full + '/index';
       if (!bySlug[target]) target = firstPageUnder(full);
-      if (target){
-        if (depth === 0){
-          // 一级目录：仅显示汉字，不带任何编号
-          htmlArr.push('<div class="dir-name" data-depth="0" data-slug="' + esc(target) + '">'
-            + '<span class="dir-label">' + esc(cleanDirName(name)) + '</span></div>');
-          walk(sub, full, '', depth + 1, htmlArr);   // 一级不贡献编号前缀
-        } else {
-          var num = parentNum ? (parentNum + '.' + (idx + 1)) : String(idx + 1);
-          htmlArr.push('<div class="dir-name" data-depth="' + depth + '" data-slug="' + esc(target) + '">'
-            + '<span class="dir-num">' + esc(num) + '</span>'
-            + '<span class="dir-label">' + esc(cleanDirName(name)) + '</span></div>');
-          walk(sub, full, num, depth + 1, htmlArr);
-        }
-      }
+      if (!target) return;
+      var children = walk(sub, full, depth + 1);
+      var audio = navAudioList(full);
+      var body = (children ? '<div class="nav-sec-children">' + children + '</div>' : '')
+               + (audio ? '<div class="nav-audio-list">' + audio + '</div>' : '');
+      var hasBody = body !== '';
+      out += '<div class="nav-sec" data-depth="' + depth + '" data-slug="' + esc(target) + '">'
+        + '<div class="nav-sec-head' + (hasBody ? ' has-body' : '') + '" data-slug="' + esc(target) + '">'
+        + '<span class="nav-chev' + (hasBody ? '' : ' nav-chev-none') + '">▸</span>'
+        + '<span class="dir-label">' + esc(name) + '</span></div>'
+        + (hasBody ? '<div class="nav-sec-body">' + body + '</div>' : '')
+        + '</div>';
     });
-    return htmlArr;
+    return out;
   }
-  var arr = walk(TREE, '', '', 0, []);
-  // 顶层独立页面（如「更新日志」）：排在目录之后，作为同级导航项，点击直达页面
+  var html = walk(TREE, '', 0);
+  // 顶层独立页面（如「更新日志」）：作为一级可点击项排在末尾
   (TREE.children || []).forEach(function(c){
     if (c.type === 'page' && !c.is_index){
-      arr.push('<div class="dir-name" data-depth="0" data-slug="' + esc(c.slug) + '">'
-        + '<span class="dir-label">' + esc(cleanDirName(c.title)) + '</span></div>');
+      html += '<div class="nav-sec" data-depth="0" data-slug="' + esc(c.slug) + '">'
+        + '<div class="nav-sec-head" data-slug="' + esc(c.slug) + '">'
+        + '<span class="nav-chev nav-chev-none">▸</span>'
+        + '<span class="dir-label">' + esc(c.title) + '</span></div></div>';
     }
   });
-  nav.innerHTML = arr.join('');
-  nav.querySelectorAll('.dir-name').forEach(function(a){
-    a.onclick = function(){ show(a.dataset.slug); closeSidebar(); };
+  nav.innerHTML = html;
+  // 折叠交互：点头部切换展开/收起（多个一级可同时展开，互不干扰）；叶子目录点击直达
+  nav.querySelectorAll('.nav-sec-head').forEach(function(h){
+    h.onclick = function(){
+      var sec = h.closest('.nav-sec');
+      var body = h.nextElementSibling;
+      var hasBody = body && body.classList.contains('nav-sec-body');
+      var isMobile = window.innerWidth <= 760;
+      if (hasBody){
+        sec.classList.toggle('open');
+        // 手机端：有子内容时点击只展开/收起下级，不跳转页面；桌面端保持原行为（既展开又跳转）
+        if (isMobile) return;
+      }
+      show(h.dataset.slug);
+      if (isMobile) closeSidebar();
+    };
     // 悬停：按该项文字色生成更深色块并选配对比文字，松开即恢复
-    a.addEventListener('mouseenter', function(){
-      if (a.classList.contains('active')) return;
-      var m = navHoverBg(a).match(/\d+/g);
-      a.style.background = 'rgb(' + m[0] + ',' + m[1] + ',' + m[2] + ')';
-      a.style.color = contrastInk(+m[0], +m[1], +m[2]);
+    h.addEventListener('mouseenter', function(){
+      if (h.classList.contains('active')) return;
+      var m = navHoverBg(h).match(/\d+/g);
+      h.style.background = 'rgb(' + m[0] + ',' + m[1] + ',' + m[2] + ')';
+      h.style.color = contrastInk(+m[0], +m[1], +m[2]);
     });
-    a.addEventListener('mouseleave', function(){
-      a.style.background = '';
-      a.style.color = '';
+    h.addEventListener('mouseleave', function(){
+      h.style.background = '';
+      h.style.color = '';
     });
+  });
+  // 导航内音频项 → 直接播放
+  nav.querySelectorAll('.nav-audio-list .hn-audio').forEach(function(a){
+    a.onclick = function(ev){
+      ev.preventDefault();
+      playTrack(parseInt(a.dataset.idx, 10));
+    };
   });
 }
 
@@ -876,13 +1045,14 @@ function show(slug){
   if (p.is_index && p.slug !== 'index'){
     inner += renderDirChildren(p.slug);
   }
-  // 音频资源页 → 附加独立音频列表（子文件夹 index 仅显示该组音频）
+  // 音频资源页 → 按文件夹层级自动生成索引列表（嵌套子文件夹取完整路径；手工编排列表优先不重复附加）
   if (p.is_index && p.slug.indexOf('音频资源') === 0){
-    var grp = (p.slug === '音频资源/index') ? null : (p.slug.split('/')[1] || null);
-    // 若该子文件夹 index 已在正文中自带音频播放列表（含 .play-btn，即按文章目录结构
-    // 手工整理的列表），则不再重复附加自动列表，避免同一批音频出现两套播放按钮。
+    var grp = null;
+    if (p.slug !== '音频资源/index'){
+      grp = p.slug.slice('音频资源/'.length).replace(/\/index$/, '');
+    }
     var _curated = grp && p.html.indexOf('class="play-btn"') !== -1;
-    if (!_curated) inner += renderAudioList(grp);
+    if (!_curated) inner += renderAudioListByFolder(grp);
   }
   var crumb = renderBreadcrumb(p);
   document.getElementById('content').innerHTML = '<div class="article">' + crumb + inner + '</div>';
@@ -891,16 +1061,29 @@ function show(slug){
   // 当父目录（大标题，如「1 为何修行」）与子目录（如「1.1 诸行无常」）解析到同一页面
   // （data-slug 相同，父目录无自身内容、只含该子目录时会发生）时，只点亮子文件夹，
   // 避免点击子文件夹时连带上方大标题一并反色高亮。
-  var _navItems = document.querySelectorAll('.nav a, .nav .dir-name');
+  var _navHeads = document.querySelectorAll('.nav .nav-sec-head, .nav a');
   var _best = null, _bestDepth = -1;
-  _navItems.forEach(function(a){
+  _navHeads.forEach(function(a){
     a.classList.remove('active');
     if (a.dataset.slug === slug){
-      var d = parseInt(a.dataset.depth || '0', 10);
+      var sec = a.closest('.nav-sec');
+      var d = sec ? parseInt(sec.dataset.depth || '0', 10) : 0;
       if (d > _bestDepth){ _bestDepth = d; _best = a; }
     }
   });
-  if (_best) _best.classList.add('active');
+  if (_best){
+    _best.classList.add('active');
+    // 展开该选中项的祖先小节（自身不强制展开，允许用户收起），保证当前所在层级一目了然
+    var el = _best.parentElement;
+    if (el) el = el.parentElement;
+    while (el && el.classList && !el.classList.contains('nav')){
+      if (el.classList.contains('nav-sec')){
+        var bd = el.querySelector('.nav-sec-body');
+        if (bd && !el.classList.contains('open')) el.classList.add('open');
+      }
+      el = el.parentElement;
+    }
+  }
   document.querySelectorAll('.wikilink').forEach(function(a){
     a.onclick = function(ev){
       ev.preventDefault();
@@ -1025,8 +1208,17 @@ function renderHomeNav(){
     }
     if (meta.audio){
       if (meta.note) html.push('<p class="audio-note">因为服务器在国外，缓冲需要时间，请耐心等一会儿。</p>');
+      // 按一级文件夹分组展示全部音频（与折叠导航的层级一致，避免平铺 70+ 条）
+      var _agroups = {};
       AUDIO_TRACKS.forEach(function(t, i){
-        html.push('<a class="hn-link hn-audio" data-idx="' + i + '">🔊 ' + esc(t.title) + '</a>');
+        var g = cleanDirName((t.folder || '其他音频').split('/')[0]);
+        (_agroups[g] = _agroups[g] || []).push({t: t, i: i});
+      });
+      Object.keys(_agroups).sort().forEach(function(g){
+        html.push('<div class="audio-group-title">' + esc(g) + '</div>');
+        _agroups[g].forEach(function(o){
+          html.push('<a class="hn-link hn-audio" data-idx="' + o.i + '">🔊 ' + esc(o.t.title) + '</a>');
+        });
       });
       html.push('<div class="album-card"><div class="t">《大圆满前行》有声书（226 集）</div>'
         + '<div class="d">嘎玛仁波切译 · 昌列寺收录。因音频体积较大，点击前往昌列寺官网在线收听。</div>'
@@ -1049,40 +1241,78 @@ function renderHomeNav(){
   return '<div class="home-nav">' + html.join('') + '</div>';
 }
 
-// ---- 目录 landing 页：聚合展示其下全部文章（不含子目录 index 自身）----
+// ---- 目录 landing 页：先展示直接子栏目卡片，再展示直属文章 ----
 function renderDirChildren(dirSlug){
+  var dirPath = dirSlug.replace(/\/index$/, '');
+  var prefix = dirPath + '/';
+  // 直接子目录：收集所有 slug 以 prefix 开头、且下一段目录名不同的页面，去重得到子目录名
+  var subDirMap = {};
+  PAGES.forEach(function(p){
+    if (p.slug.indexOf(prefix) !== 0) return;
+    var rest = p.slug.slice(prefix.length);
+    var slashIdx = rest.indexOf('/');
+    var dirName = slashIdx >= 0 ? rest.substring(0, slashIdx) : null;
+    if (dirName) subDirMap[dirName] = true;
+  });
+  var subDirs = Object.keys(subDirMap).sort();
+  // 直属文章：slug = dirSlug/文章名（文章名不含 /）
   var items = [];
   PAGES.forEach(function(p){
     if (p.is_index) return;
-    if (p.slug.indexOf(dirSlug + '/') === 0){
+    if (p.slug.indexOf(prefix) !== 0) return;
+    var rest = p.slug.slice(prefix.length);
+    if (rest.indexOf('/') === -1){
       var hasAudio = p.html.indexOf('play-btn') >= 0;
       items.push('<a class="hn-link" data-page="' + esc(p.slug) + '">'
         + esc(p.title) + (hasAudio ? ' 🔊' : '') + '</a>');
     }
   });
-  if (!items.length) return '';
-  return '<div class="dir-children"><div class="audio-list-title">本目录文章（' + items.length + ' 篇）</div>'
-    + items.join('') + '</div>';
+  var html = '';
+  if (subDirs.length){
+    html += '<div class="dir-children"><div class="audio-list-title">子栏目（' + subDirs.length + ' 个）</div>';
+    subDirs.forEach(function(d){
+      var target = firstPageUnder(dirPath + '/' + d);
+      if (target){
+        html += '<a class="hn-link" data-page="' + esc(target) + '">📁 ' + esc(d) + '</a>';
+      }
+    });
+    html += '</div>';
+  }
+  if (items.length){
+    html += '<div class="dir-children"><div class="audio-list-title">本目录文章（' + items.length + ' 篇）</div>'
+      + items.join('') + '</div>';
+  }
+  return html;
 }
 
-// ---- 音频资源页：独立音频列表（按文件夹分组；可传入 groupFilter 仅显示某一组）----
-function renderAudioList(groupFilter){
+// ---- 音频资源页：按文件夹层级自动生成索引列表（folderKey=null 显示全部；否则显示该文件夹及其子文件夹音频）----
+function renderAudioListByFolder(folderKey){
   if (!AUDIO_TRACKS.length) return '';
-  var groups = {};
+  var matched = [];
   AUDIO_TRACKS.forEach(function(t, i){
-    var g = t.group || '其他音频';
-    if (groupFilter && g !== groupFilter) return;
-    (groups[g] = groups[g] || []).push({t: t, i: i});
+    var f = t.folder || '';
+    if (!folderKey) matched.push({t: t, i: i, f: f});
+    else if (f === folderKey || f.indexOf(folderKey + '/') === 0) matched.push({t: t, i: i, f: f});
   });
-  var count = 0;
-  Object.keys(groups).forEach(function(g){ count += groups[g].length; });
-  var title = groupFilter
-    ? ('「' + cleanDirName(groupFilter) + '」音频（' + count + ' 篇）')
-    : ('全部开示音频（' + AUDIO_TRACKS.length + ' 篇）');
+  if (!matched.length) return '';
+  // 按 folderKey 下的直接子文件夹分组（同文件夹内的归为一组，保证层级清晰）
+  var groups = {};
+  matched.forEach(function(o){
+    var rel = o.f;
+    var sub = (folderKey && rel.indexOf(folderKey + '/') === 0) ? rel.slice(folderKey.length + 1) : rel;
+    var g = (sub.indexOf('/') >= 0) ? sub.slice(0, sub.indexOf('/')) : '';
+    (groups[g] = groups[g] || []).push(o);
+  });
+  var total = matched.length;
+  var title = folderKey
+    ? ('「' + cleanDirName(folderKey.split('/').pop()) + '」音频（' + total + ' 篇）')
+    : ('全部音频（' + total + ' 篇）');
   var html = '<div class="audio-list"><div class="audio-list-title">' + title + '</div>'
     + '<p class="audio-note">因为服务器在国外，缓冲需要时间，请耐心等一会儿。</p>';
-  Object.keys(groups).forEach(function(g){
-    if (!groupFilter) html += '<div class="audio-group-title">' + esc(cleanDirName(g)) + '</div>';
+  var keys = Object.keys(groups);
+  keys.sort(function(a, b){ if (a === '') return -1; if (b === '') return 1; return a < b ? -1 : 1; });
+  keys.forEach(function(g){
+    if (g) html += '<div class="audio-group-title">' + esc(cleanDirName(g)) + '</div>';
     groups[g].forEach(function(o){
       html += '<a class="hn-link hn-audio" data-idx="' + o.i + '">🔊 ' + esc(o.t.title) + '</a>';
     });
@@ -1187,6 +1417,17 @@ function playTrack(idx){
   renderPlist();
   updatePlayBtns();
   updateMini();
+  // 锁屏播放控制（Media Session API）：设置音频元信息，手机锁屏时显示标题/艺术家/专辑
+  if ('mediaSession' in navigator){
+    try{
+      navigator.mediaSession.metadata = new MediaMetadata({
+        title: t.title,
+        artist: '龙的传人｜Longchen Nyingtik',
+        album: (t.folder || '音频资源').replace(/^\d+\.\s*/, ''),
+      });
+      navigator.mediaSession.playbackState = 'playing';
+    }catch(e){}
+  }
 }
 
 function playByAudio(fname){
@@ -1263,8 +1504,37 @@ playerAudio.addEventListener('ended', function(){
   if (n >= 0) playTrack(n);
   else { document.getElementById('pPlay').textContent = '▶'; updateMini(); }
 });
-playerAudio.addEventListener('play', function(){ document.getElementById('pPlay').textContent = '⏸'; updateMini(); });
-playerAudio.addEventListener('pause', function(){ document.getElementById('pPlay').textContent = '▶'; updateMini(); });
+playerAudio.addEventListener('play', function(){
+  document.getElementById('pPlay').textContent = '⏸'; updateMini();
+  if ('mediaSession' in navigator){ try{ navigator.mediaSession.playbackState = 'playing'; }catch(e){} }
+});
+playerAudio.addEventListener('pause', function(){
+  document.getElementById('pPlay').textContent = '▶'; updateMini();
+  if ('mediaSession' in navigator){ try{ navigator.mediaSession.playbackState = 'paused'; }catch(e){} }
+});
+
+// ---- 锁屏播放控制（Media Session API）：手机锁屏/通知栏显示播放/暂停/上一首/下一首/快进快退按钮 ----
+if ('mediaSession' in navigator){
+  try{
+    navigator.mediaSession.setActionHandler('play', function(){ if (curIdx < 0 && AUDIO_TRACKS.length) playTrack(0); else playerAudio.play(); });
+    navigator.mediaSession.setActionHandler('pause', function(){ playerAudio.pause(); });
+    navigator.mediaSession.setActionHandler('previoustrack', function(){ if (curIdx >= 0) playTrack(manualPrev(curIdx)); });
+    navigator.mediaSession.setActionHandler('nexttrack', function(){ if (curIdx >= 0) playTrack(manualNext(curIdx)); });
+    navigator.mediaSession.setActionHandler('seekbackward', function(){ if (curIdx >= 0) playerAudio.currentTime = Math.max(0, playerAudio.currentTime - 15); });
+    navigator.mediaSession.setActionHandler('seekforward', function(){ if (curIdx >= 0 && playerAudio.duration) playerAudio.currentTime = Math.min(playerAudio.duration, playerAudio.currentTime + 15); });
+  }catch(e){}
+}
+// 锁屏进度条：timeupdate 时同步 position state，部分浏览器锁屏显示进度
+playerAudio.addEventListener('loadedmetadata', function(){
+  if ('mediaSession' in navigator && playerAudio.duration){
+    try{ navigator.mediaSession.setPositionState({ duration: playerAudio.duration, playbackRate: playerAudio.playbackRate, position: playerAudio.currentTime }); }catch(e){}
+  }
+});
+playerAudio.addEventListener('timeupdate', function(){
+  if ('mediaSession' in navigator && playerAudio.duration && !playerAudio.paused){
+    try{ navigator.mediaSession.setPositionState({ duration: playerAudio.duration, playbackRate: playerAudio.playbackRate, position: playerAudio.currentTime }); }catch(e){}
+  }
+});
 
 // 进度条：支持点击与拖动跳转（progEl 缺省为整屏播放器进度条）
 var pProg = document.getElementById('pProgress');
@@ -1387,20 +1657,70 @@ document.getElementById('brandHome').onclick = function(){ show('index'); };
 
 function esc(s){ var d=document.createElement('div'); d.textContent = s==null?'':String(s); return d.innerHTML; }
 
-// ---- 搜索 ----
+// ---- 搜索：中文二元分词 + 相关性排序 + 匹配摘要 + 关键词高亮 ----
+function tokenize(q){
+  var tokens = [];
+  var parts = q.toLowerCase().split(/[^a-z0-9\u4e00-\u9fa5]+/).filter(Boolean);
+  parts.forEach(function(p){
+    if (/^[a-z0-9]+$/.test(p)){ tokens.push(p); }
+    else {
+      for (var i = 0; i < p.length - 1; i++) tokens.push(p.substring(i, i+2));
+      if (p.length === 1) tokens.push(p);
+    }
+  });
+  return tokens;
+}
+function scorePage(p, tokens, q){
+  var title = p.title.toLowerCase();
+  var html = p.html.toLowerCase();
+  var score = 0;
+  if (title.indexOf(q) >= 0) score += 10;
+  if (html.indexOf(q) >= 0) score += 5;
+  tokens.forEach(function(t){
+    if (title.indexOf(t) >= 0) score += 3;
+    if (html.indexOf(t) >= 0) score += 1;
+  });
+  return score;
+}
+function searchSnippet(p, q){
+  var text = p.html.replace(/<[^>]+>/g, '');
+  var idx = text.toLowerCase().indexOf(q.toLowerCase());
+  if (idx < 0) return '';
+  var start = Math.max(0, idx - 25);
+  var end = Math.min(text.length, idx + q.length + 45);
+  return (start > 0 ? '…' : '') + text.substring(start, end) + (end < text.length ? '…' : '');
+}
+function highlight(text, q){
+  if (!q) return text;
+  var re = new RegExp('(' + q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ')', 'gi');
+  return text.replace(re, '<mark class="search-hl">$1</mark>');
+}
 document.getElementById('search').addEventListener('input', function(){
   var q = this.value.trim().toLowerCase();
   if (!q){ renderNav(); return; }
   var nav = document.getElementById('nav');
-  var arr = [];
+  var tokens = tokenize(q);
+  var results = [];
   PAGES.forEach(function(p){
-    if (p.title.toLowerCase().indexOf(q) >= 0 || p.html.toLowerCase().indexOf(q) >= 0){
-      arr.push('<a class="nav-link" data-slug="' + esc(p.slug) + '">' + esc(p.title) + '</a>');
-    }
+    if (p.slug === 'index' || p.slug === '更新日志') return; // 排除首页和更新日志
+    var s = scorePage(p, tokens, q);
+    if (s > 0) results.push({p: p, score: s});
   });
-  if (!arr.length) arr.push('<div class="group-label">无匹配结果</div>');
+  results.sort(function(a, b){ return b.score - a.score; });
+  if (!results.length){
+    nav.innerHTML = '<div class="group-label">无匹配结果</div>';
+    return;
+  }
+  var arr = ['<div class="group-label">找到 ' + results.length + ' 条结果</div>'];
+  results.forEach(function(r){
+    var snip = searchSnippet(r.p, q);
+    arr.push('<a class="nav-link search-result" data-slug="' + esc(r.p.slug) + '">'
+      + '<span class="sr-title">' + highlight(esc(r.p.title), q) + '</span>'
+      + (snip ? '<span class="sr-snip">' + highlight(esc(snip), q) + '</span>' : '')
+      + '</a>');
+  });
   nav.innerHTML = arr.join('');
-  nav.querySelectorAll('.nav-link').forEach(function(a){
+  nav.querySelectorAll('.search-result').forEach(function(a){
     a.onclick = function(){ show(a.dataset.slug); closeSidebar(); };
   });
 });
@@ -1459,6 +1779,19 @@ function showHitStat(){
 if (isAdmin()) showHitStat();
 trackVisit();
 </script>
+<footer class="site-footer">
+  <div class="footer-inner">
+    <span class="footer-copy">© 2026 龙的传人｜Longchen Nyingtik · 个人学习整理，非商业用途</span>
+    <span class="footer-build">构建于 @@BUILD_TIME@@</span>
+  </div>
+</footer>
+<button class="back-top" id="backTop" title="回到顶部">↑</button>
+<script>
+document.getElementById('backTop').onclick = function(){ window.scrollTo({top:0, behavior:'smooth'}); };
+window.addEventListener('scroll', function(){
+  document.getElementById('backTop').style.opacity = window.scrollY > 300 ? '1' : '0';
+});
+</script>
 </body>
 </html>
 """
@@ -1479,6 +1812,33 @@ def main():
                     '</div>' % CHANGLESI_ALBUM)
             p["html"] += card
             break
+
+    # 为每个含 mp3 但缺少 index 的音频文件夹，自动生成索引页（构建期合成，不写回 content/，零维护）
+    # 这样「2. 上师法音 / 2.1 仪轨与经文 / 2.2 圣号与明咒」等只有音频没有 md 的文件夹
+    # 也能进入导航树并拥有可浏览的对应索引页，保证所有文件夹内容都能通过折叠导航访问。
+    _audio_folders = set()
+    for _f in LOCAL_AUDIO:
+        _fol = audio_folder_rel(_f)
+        if not _fol:
+            continue
+        _segs = _fol.split("/")
+        for _d in range(1, len(_segs) + 1):
+            _audio_folders.add("/".join(_segs[:_d]))
+    _existing_audio_index = set(p["slug"] for p in pages
+                                if p["is_index"] and p["slug"].startswith("音频资源/"))
+    for _key in sorted(_audio_folders):
+        _slug = "音频资源/" + _key + "/index"
+        if _slug in _existing_audio_index:
+            continue
+        pages.append({
+            "slug": _slug,
+            "title": clean_dir_name(_key.split("/")[-1]),
+            "rel": _slug + ".md",
+            "dir": "音频资源/" + _key,
+            "is_index": True,
+            "meta": {},
+            "html": "",
+        })
 
     tree = build_tree(pages)
 
@@ -1535,6 +1895,7 @@ def main():
             "file": fname,
         }
         t["group"] = audio_group(fname)
+        t["folder"] = audio_folder_rel(fname)
         audio_tracks.append(t)
 
 
@@ -1547,6 +1908,7 @@ def main():
     html_out = html_out.replace("@@HOME_UPDATE_JSON@@", json.dumps(home_update_html, ensure_ascii=False))
     html_out = html_out.replace("@@HOME_UPDATE_DATE@@", home_update_date)
     html_out = html_out.replace("@@SITE_TITLE@@", site_title)
+    html_out = html_out.replace("@@BUILD_TIME@@", time.strftime("%Y-%m-%d %H:%M"))
 
     os.makedirs(DIST_DIR, exist_ok=True)
     out_path = os.path.join(DIST_DIR, "index.html")
@@ -1561,6 +1923,25 @@ def main():
         shutil.copy2(src, os.path.join(audio_dir, fname))
         copied += 1
 
+    # 复制 content/ 下的图片到 dist/assets/（保持相对目录结构，支持 Obsidian ![[image.png]] 嵌入）
+    IMG_EXT = (".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg", ".bmp")
+    assets_dir = os.path.join(DIST_DIR, "assets")
+    img_copied = 0
+    for _dp, _dn, _fn in os.walk(CONTENT_DIR):
+        for f in _fn:
+            if f.lower().endswith(IMG_EXT):
+                src = os.path.join(_dp, f)
+                rel = os.path.relpath(src, CONTENT_DIR)
+                dst = os.path.join(assets_dir, rel)
+                os.makedirs(os.path.dirname(dst), exist_ok=True)
+                shutil.copy2(src, dst)
+                img_copied += 1
+
+    # 复制 content/sw.js 到 dist/ 根（Service Worker：音频离线缓存 + 页面更新策略）
+    sw_src = os.path.join(CONTENT_DIR, "sw.js")
+    if os.path.exists(sw_src):
+        shutil.copy2(sw_src, os.path.join(DIST_DIR, "sw.js"))
+
     # 复制 Cloudflare Pages 的 _headers（缓存/安全策略）到 dist/ 根；仓库无此文件时跳过
     _headers_src = os.path.join(os.path.dirname(os.path.abspath(__file__)), "cloudflare", "_headers")
     if os.path.exists(_headers_src):
@@ -1569,6 +1950,7 @@ def main():
     print("已生成: %s" % out_path)
     print("文章数: %d" % len(pages))
     print("本地音频复制: %d 个" % copied)
+    print("图片复制: %d 个" % img_copied)
     print("HTML 大小: %.1f KB" % (os.path.getsize(out_path) / 1024.0))
 
 
