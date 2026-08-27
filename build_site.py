@@ -18,8 +18,10 @@ import re
 import json
 import html as html_mod
 import shutil
+import struct
 import sys
 import time
+import zlib
 from urllib.parse import quote
 
 CONTENT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "content")
@@ -1333,6 +1335,8 @@ function matchByTitle(t){
 // ---- 全局音频播放器 ----
 var playerAudio = new Audio();
 playerAudio.preload = 'none';
+// iOS：允许内联播放，后台/锁屏时保持播放并启用 Media Session 锁屏控制
+try{ playerAudio.playsInline = true; playerAudio.setAttribute('playsinline', ''); }catch(e){}
 var curIdx = -1;
 var SPEEDS = [0.5, 0.75, 1, 1.25, 1.5, 2];   // 倍速预设档位
 var speedIdx = 2;                              // 默认 1x
@@ -1417,13 +1421,14 @@ function playTrack(idx){
   renderPlist();
   updatePlayBtns();
   updateMini();
-  // 锁屏播放控制（Media Session API）：设置音频元信息，手机锁屏时显示标题/艺术家/专辑
+  // 锁屏播放控制（Media Session API）：设置音频元信息，手机锁屏时显示标题/艺术家/封面
   if ('mediaSession' in navigator){
     try{
       navigator.mediaSession.metadata = new MediaMetadata({
         title: t.title,
         artist: '龙的传人｜Longchen Nyingtik',
         album: (t.folder || '音频资源').replace(/^\d+\.\s*/, ''),
+        artwork: [{ src: new URL('assets/cover.png', location.href).href, sizes: '512x512', type: 'image/png' }]
       });
       navigator.mediaSession.playbackState = 'playing';
     }catch(e){}
@@ -1937,6 +1942,11 @@ def main():
                 shutil.copy2(src, dst)
                 img_copied += 1
 
+    # 生成锁屏封面图 assets/cover.png（Media Session artwork 用）
+    cover_path = os.path.join(assets_dir, "cover.png")
+    gen_cover_png(cover_path)
+    print("封面图生成: %s" % cover_path)
+
     # 复制 content/sw.js 到 dist/ 根（Service Worker：音频离线缓存 + 页面更新策略）
     sw_src = os.path.join(CONTENT_DIR, "sw.js")
     if os.path.exists(sw_src):
@@ -1952,6 +1962,45 @@ def main():
     print("本地音频复制: %d 个" % copied)
     print("图片复制: %d 个" % img_copied)
     print("HTML 大小: %.1f KB" % (os.path.getsize(out_path) / 1024.0))
+
+
+# ---- 生成锁屏封面图（纯标准库手写 PNG）：深红底 + 金色同心圆（坛城意象）----
+# 用途：Media Session artwork，iOS/Android 锁屏界面显示播放控制时需要 PNG/JPG 封面
+def gen_cover_png(path, size=512):
+    W = H = size
+    cx = cy = W / 2.0
+    bg = (138, 31, 28)      # 深红 #8a1f1c
+    gold = (217, 184, 106)  # 金 #d9b86a
+    gold2 = (245, 222, 160) # 淡金
+    rings = [(28, gold2, 7), (58, gold, 6), (95, gold2, 5), (132, gold, 6), (172, gold2, 4), (208, gold, 5), (244, gold2, 3)]
+    rows = []
+    for y in range(H):
+        row = bytearray([0])  # PNG 每行首字节为 filter type（0 = None）
+        for x in range(W):
+            dx = x - cx
+            dy = y - cy
+            r = (dx * dx + dy * dy) ** 0.5
+            color = bg
+            for rr, c, w in rings:
+                if abs(r - rr) < w:
+                    color = c
+                    break
+            row += bytes(color) + b'\xff'
+        rows.append(bytes(row))
+    raw = b''.join(rows)
+
+    def chunk(typ, data):
+        c = struct.pack('>I', len(data)) + typ + data
+        c += struct.pack('>I', zlib.crc32(typ + data) & 0xffffffff)
+        return c
+
+    ihdr = struct.pack('>IIBBBBB', W, H, 8, 6, 0, 0, 0)  # 8bit RGBA
+    png = (b'\x89PNG\r\n\x1a\n'
+           + chunk(b'IHDR', ihdr)
+           + chunk(b'IDAT', zlib.compress(raw, 9))
+           + chunk(b'IEND', b''))
+    with open(path, 'wb') as f:
+        f.write(png)
 
 
 if __name__ == "__main__":
