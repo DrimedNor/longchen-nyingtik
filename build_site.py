@@ -326,6 +326,9 @@ PAGE_TEMPLATE = r"""<!DOCTYPE html>
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow, noarchive">
+<meta name="googlebot" content="noindex, nofollow, noarchive">
+<meta name="baiduspider" content="noindex, nofollow, noarchive">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='20' fill='%238a1f1c'/%3E%3Ctext x='50' y='68' font-size='52' font-family='serif' font-weight='bold' text-anchor='middle' fill='%23d9b86a'%3E%E9%BE%99%3C/text%3E%3C/svg%3E">
 <title>@@SITE_TITLE@@</title>
 <style>
@@ -1929,6 +1932,11 @@ def main():
     out_path = os.path.join(DIST_DIR, "index.html")
     with open(out_path, "w", encoding="utf-8") as f:
         f.write(html_out)
+
+    # 生成 robots.txt：禁止所有搜索引擎收录（国内+国外），降低宗教内容公开传播风险
+    robots_path = os.path.join(DIST_DIR, "robots.txt")
+    with open(robots_path, "w", encoding="utf-8") as f:
+        f.write("User-agent: *\nDisallow: /\n")
 
     # 复制本地音频到 dist/audio/（覆盖式复制；旧残留由构建前 shell rm 清理）
     audio_dir = os.path.join(DIST_DIR, "audio")

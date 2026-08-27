@@ -18,3 +18,5 @@ dist/
 r2_upload.py
 build_site.log
 *.log
+__pycache__/
+*.pyc

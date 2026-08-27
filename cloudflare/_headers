@@ -11,10 +11,11 @@
 /audio/*
   Cache-Control: public, max-age=86400, immutable
 
-# 3) 全局基础安全头
+# 3) 全局基础安全头 + 禁止搜索引擎索引（国内+国外爬虫均不收录）
 /*
   X-Content-Type-Options: nosniff
   Referrer-Policy: no-referrer
+  X-Robots-Tag: noindex, nofollow, noarchive
 
 # 4) 仅自己与朋友使用，不对外：阻止默认 pages.dev 子域被搜索引擎索引
 https://:project.pages.dev/*
