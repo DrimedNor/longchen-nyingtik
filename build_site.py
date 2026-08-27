@@ -567,6 +567,30 @@ a:hover{color:var(--accent-soft)}
 .breadcrumb a:hover{color:var(--accent)}
 .breadcrumb .sep{color:var(--ink-faint); opacity:.5; padding:0 .1rem}
 .breadcrumb .cur{color:var(--ink); font-weight:600}
+.breadcrumb a.dir-crumb{cursor:pointer}
+.breadcrumb a.dir-crumb:active{color:var(--accent)}
+
+/* 目录弹层：手机端点面包屑目录层级时弹出该目录下的文章列表 */
+.dir-pop{position:fixed; inset:0; z-index:60; display:none}
+.dir-pop.show{display:block}
+.dir-pop-mask{position:absolute; inset:0; background:rgba(59,42,34,.35)}
+.dir-pop-panel{position:absolute; left:0; right:0; bottom:0; background:var(--surface);
+  border-radius:16px 16px 0 0; max-height:72vh; display:flex; flex-direction:column;
+  padding-bottom:env(safe-area-inset-bottom,0); box-shadow:0 -8px 30px rgba(59,42,34,.25)}
+.dir-pop-head{display:flex; align-items:center; justify-content:space-between; padding:1rem 1.2rem;
+  font-weight:600; color:var(--ink); border-bottom:1px solid var(--line); flex:0 0 auto}
+.dir-pop-x{border:none; background:none; color:var(--ink-soft); font-size:1.1rem; cursor:pointer; padding:.2rem .4rem}
+.dir-pop-body{overflow-y:auto; flex:1}
+.dir-pop-item{padding:.95rem 1.2rem; cursor:pointer; color:var(--ink);
+  border-bottom:1px solid var(--line); font-size:1rem; line-height:1.4}
+.dir-pop-item:active{background:var(--surface-soft)}
+.dir-pop-dir{color:var(--accent); font-weight:500; display:flex; justify-content:space-between; align-items:center}
+.dir-pop-arrow{color:var(--ink-faint)}
+.dir-pop-empty{padding:1.5rem 1.2rem; color:var(--ink-faint); text-align:center}
+@media (min-width:761px){
+  .dir-pop-panel{left:50%; right:auto; width:420px; transform:translateX(-50%);
+    border-radius:16px; bottom:50%; margin-bottom:-40vh}
+}
 
 /* 全局播放器（默认占据下三分之一屏） */
 .player{position:fixed; left:0; right:0; bottom:0; z-index:40; background:var(--surface);
@@ -1030,6 +1054,61 @@ function renderNav(){
   });
 }
 
+// ---- 目录弹层：手机端点面包屑目录层级时，弹出该目录下的子目录+文章列表 ----
+function treeNode(path){
+  var node = TREE;
+  (String(path).split('/') || []).forEach(function(seg){
+    if (node && node.dirs) node = node.dirs[seg];
+  });
+  return node;
+}
+// 某目录下直接文章（不含子目录 index，不含更深层级）
+function dirDirectPages(path){
+  var pre = path + '/';
+  return PAGES.filter(function(p){
+    if (p.slug.indexOf(pre) !== 0) return false;
+    if (p.slug === path + '/index') return false;
+    var rest = p.slug.slice(pre.length);
+    return rest.indexOf('/') === -1;
+  }).sort(function(a, b){ return a.slug < b.slug ? -1 : 1; });
+}
+function openDirList(path){
+  var node = treeNode(path);
+  var html = '';
+  // 子目录（可继续展开下一级）
+  var dirNames = node && node.dirs ? Object.keys(node.dirs).slice().sort() : [];
+  dirNames.forEach(function(name){
+    var subFull = path + '/' + name;
+    var subTarget = subFull + '/index';
+    if (!bySlug[subTarget]) subTarget = firstPageUnder(subFull);
+    html += '<div class="dir-pop-item dir-pop-dir" data-dir="' + esc(subFull) + '" data-jump="' + esc(subTarget || '') + '">📁 ' + esc(cleanDirName(name)) + '<span class="dir-pop-arrow">›</span></div>';
+  });
+  // 直接文章（点击直接打开）
+  var pages = dirDirectPages(path);
+  pages.forEach(function(p){
+    html += '<div class="dir-pop-item dir-pop-page" data-jump="' + esc(p.slug) + '">' + esc(p.title) + '</div>';
+  });
+  if (!html) html = '<div class="dir-pop-empty">（暂无内容）</div>';
+  var label = cleanDirName(String(path).split('/').pop() || path);
+  document.getElementById('dirPopTitle').textContent = label;
+  document.getElementById('dirPopBody').innerHTML = html;
+  document.getElementById('dirPop').classList.add('show');
+  // 子目录 → 继续展开；文章 → 跳转
+  document.querySelectorAll('#dirPop .dir-pop-dir').forEach(function(el){
+    el.onclick = function(){ openDirList(el.dataset.dir); };
+  });
+  document.querySelectorAll('#dirPop .dir-pop-page').forEach(function(el){
+    el.onclick = function(){
+      closeDirPop();
+      var slug = el.dataset.jump;
+      if (bySlug[slug]) show(slug);
+    };
+  });
+}
+function closeDirPop(){
+  document.getElementById('dirPop').classList.remove('show');
+}
+
 // ---- 显示页面 ----
 function show(slug){
   var p = bySlug[slug];
@@ -1116,10 +1195,12 @@ function show(slug){
       playTrack(parseInt(a.dataset.idx, 10));
     };
   });
-  // 面包屑链接
+  // 面包屑链接：手机端点目录层级弹出该目录文章列表；主页/桌面端正常跳转
   document.querySelectorAll('.breadcrumb a').forEach(function(a){
     a.onclick = function(ev){
       ev.preventDefault();
+      var isMobile = window.innerWidth <= 760;
+      if (a.dataset.dir && isMobile){ openDirList(a.dataset.dir); return; }
       var target = a.dataset.page;
       var hit = bySlug[target] || matchByTitle(target);
       if (hit) show(hit.slug); else alert('未找到页面：' + target);
@@ -1136,25 +1217,20 @@ function show(slug){
 }
 
 // ---- 面包屑导航 ----
+// 目录层级（非最后一级）均渲染为可点击 crumb：手机端点击弹出该目录下的子目录+文章列表，
+// 桌面端点击跳转到该目录（data-page 优先 index，弹层函数另有兜底）。
 function renderBreadcrumb(p){
   var parts = p.slug.split('/').filter(function(x){ return x && x !== 'index'; });
   var crumbs = ['<a class="crumb" data-page="index">主页</a>'];
-  var sectionSlug = parts[0] ? parts[0] + '/index' : null;
-  if (sectionSlug && bySlug[sectionSlug] && parts.length > 1){
-    crumbs.push('<span class="sep">›</span><a class="crumb" data-page="' + esc(sectionSlug) + '">' + esc(parts[0]) + '</a>');
-  } else if (sectionSlug && bySlug[sectionSlug] && parts.length === 1 && p.slug !== 'index'){
-    crumbs.push('<span class="sep">›</span><span class="cur">' + esc(parts[0]) + '</span>');
-  } else if (p.slug !== 'index' && parts.length === 1){
-    // 顶层独立页面（如「更新日志」）：无父级 index，直接显示当前页标题
-    crumbs.push('<span class="sep">›</span><span class="cur">' + esc(p.title) + '</span>');
-  }
-  // 中间目录层级（不可点击，仅展示）
-  for (var i = 1; i < parts.length - 1; i++){
-    crumbs.push('<span class="sep">›</span><span>' + esc(parts[i]) + '</span>');
-  }
-  // 当前页标题（文章页）
-  if (parts.length > 1){
-    crumbs.push('<span class="sep">›</span><span class="cur">' + esc(p.title) + '</span>');
+  var acc = '';
+  for (var i = 0; i < parts.length; i++){
+    acc = acc ? acc + '/' + parts[i] : parts[i];
+    crumbs.push('<span class="sep">›</span>');
+    if (i < parts.length - 1){
+      crumbs.push('<a class="crumb dir-crumb" data-page="' + esc(acc + '/index') + '" data-dir="' + esc(acc) + '">' + esc(parts[i]) + '</a>');
+    } else {
+      crumbs.push('<span class="cur">' + esc(parts[i]) + '</span>');
+    }
   }
   return '<div class="breadcrumb">' + crumbs.join('') + '</div>';
 }
@@ -1762,6 +1838,18 @@ document.getElementById('sidebarOverlay').onclick = function(){ closeSidebar(); 
 // ---- 初始化 ----
 renderNav();
 updateModeBtn();
+// 目录弹层：插入 DOM 并绑定关闭/遮罩点击
+var dirPopEl = document.createElement('div');
+dirPopEl.id = 'dirPop';
+dirPopEl.className = 'dir-pop';
+dirPopEl.innerHTML = '<div class="dir-pop-mask"></div>'
+  + '<div class="dir-pop-panel">'
+  + '<div class="dir-pop-head"><span id="dirPopTitle"></span><button class="dir-pop-x" title="关闭">✕</button></div>'
+  + '<div class="dir-pop-body" id="dirPopBody"></div>'
+  + '</div>';
+document.body.appendChild(dirPopEl);
+document.querySelector('#dirPop .dir-pop-mask').onclick = closeDirPop;
+document.querySelector('#dirPop .dir-pop-x').onclick = closeDirPop;
 var home = TREE.children && TREE.children.find(function(c){ return c.is_index; });
 show(home ? home.slug : PAGES[0].slug);
 
