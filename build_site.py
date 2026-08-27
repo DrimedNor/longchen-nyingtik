@@ -1334,10 +1334,13 @@ function matchByTitle(t){
 }
 
 // ---- 全局音频播放器 ----
-var playerAudio = new Audio();
-playerAudio.preload = 'none';
+// iOS 锁屏控制要求 <audio> 元素在 DOM 中，故用 createElement + appendChild，而非 new Audio()
+var playerAudio = document.createElement('audio');
+playerAudio.preload = 'metadata';   // iOS 需预加载元数据才能在锁屏显示标题/时长
 // iOS：允许内联播放，后台/锁屏时保持播放并启用 Media Session 锁屏控制
 try{ playerAudio.playsInline = true; playerAudio.setAttribute('playsinline', ''); }catch(e){}
+playerAudio.style.display = 'none';
+document.body.appendChild(playerAudio);
 var curIdx = -1;
 var SPEEDS = [0.5, 0.75, 1, 1.25, 1.5, 2];   // 倍速预设档位
 var speedIdx = 2;                              // 默认 1x
@@ -1409,6 +1412,21 @@ function updateMini(){
   document.getElementById('pmPlay').textContent = playerAudio.paused ? '▶' : '⏸';
 }
 
+// ---- 设置 Media Session 元信息（iOS 锁屏显示标题/封面/控制）----
+// 需在 playTrack 和 play 事件中都调用：iOS 有时要在音频真正开始播放后才能识别
+function setMediaMeta(t){
+  if (!('mediaSession' in navigator) || !t) return;
+  try{
+    navigator.mediaSession.metadata = new MediaMetadata({
+      title: t.title,
+      artist: '龙的传人｜Longchen Nyingtik',
+      album: (t.folder || '音频资源').replace(/^\d+\.\s*/, ''),
+      artwork: [{ src: new URL('assets/cover.png', location.href).href, sizes: '512x512', type: 'image/png' }]
+    });
+    navigator.mediaSession.playbackState = 'playing';
+  }catch(e){}
+}
+
 function playTrack(idx){
   if (idx < 0 || idx >= AUDIO_TRACKS.length) return;
   curIdx = idx;
@@ -1422,18 +1440,7 @@ function playTrack(idx){
   renderPlist();
   updatePlayBtns();
   updateMini();
-  // 锁屏播放控制（Media Session API）：设置音频元信息，手机锁屏时显示标题/艺术家/封面
-  if ('mediaSession' in navigator){
-    try{
-      navigator.mediaSession.metadata = new MediaMetadata({
-        title: t.title,
-        artist: '龙的传人｜Longchen Nyingtik',
-        album: (t.folder || '音频资源').replace(/^\d+\.\s*/, ''),
-        artwork: [{ src: new URL('assets/cover.png', location.href).href, sizes: '512x512', type: 'image/png' }]
-      });
-      navigator.mediaSession.playbackState = 'playing';
-    }catch(e){}
-  }
+  setMediaMeta(t);
 }
 
 function playByAudio(fname){
@@ -1512,6 +1519,8 @@ playerAudio.addEventListener('ended', function(){
 });
 playerAudio.addEventListener('play', function(){
   document.getElementById('pPlay').textContent = '⏸'; updateMini();
+  // iOS：音频真正开始播放时重新设置 Media Session 元信息，确保锁屏显示
+  if (curIdx >= 0 && AUDIO_TRACKS[curIdx]) setMediaMeta(AUDIO_TRACKS[curIdx]);
   if ('mediaSession' in navigator){ try{ navigator.mediaSession.playbackState = 'playing'; }catch(e){} }
 });
 playerAudio.addEventListener('pause', function(){
