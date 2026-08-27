@@ -758,6 +758,8 @@ a:hover{color:var(--accent-soft)}
 .home-update .play-btn{margin:.2rem 0 .2rem 0}
 .dir-children{margin-top:.6rem}
 .dir-children .hn-link{font-size:1.02em}
+/* 目录 Index 完整目录树容器 */
+.dir-full-tree{margin-top:1.4rem; padding-top:.6rem}
 
 /* 移动端 */
 @media(max-width:760px){
@@ -965,73 +967,25 @@ function navHoverBg(el){
 function renderNav(){
   var nav = document.getElementById('nav');
   // 一级目录固定顺序（与首页导览一致）；其余新增目录按名称追加在末尾
-  var TOP_ORDER = ['上师开示', '龙钦宁提传承', '音频资源', '书籍', '更新日志'];
+  // 简化导航：只显示一级菜单，点击直接进入该目录的 Index 页面（Index 内展示完整目录）
+  var TOP_ORDER = ['上师开示', '龙钦宁提传承', '音频资源', '书籍', '关于本站'];
   function topKey(name){ var i = TOP_ORDER.indexOf(name); return i < 0 ? 1000 : i; }
-  // 某文件夹（完整路径，如 "音频资源/2. 上师法音"）直属的音频条目；只匹配直接归属，不含子文件夹
-  function navAudioList(full){
-    if (!full || full.indexOf('音频资源/') !== 0) return '';
-    var key = full.slice('音频资源/'.length);
-    var items = [];
-    AUDIO_TRACKS.forEach(function(t, i){
-      if ((t.folder || '') === key){
-        items.push('<a class="hn-link hn-audio" data-idx="' + i + '">🔊 ' + esc(t.title) + '</a>');
-      }
-    });
-    return items.join('');
-  }
-  // 递归渲染手风琴：每个有内容的目录 = 一个可折叠小节；正文 = 子目录小节 + 直属音频
-  // 默认只展示一级标题（一级始终可见），子层级收起，点击一级展开
-  function walk(node, prefix, depth){
-    if (depth > 2) return '';   // 控制在 3 个层级（depth 0 / 1 / 2）
-    var names = (node.dirs ? Object.keys(node.dirs) : []).slice();
-    if (depth === 0) names.sort(function(a, b){ return topKey(a) - topKey(b); });
-    else names.sort();
-    var out = '';
-    names.forEach(function(name){
-      var sub = node.dirs[name];
-      var full = (prefix ? prefix + '/' : '') + name;
-      var target = full + '/index';
-      if (!bySlug[target]) target = firstPageUnder(full);
-      if (!target) return;
-      var children = walk(sub, full, depth + 1);
-      var audio = navAudioList(full);
-      var body = (children ? '<div class="nav-sec-children">' + children + '</div>' : '')
-               + (audio ? '<div class="nav-audio-list">' + audio + '</div>' : '');
-      var hasBody = body !== '';
-      out += '<div class="nav-sec" data-depth="' + depth + '" data-slug="' + esc(target) + '">'
-        + '<div class="nav-sec-head' + (hasBody ? ' has-body' : '') + '" data-slug="' + esc(target) + '">'
-        + '<span class="nav-chev' + (hasBody ? '' : ' nav-chev-none') + '">▸</span>'
-        + '<span class="dir-label">' + esc(name) + '</span></div>'
-        + (hasBody ? '<div class="nav-sec-body">' + body + '</div>' : '')
-        + '</div>';
-    });
-    return out;
-  }
-  var html = walk(TREE, '', 0);
-  // 顶层独立页面（如「更新日志」）：作为一级可点击项排在末尾
-  (TREE.children || []).forEach(function(c){
-    if (c.type === 'page' && !c.is_index){
-      html += '<div class="nav-sec" data-depth="0" data-slug="' + esc(c.slug) + '">'
-        + '<div class="nav-sec-head" data-slug="' + esc(c.slug) + '">'
-        + '<span class="nav-chev nav-chev-none">▸</span>'
-        + '<span class="dir-label">' + esc(c.title) + '</span></div></div>';
-    }
+  var html = '';
+  Object.keys(TREE.dirs).sort(function(a, b){ return topKey(a) - topKey(b); }).forEach(function(name){
+    var target = name + '/index';
+    if (!bySlug[target]) target = firstPageUnder(name);
+    if (!target) return;   // 空目录（无 index / 无首篇 / 无子目录）→ 跳过
+    html += '<div class="nav-sec" data-depth="0" data-slug="' + esc(target) + '">'
+      + '<div class="nav-sec-head" data-slug="' + esc(target) + '">'
+      + '<span class="nav-chev nav-chev-none">▸</span>'
+      + '<span class="dir-label">' + esc(cleanDirName(name)) + '</span></div></div>';
   });
   nav.innerHTML = html;
-  // 折叠交互：点头部切换展开/收起（多个一级可同时展开，互不干扰）；叶子目录点击直达
+  // 一级菜单点击：直接进入该目录 Index 页面
   nav.querySelectorAll('.nav-sec-head').forEach(function(h){
     h.onclick = function(){
-      var sec = h.closest('.nav-sec');
-      var body = h.nextElementSibling;
-      var hasBody = body && body.classList.contains('nav-sec-body');
-      var isMobile = window.innerWidth <= 760;
-      if (hasBody){
-        sec.classList.toggle('open');
-        // 手机端：有子内容时点击只展开/收起下级，不跳转页面；桌面端保持原行为（既展开又跳转）
-        if (isMobile) return;
-      }
       show(h.dataset.slug);
-      if (isMobile) closeSidebar();
+      if (window.innerWidth <= 760) closeSidebar();
     };
     // 悬停：按该项文字色生成更深色块并选配对比文字，松开即恢复
     h.addEventListener('mouseenter', function(){
@@ -1044,13 +998,6 @@ function renderNav(){
       h.style.background = '';
       h.style.color = '';
     });
-  });
-  // 导航内音频项 → 直接播放
-  nav.querySelectorAll('.nav-audio-list .hn-audio').forEach(function(a){
-    a.onclick = function(ev){
-      ev.preventDefault();
-      playTrack(parseInt(a.dataset.idx, 10));
-    };
   });
 }
 
@@ -1130,16 +1077,18 @@ function show(slug){
   }
   // 目录 landing 页（非首页 index）：自动聚合展示其下文章列表
   if (p.is_index && p.slug !== 'index'){
-    inner += renderDirChildren(p.slug);
-  }
-  // 音频资源页 → 按文件夹层级自动生成索引列表（嵌套子文件夹取完整路径；手工编排列表优先不重复附加）
-  if (p.is_index && p.slug.indexOf('音频资源') === 0){
-    var grp = null;
-    if (p.slug !== '音频资源/index'){
-      grp = p.slug.slice('音频资源/'.length).replace(/\/index$/, '');
+    // 音频资源目录特殊渲染（按文件夹层级列出音频）
+    if (p.slug.indexOf('音频资源') === 0){
+      var grp = null;
+      if (p.slug !== '音频资源/index'){
+        grp = p.slug.slice('音频资源/'.length).replace(/\/index$/, '');
+      }
+      var _curated = grp && p.html.indexOf('class="play-btn"') !== -1;
+      if (!_curated) inner += renderAudioListByFolder(grp);
+    } else {
+      // 其他目录：展示完整目录树（所有层级子目录+文章，无需逐级点开）
+      inner += renderFullDirTree(p.slug);
     }
-    var _curated = grp && p.html.indexOf('class="play-btn"') !== -1;
-    if (!_curated) inner += renderAudioListByFolder(grp);
   }
   var crumb = renderBreadcrumb(p);
   document.getElementById('content').innerHTML = '<div class="article">' + crumb + inner + '</div>';
@@ -1158,6 +1107,16 @@ function show(slug){
       if (d > _bestDepth){ _bestDepth = d; _best = a; }
     }
   });
+  // 精确匹配未命中时：按一级菜单前缀匹配（如文章「上师开示/...」高亮一级「上师开示」）
+  if (!_best){
+    _navHeads.forEach(function(a){
+      var s = a.dataset.slug;
+      if (s && _best) return;
+      if (s && s.indexOf('/index') > 0 && slug !== s && slug.indexOf(s.replace(/\/index$/, '')) === 0){
+        _best = a; _bestDepth = 0;
+      }
+    });
+  }
   if (_best){
     _best.classList.add('active');
     // 展开该选中项的祖先小节（自身不强制展开，允许用户收起），保证当前所在层级一目了然
@@ -1323,6 +1282,21 @@ function renderHomeNav(){
     }
   });
   return '<div class="home-nav">' + html.join('') + '</div>';
+}
+
+// ---- 目录 Index 完整目录树：展示该目录下所有层级的子目录+文章（类似首页导览，无需逐级点开）----
+function renderFullDirTree(dirSlug){
+  var dirPath = dirSlug.replace(/\/index$/, '');
+  var node = TREE;
+  var segs = dirPath.split('/');
+  for (var i = 0; i < segs.length; i++){
+    if (node && node.dirs) node = node.dirs[segs[i]];
+    else return '';
+  }
+  if (!node) return '';
+  var arr = walkBlock(node, dirPath, 0, '');
+  if (!arr.length) return '';
+  return '<div class="dir-full-tree">' + arr.join('') + '</div>';
 }
 
 // ---- 目录 landing 页：先展示直接子栏目卡片，再展示直属文章 ----
