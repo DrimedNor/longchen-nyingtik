@@ -239,15 +239,16 @@ def discover_pages():
     global LOCAL_AUDIO
     LOCAL_AUDIO = {}
     # 第一遍：先扫描收集所有本地音频（必须在解析 md 之前完成）
+    # 排除规则：隐藏目录（.开头）和「不推送」目录（用户不想公开的音频/资料，仅本地保留）
     for dirpath, dirs, files in os.walk(CONTENT_DIR):
-        dirs[:] = [d for d in dirs if not d.startswith(".")]
+        dirs[:] = [d for d in dirs if not d.startswith(".") and "不推送" not in d]
         for f in files:
             if f.lower().endswith((".mp3", ".m4a", ".wav")):
                 LOCAL_AUDIO[f] = os.path.join(dirpath, f)
     # 第二遍：解析 md
     pages = []
     for dirpath, dirs, files in os.walk(CONTENT_DIR):
-        dirs[:] = [d for d in dirs if not d.startswith(".")]
+        dirs[:] = [d for d in dirs if not d.startswith(".") and "不推送" not in d]
         for f in sorted(files):
             if not f.endswith(".md"):
                 continue
