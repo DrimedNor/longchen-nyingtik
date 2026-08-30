@@ -917,6 +917,7 @@ a:hover{color:var(--accent-soft)}
 </div>
 
 <script>
+@@QRCODE_LIB@@
 // ---- Service Worker 注册：音频离线缓存 + 页面更新策略（sw.js 由构建时复制到 dist 根） ----
 if ('serviceWorker' in navigator){
   window.addEventListener('load', function(){
@@ -1215,7 +1216,16 @@ function show(slug){
   // 恢复本页划线
   if (!p.is_index) restoreHighlights(slug);
   updatePlayBtns();
-  window.scrollTo({top:0, behavior:'smooth'});
+  // 恢复阅读进度（非首页且有保存位置时）
+  var savedScroll = 0;
+  if (!p.is_index && slug !== 'index'){
+    savedScroll = parseInt(localStorage.getItem(SCROLL_KEY + slug) || '0', 10);
+  }
+  if (savedScroll > 60){
+    setTimeout(function(){ window.scrollTo(0, savedScroll); }, 80);
+  } else {
+    window.scrollTo({top:0, behavior:'smooth'});
+  }
 }
 
 // ==================== 划线与分享系统 ====================
@@ -1386,7 +1396,7 @@ function openSharePanel(opts){
     + '<div class="sp-link">' + esc(opts.url) + '</div>';
   shareMask.classList.add('show');
   sharePanel.classList.add('show');
-  if (hasCard) drawShareCard(opts.title, opts.highlight);
+  if (hasCard) drawShareCard(opts.title, opts.highlight, opts.url);
   sharePanel.querySelectorAll('.sp-btn').forEach(function(b){
     b.onclick = function(){
       var act = b.dataset.act;
@@ -1419,7 +1429,25 @@ function shareHighlight(text){
 }
 
 // ---- Canvas 分享卡片 ----
-function drawShareCard(title, text){
+function drawQRCode(ctx, text, x, y, size){
+  try {
+    if (typeof qrcode !== 'function') return;
+    var qr = qrcode(0, 'M');
+    qr.addData(text);
+    qr.make();
+    var count = qr.getModuleCount();
+    var cell = size / count;
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(x - 5, y - 5, size + 10, size + 10);
+    ctx.fillStyle = '#2a1f1a';
+    for (var r = 0; r < count; r++){
+      for (var c = 0; c < count; c++){
+        if (qr.isDark(r, c)) ctx.fillRect(x + c * cell, y + r * cell, Math.ceil(cell), Math.ceil(cell));
+      }
+    }
+  } catch(e){}
+}
+function drawShareCard(title, text, url){
   var canvas = document.getElementById('shareCard');
   if (!canvas) return;
   var ctx = canvas.getContext('2d');
@@ -1462,13 +1490,16 @@ function drawShareCard(title, text){
     ctx.fillStyle = '#2a1f1a';
     ctx.fillText(l, 60, startY + i * lineH);
   });
-  // 底部来源
+  // 底部区域：左侧来源+提示，右侧二维码
   ctx.fillStyle = '#9b8475';
-  ctx.font = '22px "Noto Serif SC",sans-serif';
-  ctx.textAlign = 'center';
-  ctx.fillText('龙的传人 · Longchen Nyingtik', W / 2, H - 90);
+  ctx.font = '20px "Noto Serif SC",sans-serif';
+  ctx.textAlign = 'left';
+  ctx.fillText('龙的传人 · Longchen Nyingtik', 60, H - 100);
   ctx.fillStyle = '#b8893b';
-  ctx.fillRect(W / 2 - 40, H - 65, 80, 2);
+  ctx.font = '18px "Noto Serif SC",sans-serif';
+  ctx.fillText('长按识别二维码 · 查看原文', 60, H - 65);
+  // 二维码
+  if (url) drawQRCode(ctx, url, W - 155, H - 145, 105);
 }
 function saveShareCard(){
   var canvas = document.getElementById('shareCard');
@@ -2147,21 +2178,77 @@ document.addEventListener('touchend', function(e){
 // 点击非工具栏区域隐藏
 document.addEventListener('mousedown', function(e){
   if (selToolbar && !selToolbar.contains(e.target)) hideSelToolbar();
+  if (hlToolbar && !hlToolbar.contains(e.target)) hideHlToolbar();
 });
-// 已划线文字点击 → 确认取消
+// 已划线文字点击 → 弹出操作菜单（取消划线/复制/分享）
+var hlToolbar = null;
+function initHlToolbar(){
+  if (hlToolbar) return;
+  hlToolbar = document.createElement('div');
+  hlToolbar.className = 'sel-toolbar hl-toolbar';
+  hlToolbar.style.display = 'none';
+  hlToolbar.innerHTML = '<button data-act="remove">取消划线</button>'
+    + '<div class="st-sep"></div>'
+    + '<button data-act="copy">复制</button>'
+    + '<div class="st-sep"></div>'
+    + '<button data-act="share">分享</button>';
+  document.body.appendChild(hlToolbar);
+  hlToolbar.addEventListener('mousedown', function(e){ e.preventDefault(); });
+  hlToolbar.querySelectorAll('button').forEach(function(b){
+    b.onclick = function(){
+      var act = b.dataset.act;
+      var hl = hlToolbar._target;
+      if (!hl){ hideHlToolbar(); return; }
+      var text = hl.textContent;
+      if (act === 'remove'){
+        var parent = hl.parentNode;
+        while (hl.firstChild) parent.insertBefore(hl.firstChild, hl);
+        parent.removeChild(hl);
+        parent.normalize();
+        removeHighlight(currentSlug, text);
+        toast('已取消划线');
+      } else if (act === 'copy'){
+        copyText(text); toast('已复制');
+      } else if (act === 'share'){
+        shareHighlight(text);
+      }
+      hideHlToolbar();
+    };
+  });
+}
+function showHlToolbar(hl){
+  initHlToolbar();
+  hlToolbar._target = hl;
+  var rect = hl.getBoundingClientRect();
+  hlToolbar.style.display = 'flex';
+  var tbW = hlToolbar.offsetWidth;
+  var left = rect.left + rect.width / 2 - tbW / 2;
+  left = Math.max(8, Math.min(left, window.innerWidth - tbW - 8));
+  var isMobile = window.innerWidth <= 760;
+  var top = isMobile ? rect.bottom + 8 : rect.top - hlToolbar.offsetHeight - 8;
+  if (top < 8 || top + hlToolbar.offsetHeight > window.innerHeight - 8) top = rect.bottom + 8;
+  hlToolbar.style.left = left + 'px';
+  hlToolbar.style.top = top + 'px';
+}
+function hideHlToolbar(){ if (hlToolbar) hlToolbar.style.display = 'none'; }
 document.addEventListener('click', function(e){
   var hl = e.target.closest('.hl');
   if (hl && hl.closest('.article')){
     e.preventDefault();
-    if (confirm('取消此划线？')){
-      var text = hl.textContent;
-      var parent = hl.parentNode;
-      while (hl.firstChild) parent.insertBefore(hl.firstChild, hl);
-      parent.removeChild(hl);
-      parent.normalize();
-      removeHighlight(currentSlug, text);
-    }
+    e.stopPropagation();
+    showHlToolbar(hl);
   }
+});
+
+// ---- 阅读进度记忆：记录每篇文章滚动位置，下次打开自动恢复 ----
+var SCROLL_KEY = 'longchen-scroll-';
+var scrollTimer = null;
+window.addEventListener('scroll', function(){
+  if (!currentSlug || currentSlug === 'index') return;
+  if (scrollTimer) clearTimeout(scrollTimer);
+  scrollTimer = setTimeout(function(){
+    localStorage.setItem(SCROLL_KEY + currentSlug, String(window.scrollY));
+  }, 300);
 });
 
 // 目录弹层：插入 DOM 并绑定关闭/遮罩点击
@@ -2360,6 +2447,16 @@ def main():
     html_out = html_out.replace("@@HOME_UPDATE_DATE@@", home_update_date)
     html_out = html_out.replace("@@SITE_TITLE@@", site_title)
     html_out = html_out.replace("@@BUILD_TIME@@", time.strftime("%Y-%m-%d %H:%M"))
+    # 内联二维码生成库（qrcode.min.js，用于分享卡片生成文章链接二维码）
+    qrcode_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "qrcode.min.js")
+    if os.path.exists(qrcode_path):
+        with open(qrcode_path, "r", encoding="utf-8") as f:
+            qrcode_lib = f.read()
+    else:
+        qrcode_lib = "/* qrcode.min.js not found */"
+    # 确保 qrcode 暴露为全局变量（UMD 库在浏览器中可能不自动挂载）
+    qrcode_lib += "\n;window.qrcode = (typeof qrcode !== 'undefined') ? qrcode : (window.qrcode || null);\n"
+    html_out = html_out.replace("@@QRCODE_LIB@@", qrcode_lib)
 
     os.makedirs(DIST_DIR, exist_ok=True)
     out_path = os.path.join(DIST_DIR, "index.html")
