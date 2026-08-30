@@ -761,6 +761,32 @@ a:hover{color:var(--accent-soft)}
 /* 目录 Index 完整目录树容器 */
 .dir-full-tree{margin-top:1.4rem; padding-top:.6rem}
 
+/* ===== 划线与分享 ===== */
+/* 划线高亮：金色底纹（类似微信读书划线） */
+.hl{background:linear-gradient(transparent 55%, rgba(184,137,59,.38) 55%); cursor:pointer; border-radius:2px; padding:0 1px; transition:background .2s}
+.hl:hover{background:linear-gradient(transparent 50%, rgba(184,137,59,.6) 50%)}
+/* 选中浮动工具栏 */
+.sel-toolbar{position:fixed; z-index:9999; background:#2a1f1a; color:#f5efe8; border-radius:10px; padding:5px; display:flex; gap:2px; box-shadow:0 6px 24px rgba(0,0,0,.35); font-size:14px}
+.sel-toolbar button{background:transparent; border:none; color:#f5efe8; padding:7px 14px; border-radius:7px; cursor:pointer; font-size:13px; white-space:nowrap; transition:background .15s}
+.sel-toolbar button:hover{background:rgba(255,255,255,.14)}
+.sel-toolbar .st-sep{width:1px; background:rgba(255,255,255,.15); margin:5px 0}
+/* 文章操作栏（分享按钮） */
+.article-actions{margin:.3rem 0 1rem; display:flex; gap:.6rem; align-items:center}
+.share-btn{background:var(--surface-soft); border:1px solid var(--line); color:var(--ink-soft); padding:.32rem .95rem; border-radius:20px; font-size:.84em; cursor:pointer; transition:all .15s}
+.share-btn:hover{border-color:var(--accent); color:var(--accent); background:var(--surface-hover)}
+/* 分享面板（底部弹层） */
+.share-mask{position:fixed; inset:0; background:rgba(0,0,0,.45); z-index:9998; display:none}
+.share-mask.show{display:block}
+.share-panel{position:fixed; left:0; right:0; bottom:0; background:var(--surface); border-radius:18px 18px 0 0; padding:1.3rem 1.4rem 1.8rem; z-index:9999; transform:translateY(100%); transition:transform .28s ease; max-height:82vh; overflow-y:auto}
+.share-panel.show{transform:translateY(0)}
+.share-panel h3{margin:0 0 .9rem; font-size:1.08em; color:var(--ink)}
+.share-panel .sp-row{display:flex; gap:.7rem; margin:.7rem 0; flex-wrap:wrap}
+.share-panel .sp-btn{flex:1; min-width:110px; padding:.75rem .5rem; border:1px solid var(--line); border-radius:10px; background:var(--surface-soft); cursor:pointer; text-align:center; font-size:.88em; color:var(--ink-soft); transition:all .15s}
+.share-panel .sp-btn:hover{border-color:var(--accent); color:var(--accent)}
+.share-panel .sp-link{width:100%; box-sizing:border-box; padding:.5rem .7rem; border:1px solid var(--line); border-radius:8px; font-size:.78em; background:var(--surface-soft); color:var(--ink-faint); word-break:break-all; margin-top:.5rem}
+.share-card-preview{text-align:center; margin:.9rem 0}
+.share-card-preview canvas{max-width:100%; border-radius:14px; box-shadow:0 6px 24px rgba(0,0,0,.18)}
+
 /* 移动端 */
 @media(max-width:760px){
   .menu-btn{display:inline-block}
@@ -1057,9 +1083,15 @@ function closeDirPop(){
 }
 
 // ---- 显示页面 ----
+var currentSlug = null;
 function show(slug){
   var p = bySlug[slug];
   if (!p) return;
+  if (currentSlug === slug) return;
+  currentSlug = slug;
+  // Hash 路由：更新 URL 使文章可被链接分享（replaceState 不触发 hashchange，避免循环）
+  var targetHash = '#/' + slug.split('/').map(encodeURIComponent).join('/');
+  if (location.hash !== targetHash) history.replaceState(null, '', targetHash);
   var meta = '';
   if (p.meta.author) meta += '<span>作者：' + esc(p.meta.author) + '</span>';
   if (p.meta.source_url) meta += '<span class="src"><a href="' + esc(p.meta.source_url) + '" target="_blank" rel="noopener">查看原文 ↗</a></span>';
@@ -1067,7 +1099,9 @@ function show(slug){
   var isHome = (p.slug === 'index');
   var titleHtml = p.is_index ? '' : '<h1>' + esc(p.title) + '</h1>';
   var metaHtml = meta ? '<div class="meta">' + meta + '</div>' : '';
-  var inner = titleHtml + metaHtml + p.html;
+  // 文章页（非目录 index）加分享按钮
+  var shareBar = (p.is_index || isHome) ? '' : '<div class="article-actions"><button class="share-btn" id="shareArticleBtn">分享本文</button></div>';
+  var inner = titleHtml + shareBar + metaHtml + p.html;
   if (isHome){
     inner = '<div class="welcome"><div class="big">' + esc(SITE_TITLE) + '</div>'
           + '<div class="welcome-sub">龙钦宁提资料库 · 学习整理与分享</div></div>'
@@ -1171,8 +1205,266 @@ function show(slug){
       playByAudio(b.dataset.audio);
     };
   });
+  // 文章分享按钮
+  var sab = document.getElementById('shareArticleBtn');
+  if (sab) sab.onclick = function(){ shareArticle(); };
+  // 恢复本页划线
+  if (!p.is_index) restoreHighlights(slug);
   updatePlayBtns();
   window.scrollTo({top:0, behavior:'smooth'});
+}
+
+// ==================== 划线与分享系统 ====================
+var HL_KEY_PREFIX = 'longchen-hl-';
+var selToolbar = null;
+
+// ---- 选中浮动工具栏 ----
+function initSelToolbar(){
+  if (selToolbar) return;
+  selToolbar = document.createElement('div');
+  selToolbar.className = 'sel-toolbar';
+  selToolbar.style.display = 'none';
+  selToolbar.innerHTML = '<button data-act="highlight">划线</button>'
+    + '<div class="st-sep"></div>'
+    + '<button data-act="copy">复制</button>'
+    + '<div class="st-sep"></div>'
+    + '<button data-act="share">分享</button>';
+  document.body.appendChild(selToolbar);
+  selToolbar.addEventListener('mousedown', function(e){ e.preventDefault(); });
+  selToolbar.querySelectorAll('button').forEach(function(b){
+    b.onclick = function(){
+      var act = b.dataset.act;
+      var text = getSelText();
+      if (!text){ hideSelToolbar(); return; }
+      if (act === 'highlight') doHighlight(text);
+      else if (act === 'copy'){ copyText(text); toast('已复制'); }
+      else if (act === 'share') shareHighlight(text);
+      hideSelToolbar();
+    };
+  });
+}
+function getSelText(){
+  var sel = window.getSelection();
+  return sel ? sel.toString().trim() : '';
+}
+function showSelToolbar(){
+  initSelToolbar();
+  var sel = window.getSelection();
+  if (!sel || sel.rangeCount === 0) return;
+  var range = sel.getRangeAt(0);
+  var rect = range.getBoundingClientRect();
+  if (rect.width === 0 && rect.height === 0) return;
+  selToolbar.style.display = 'flex';
+  var tbW = selToolbar.offsetWidth;
+  var left = rect.left + rect.width / 2 - tbW / 2;
+  left = Math.max(8, Math.min(left, window.innerWidth - tbW - 8));
+  var top = rect.top - selToolbar.offsetHeight - 8;
+  if (top < 8) top = rect.bottom + 8;
+  selToolbar.style.left = left + 'px';
+  selToolbar.style.top = top + 'px';
+}
+function hideSelToolbar(){ if (selToolbar) selToolbar.style.display = 'none'; }
+
+// ---- 划线操作 ----
+function doHighlight(text){
+  var sel = window.getSelection();
+  if (!sel || sel.rangeCount === 0) return;
+  var range = sel.getRangeAt(0);
+  var mark = document.createElement('mark');
+  mark.className = 'hl';
+  try {
+    range.surroundContents(mark);
+  } catch(e){
+    // 跨节点时用 extractContents 方案
+    try {
+      var frag = range.extractContents();
+      mark.appendChild(frag);
+      range.insertNode(mark);
+    } catch(e2){ return; }
+  }
+  saveHighlight(currentSlug, text);
+  sel.removeAllRanges();
+}
+function saveHighlight(slug, text){
+  var key = HL_KEY_PREFIX + slug;
+  var list = [];
+  try { list = JSON.parse(localStorage.getItem(key) || '[]'); } catch(e){}
+  if (list.indexOf(text) === -1) list.push(text);
+  localStorage.setItem(key, JSON.stringify(list));
+}
+function getHighlights(slug){
+  try { return JSON.parse(localStorage.getItem(HL_KEY_PREFIX + slug) || '[]'); } catch(e){ return []; }
+}
+function removeHighlight(slug, text){
+  var key = HL_KEY_PREFIX + slug;
+  var list = getHighlights(slug);
+  var idx = list.indexOf(text);
+  if (idx > -1) list.splice(idx, 1);
+  localStorage.setItem(key, JSON.stringify(list));
+}
+function restoreHighlights(slug){
+  var list = getHighlights(slug);
+  if (!list.length) return;
+  var article = document.querySelector('.article');
+  if (!article) return;
+  list.forEach(function(text){ highlightTextInElement(article, text); });
+}
+function highlightTextInElement(root, text){
+  if (!text) return;
+  var walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, null);
+  var node;
+  while (node = walker.nextNode()){
+    var idx = node.nodeValue.indexOf(text);
+    if (idx > -1){
+      var range = document.createRange();
+      range.setStart(node, idx);
+      range.setEnd(node, idx + text.length);
+      try {
+        var mark = document.createElement('mark');
+        mark.className = 'hl';
+        range.surroundContents(mark);
+      } catch(e){}
+      return;
+    }
+  }
+}
+
+// ---- 复制与提示 ----
+function copyText(text){
+  if (navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(text).catch(function(){ fallbackCopy(text); });
+  } else fallbackCopy(text);
+}
+function fallbackCopy(text){
+  var ta = document.createElement('textarea');
+  ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+  document.body.appendChild(ta); ta.select();
+  try { document.execCommand('copy'); } catch(e){}
+  document.body.removeChild(ta);
+}
+function toast(msg){
+  var t = document.createElement('div');
+  t.style.cssText = 'position:fixed;top:24px;left:50%;transform:translateX(-50%);background:rgba(42,31,26,.92);color:#f5efe8;padding:.55rem 1.2rem;border-radius:20px;font-size:.88em;z-index:10000;pointer-events:none;transition:opacity .3s';
+  t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(function(){ t.style.opacity = '0'; }, 1400);
+  setTimeout(function(){ t.remove(); }, 1800);
+}
+
+// ---- 分享面板 ----
+var shareMask = null, sharePanel = null;
+function openSharePanel(opts){
+  if (!shareMask){
+    shareMask = document.createElement('div');
+    shareMask.className = 'share-mask';
+    sharePanel = document.createElement('div');
+    sharePanel.className = 'share-panel';
+    document.body.appendChild(shareMask);
+    document.body.appendChild(sharePanel);
+    shareMask.onclick = closeSharePanel;
+  }
+  var hasCard = !!opts.highlight;
+  sharePanel.innerHTML = '<h3>' + (hasCard ? '分享划线' : '分享本文') + '</h3>'
+    + (hasCard ? '<div class="share-card-preview"><canvas id="shareCard" width="750" height="1000"></canvas></div>' : '')
+    + '<div class="sp-row">'
+    + '<button class="sp-btn" data-act="copy-link">复制链接</button>'
+    + '<button class="sp-btn" data-act="copy-text">复制文字</button>'
+    + (hasCard ? '<button class="sp-btn" data-act="save-card">保存卡片图片</button>' : '')
+    + '</div>'
+    + '<div class="sp-link">' + esc(opts.url) + '</div>';
+  shareMask.classList.add('show');
+  sharePanel.classList.add('show');
+  if (hasCard) drawShareCard(opts.title, opts.highlight);
+  sharePanel.querySelectorAll('.sp-btn').forEach(function(b){
+    b.onclick = function(){
+      var act = b.dataset.act;
+      if (act === 'copy-link'){ copyText(opts.url); toast('链接已复制'); }
+      else if (act === 'copy-text'){ copyText(opts.text); toast('文字已复制'); }
+      else if (act === 'save-card'){ saveShareCard(); toast('图片已保存'); }
+      closeSharePanel();
+    };
+  });
+}
+function closeSharePanel(){
+  if (shareMask) shareMask.classList.remove('show');
+  if (sharePanel) sharePanel.classList.remove('show');
+}
+function shareArticle(){
+  var p = bySlug[currentSlug];
+  if (!p) return;
+  var url = location.origin + location.pathname + '#/' + currentSlug.split('/').map(encodeURIComponent).join('/');
+  openSharePanel({ title: p.title, url: url, text: p.title + '\n' + url });
+}
+function shareHighlight(text){
+  var p = bySlug[currentSlug];
+  var title = p ? p.title : '';
+  var url = location.origin + location.pathname + '#/' + currentSlug.split('/').map(encodeURIComponent).join('/');
+  openSharePanel({
+    title: title, url: url,
+    text: '「' + text + '」\n—— ' + title + '\n' + url,
+    highlight: text
+  });
+}
+
+// ---- Canvas 分享卡片 ----
+function drawShareCard(title, text){
+  var canvas = document.getElementById('shareCard');
+  if (!canvas) return;
+  var ctx = canvas.getContext('2d');
+  var W = 750, H = 1000;
+  // 背景
+  ctx.fillStyle = '#f5efe8';
+  ctx.fillRect(0, 0, W, H);
+  // 顶部装饰条
+  ctx.fillStyle = '#6e1614';
+  ctx.fillRect(0, 0, W, 8);
+  // 标题
+  ctx.fillStyle = '#6e1614';
+  ctx.font = 'bold 34px "Noto Serif SC","Songti SC","SimSun",serif';
+  ctx.textAlign = 'center';
+  ctx.fillText(title || '', W / 2, 130);
+  // 分隔线
+  ctx.strokeStyle = '#b8893b';
+  ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(W / 2 - 60, 165); ctx.lineTo(W / 2 + 60, 165); ctx.stroke();
+  // 划线内容（自动换行）
+  ctx.fillStyle = '#2a1f1a';
+  ctx.font = '28px "Noto Serif SC","Songti SC","SimSun",serif';
+  ctx.textAlign = 'left';
+  var maxW = W - 120;
+  var chars = text.split('');
+  var lines = [], line = '';
+  for (var i = 0; i < chars.length; i++){
+    var test = line + chars[i];
+    if (ctx.measureText(test).width > maxW && line){
+      lines.push(line); line = chars[i];
+    } else line = test;
+  }
+  if (line) lines.push(line);
+  var lineH = 48;
+  var startY = 240;
+  lines.slice(0, 12).forEach(function(l, i){
+    var tw = ctx.measureText(l).width;
+    ctx.fillStyle = 'rgba(184,137,59,.28)';
+    ctx.fillRect(60, startY + i * lineH - 32, tw, 40);
+    ctx.fillStyle = '#2a1f1a';
+    ctx.fillText(l, 60, startY + i * lineH);
+  });
+  // 底部来源
+  ctx.fillStyle = '#9b8475';
+  ctx.font = '22px "Noto Serif SC",sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('龙的传人 · Longchen Nyingtik', W / 2, H - 90);
+  ctx.fillStyle = '#b8893b';
+  ctx.fillRect(W / 2 - 40, H - 65, 80, 2);
+}
+function saveShareCard(){
+  var canvas = document.getElementById('shareCard');
+  if (!canvas) return;
+  var link = document.createElement('a');
+  link.download = '分享卡片.png';
+  link.href = canvas.toDataURL('image/png');
+  link.click();
 }
 
 // ---- 面包屑导航 ----
@@ -1812,6 +2104,42 @@ document.getElementById('sidebarOverlay').onclick = function(){ closeSidebar(); 
 // ---- 初始化 ----
 renderNav();
 updateModeBtn();
+
+// ---- 划线系统：选中文字弹出工具栏，已划线点击取消 ----
+document.addEventListener('mouseup', function(e){
+  if (!e.target.closest('.article')){ hideSelToolbar(); return; }
+  setTimeout(function(){
+    var text = getSelText();
+    if (text && text.length >= 2) showSelToolbar();
+    else hideSelToolbar();
+  }, 10);
+});
+document.addEventListener('touchend', function(e){
+  if (!e.target.closest('.article')) return;
+  setTimeout(function(){
+    var text = getSelText();
+    if (text && text.length >= 2) showSelToolbar();
+  }, 120);
+});
+document.addEventListener('mousedown', function(e){
+  if (selToolbar && !selToolbar.contains(e.target)) hideSelToolbar();
+});
+// 已划线文字点击 → 确认取消
+document.addEventListener('click', function(e){
+  var hl = e.target.closest('.hl');
+  if (hl && hl.closest('.article')){
+    e.preventDefault();
+    if (confirm('取消此划线？')){
+      var text = hl.textContent;
+      var parent = hl.parentNode;
+      while (hl.firstChild) parent.insertBefore(hl.firstChild, hl);
+      parent.removeChild(hl);
+      parent.normalize();
+      removeHighlight(currentSlug, text);
+    }
+  }
+});
+
 // 目录弹层：插入 DOM 并绑定关闭/遮罩点击
 var dirPopEl = document.createElement('div');
 dirPopEl.id = 'dirPop';
@@ -1824,8 +2152,25 @@ dirPopEl.innerHTML = '<div class="dir-pop-mask"></div>'
 document.body.appendChild(dirPopEl);
 document.querySelector('#dirPop .dir-pop-mask').onclick = closeDirPop;
 document.querySelector('#dirPop .dir-pop-x').onclick = closeDirPop;
-var home = TREE.children && TREE.children.find(function(c){ return c.is_index; });
-show(home ? home.slug : PAGES[0].slug);
+
+// ---- Hash 路由：读取 URL 中的 #/文章路径 定位文章；支持浏览器前进/后退 ----
+function slugFromHash(){
+  if (location.hash && location.hash.indexOf('#/') === 0){
+    var h = location.hash.slice(2).split('/').map(function(s){
+      try { return decodeURIComponent(s); } catch(e){ return s; }
+    }).join('/');
+    if (bySlug[h]) return h;
+  }
+  return null;
+}
+window.addEventListener('hashchange', function(){
+  var s = slugFromHash();
+  if (s) show(s);
+  else { var home = TREE.children && TREE.children.find(function(c){ return c.is_index; }); show(home ? home.slug : PAGES[0].slug); }
+});
+var initSlug = slugFromHash();
+if (initSlug){ show(initSlug); }
+else { var home = TREE.children && TREE.children.find(function(c){ return c.is_index; }); show(home ? home.slug : PAGES[0].slug); }
 
 // ---- 网页打开次数统计（仅作者/管理员可见）----
 // 说明：纯静态站无法做登录鉴权。此处用免注册的公开计数 API 累加打开次数，
