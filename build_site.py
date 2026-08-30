@@ -770,6 +770,10 @@ a:hover{color:var(--accent-soft)}
 .sel-toolbar button{background:transparent; border:none; color:#f5efe8; padding:7px 14px; border-radius:7px; cursor:pointer; font-size:13px; white-space:nowrap; transition:background .15s}
 .sel-toolbar button:hover{background:rgba(255,255,255,.14)}
 .sel-toolbar .st-sep{width:1px; background:rgba(255,255,255,.15); margin:5px 0}
+@media(max-width:760px){
+  .sel-toolbar{padding:6px; border-radius:12px}
+  .sel-toolbar button{padding:10px 18px; font-size:15px}
+}
 /* 文章操作栏（分享按钮） */
 .article-actions{margin:.3rem 0 1rem; display:flex; gap:.6rem; align-items:center}
 .share-btn{background:var(--surface-soft); border:1px solid var(--line); color:var(--ink-soft); padding:.32rem .95rem; border-radius:20px; font-size:.84em; cursor:pointer; transition:all .15s}
@@ -1258,8 +1262,16 @@ function showSelToolbar(){
   var tbW = selToolbar.offsetWidth;
   var left = rect.left + rect.width / 2 - tbW / 2;
   left = Math.max(8, Math.min(left, window.innerWidth - tbW - 8));
-  var top = rect.top - selToolbar.offsetHeight - 8;
-  if (top < 8) top = rect.bottom + 8;
+  var isMobile = window.innerWidth <= 760;
+  var top;
+  if (isMobile){
+    // 手机端：显示在选区下方，避免与系统编辑菜单（通常在上方）重叠
+    top = rect.bottom + 8;
+    if (top + selToolbar.offsetHeight > window.innerHeight - 8) top = rect.top - selToolbar.offsetHeight - 8;
+  } else {
+    top = rect.top - selToolbar.offsetHeight - 8;
+    if (top < 8) top = rect.bottom + 8;
+  }
   selToolbar.style.left = left + 'px';
   selToolbar.style.top = top + 'px';
 }
@@ -2106,21 +2118,33 @@ renderNav();
 updateModeBtn();
 
 // ---- 划线系统：选中文字弹出工具栏，已划线点击取消 ----
-document.addEventListener('mouseup', function(e){
-  if (!e.target.closest('.article')){ hideSelToolbar(); return; }
-  setTimeout(function(){
-    var text = getSelText();
-    if (text && text.length >= 2) showSelToolbar();
-    else hideSelToolbar();
-  }, 10);
+// 用 selectionchange 检测选区（比 mouseup/touchend 更可靠，尤其手机端长按选中）
+document.addEventListener('selectionchange', function(){
+  var sel = window.getSelection();
+  if (!sel || sel.rangeCount === 0){ hideSelToolbar(); return; }
+  var text = sel.toString().trim();
+  if (!text || text.length < 2){ hideSelToolbar(); return; }
+  var range = sel.getRangeAt(0);
+  var container = range.commonAncestorContainer;
+  var el = container.nodeType === 1 ? container : container.parentElement;
+  if (el && el.closest('.article')){
+    showSelToolbar();
+  } else {
+    hideSelToolbar();
+  }
 });
+// 手机端补充：touchend 后延迟检查选区（部分浏览器 selectionchange 触发不稳定）
 document.addEventListener('touchend', function(e){
   if (!e.target.closest('.article')) return;
   setTimeout(function(){
-    var text = getSelText();
-    if (text && text.length >= 2) showSelToolbar();
-  }, 120);
+    var sel = window.getSelection();
+    if (sel && sel.rangeCount > 0){
+      var text = sel.toString().trim();
+      if (text && text.length >= 2) showSelToolbar();
+    }
+  }, 300);
 });
+// 点击非工具栏区域隐藏
 document.addEventListener('mousedown', function(e){
   if (selToolbar && !selToolbar.contains(e.target)) hideSelToolbar();
 });
