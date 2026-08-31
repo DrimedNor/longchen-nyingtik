@@ -761,6 +761,27 @@ a:hover{color:var(--accent-soft)}
 /* 目录 Index 完整目录树容器 */
 .dir-full-tree{margin-top:1.4rem; padding-top:.6rem}
 
+/* ===== AI 问答入口 ===== */
+/* 首页 AI 问答卡片 */
+.ai-ask-card{display:flex; align-items:center; gap:1rem; padding:1.1rem 1.3rem; border:1px solid var(--line); border-radius:12px; background:var(--surface-soft); text-decoration:none; color:var(--ink); transition:all .2s; margin-top:.5rem}
+.ai-ask-card:hover{border-color:var(--accent); background:var(--surface-hover); transform:translateY(-2px); box-shadow:0 4px 16px rgba(0,0,0,.08)}
+.ai-ask-icon{font-size:2em; flex:0 0 auto}
+.ai-ask-text{flex:1; min-width:0}
+.ai-ask-title{font-weight:700; font-size:1.05em; color:var(--ink); margin-bottom:.2rem}
+.ai-ask-desc{font-size:.88em; color:var(--ink-faint)}
+.ai-ask-arrow{flex:0 0 auto; color:var(--accent); font-size:.9em; font-weight:600; white-space:nowrap}
+/* 导航栏外部链接项 */
+.nav-ai-ask{margin-top:.6rem; border-top:1px solid var(--line); padding-top:.6rem}
+.nav-external{text-decoration:none; display:flex; align-items:center; gap:.5rem; padding:.55rem .7rem; border-radius:8px; color:var(--ink-soft); cursor:pointer; transition:all .15s}
+.nav-external:hover{background:var(--surface-hover); color:var(--accent)}
+.nav-external .dir-label{flex:1}
+/* 文章页 AI 问答浮动按钮 */
+.ai-ask-fab{position:fixed; right:1.2rem; bottom:5.5rem; z-index:50; width:48px; height:48px; border-radius:50%; background:var(--accent); color:#fff; align-items:center; justify-content:center; font-size:1.3em; text-decoration:none; box-shadow:0 4px 16px rgba(110,22,20,.35); transition:all .2s; display:none}
+.ai-ask-fab:hover{transform:scale(1.1); box-shadow:0 6px 20px rgba(110,22,20,.5)}
+@media(max-width:760px){
+  .ai-ask-fab{right:1rem; bottom:5rem; width:44px; height:44px; font-size:1.15em}
+}
+
 /* ===== 划线与分享 ===== */
 /* 划线高亮：金色底纹（类似微信读书划线） */
 .hl{background:linear-gradient(transparent 55%, rgba(184,137,59,.38) 55%); cursor:pointer; border-radius:2px; padding:0 1px; transition:background .2s}
@@ -931,6 +952,8 @@ var AUDIO_ALBUM = @@AUDIO_ALBUM_JSON@@;
 var AUDIO_TRACKS = @@AUDIO_TRACKS_JSON@@;
 var HOME_UPDATE_HTML = @@HOME_UPDATE_JSON@@;   // 首页「本次更新内容」区块（纯用户资料，不含技术调整）
 var HOME_UPDATE_DATE = "@@HOME_UPDATE_DATE@@"; // 首页公告区标题用的更新日期（取自内容文件 frontmatter date 字段）
+// AI 问答入口：ima 知识库（基于本站资料的外部 AI 问答页面，新窗口打开）
+var AI_ASK_URL = "https://ima.qq.com/wiki/?shareId=588af6f2d87e769588a77ab9deda499bd5d63994b176841528534a103547ca3f";
 
 var bySlug = {};
 PAGES.forEach(function(p){ bySlug[p.slug] = p; });
@@ -1011,9 +1034,15 @@ function renderNav(){
       + '<span class="nav-chev nav-chev-none">▸</span>'
       + '<span class="dir-label">' + esc(cleanDirName(name)) + '</span></div></div>';
   });
+  // AI 问答入口（外部链接，新窗口打开 ima 知识库）
+  html += '<div class="nav-sec nav-ai-ask" data-depth="0">'
+    + '<a class="nav-sec-head nav-external" href="' + AI_ASK_URL + '" target="_blank" rel="noopener">'
+    + '<span class="nav-chev nav-chev-none">↗</span>'
+    + '<span class="dir-label">AI 问答</span></a></div>';
   nav.innerHTML = html;
   // 一级菜单点击：直接进入该目录 Index 页面
   nav.querySelectorAll('.nav-sec-head').forEach(function(h){
+    if (h.classList.contains('nav-external')) return;   // 外部链接项不绑定点击，让 <a> 默认跳转
     h.onclick = function(){
       show(h.dataset.slug);
       if (window.innerWidth <= 760) closeSidebar();
@@ -1216,6 +1245,9 @@ function show(slug){
   // 恢复本页划线
   if (!p.is_index) restoreHighlights(slug);
   updatePlayBtns();
+  // AI 问答浮动按钮：仅非首页显示
+  var _fab = document.getElementById('aiAskFab');
+  if (_fab) _fab.style.display = (p.is_index || slug === 'index') ? 'none' : 'flex';
   // 恢复阅读进度（非首页且有保存位置时）
   var savedScroll = 0;
   if (!p.is_index && slug !== 'index'){
@@ -1616,6 +1648,16 @@ function renderHomeNav(){
       html.push('</section>');
     }
   });
+  // AI 问答入口（外部链接，新窗口打开 ima 知识库）
+  html.push('<section class="hn-sec ai-ask-sec">');
+  html.push('<h2 class="hn-sec-title">🤖 AI 问答</h2>');
+  html.push('<p class="hn-desc">基于本站整理的上师开示等资料，有问题随时向 AI 提问。点击下方卡片前往提问。</p>');
+  html.push('<a class="ai-ask-card" href="' + AI_ASK_URL + '" target="_blank" rel="noopener">');
+  html.push('<div class="ai-ask-icon">💬</div>');
+  html.push('<div class="ai-ask-text"><div class="ai-ask-title">龙的传人 · AI 知识库</div><div class="ai-ask-desc">输入你的问题，AI 基于上师开示等资料为你解答</div></div>');
+  html.push('<div class="ai-ask-arrow">前往提问 ↗</div>');
+  html.push('</a>');
+  html.push('</section>');
   return '<div class="home-nav">' + html.join('') + '</div>';
 }
 
@@ -2323,8 +2365,16 @@ trackVisit();
     <span class="footer-build">构建于 @@BUILD_TIME@@</span>
   </div>
 </footer>
+<a class="ai-ask-fab" id="aiAskFab" target="_blank" rel="noopener" title="AI 问答 · 基于本站资料">💬</a>
 <button class="back-top" id="backTop" title="回到顶部">↑</button>
 <script>
+// AI 问答浮动按钮：设置链接并根据当前页面控制显示
+var _aiFab = document.getElementById('aiAskFab');
+if (_aiFab) {
+  _aiFab.href = AI_ASK_URL;
+  var _isHome = !currentSlug || currentSlug === 'index' || currentSlug.endsWith('/index');
+  _aiFab.style.display = _isHome ? 'none' : 'flex';
+}
 document.getElementById('backTop').onclick = function(){ window.scrollTo({top:0, behavior:'smooth'}); };
 window.addEventListener('scroll', function(){
   document.getElementById('backTop').style.opacity = window.scrollY > 300 ? '1' : '0';
