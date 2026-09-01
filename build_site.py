@@ -203,12 +203,19 @@ def md_to_html(body):
             i += 1
             continue
 
-        # 标题
+        # 标题（为 h2/h3 添加 id，用于目录跳转）
         m = re.match(r"^(#{1,6})\s+(.*)$", stripped)
         if m:
             flush_list(); flush_quote()
             lvl = len(m.group(1))
-            out.append("<h%d>%s</h%d>" % (lvl, inline(m.group(2)), lvl))
+            title_text = m.group(2)
+            title_html = inline(title_text)
+            if lvl in (2, 3):
+                # 生成 id：去除标点、空格转连字符
+                heading_id = re.sub(r"[^\w\u4e00-\u9fa5]+", "-", title_text).strip("-")
+                out.append('<h%d id="toc-%s">%s</h%d>' % (lvl, heading_id, title_html, lvl))
+            else:
+                out.append("<h%d>%s</h%d>" % (lvl, title_html, lvl))
             i += 1
             continue
 
@@ -788,6 +795,25 @@ a:hover{color:var(--accent-soft)}
 /* 文章页 AI 问答浮动按钮 */
 .ai-ask-fab{position:fixed; right:1.2rem; bottom:5.5rem; z-index:50; width:48px; height:48px; border-radius:50%; background:var(--accent); color:#fff; align-items:center; justify-content:center; font-size:1.3em; text-decoration:none; box-shadow:0 4px 16px rgba(110,22,20,.35); transition:all .2s; display:none}
 .ai-ask-fab:hover{transform:scale(1.1); box-shadow:0 6px 20px rgba(110,22,20,.5)}
+.back-to-top{position:fixed; right:1.2rem; bottom:9rem; width:44px; height:44px; border-radius:50%; background:var(--surface); color:var(--ink-soft); border:1px solid var(--line); font-size:1.1rem; cursor:pointer; display:none; align-items:center; justify-content:center; box-shadow:0 4px 12px rgba(0,0,0,.1); z-index:90; transition:all .2s}
+.back-to-top:hover{background:var(--accent); color:#fff; border-color:var(--accent); transform:translateY(-2px)}
+.back-to-top.visible{display:flex}
+.page-404{text-align:center; padding:4rem 1rem}
+.page-404-code{font-size:5em; font-weight:700; color:var(--accent); line-height:1; margin-bottom:1rem}
+.page-404-text{font-size:1.5em; color:var(--ink); margin-bottom:.8rem}
+.page-404 p{color:var(--ink-faint); margin-bottom:1.5rem}
+.page-404-home{display:inline-block; padding:.6rem 1.5rem; background:var(--accent); color:#fff; border-radius:8px; text-decoration:none; transition:background .15s}
+.page-404-home:hover{background:var(--accent-deep)}
+/* 文章目录 */
+.article-toc{border:1px solid var(--line); border-radius:10px; margin:1rem 0 1.5rem; background:var(--surface-soft); overflow:hidden}
+.article-toc-head{display:flex; align-items:center; gap:.5rem; padding:.7rem 1rem; cursor:pointer; user-select:none; font-weight:600; color:var(--ink); font-size:.95em}
+.article-toc-chev{margin-left:auto; font-size:.7em; color:var(--ink-faint); transition:transform .2s}
+.article-toc:not(.open) .article-toc-body{display:none}
+.article-toc:not(.open) .article-toc-chev{transform:rotate(-90deg)}
+.article-toc-body{padding:.5rem 1rem .8rem; border-top:1px solid var(--line)}
+.article-toc-item{display:block; padding:.3rem 0; color:var(--ink-soft); text-decoration:none; font-size:.9em; line-height:1.5; transition:color .15s}
+.article-toc-item:hover{color:var(--accent)}
+.article-toc-l3{padding-left:1.2rem; font-size:.85em; color:var(--ink-faint)}
 @media(max-width:760px){
   .ai-ask-fab{right:1rem; bottom:5rem; width:44px; height:44px; font-size:1.15em}
 }
@@ -1198,7 +1224,15 @@ function closeDirPop(){
 var currentSlug = null;
 function show(slug){
   var p = bySlug[slug];
-  if (!p) return;
+  if (!p){
+    // 404 页面
+    currentSlug = slug;
+    document.getElementById('pageCrumbs').textContent = ' / 页面未找到';
+    document.getElementById('content').innerHTML = '<div class="article"><div class="page-404"><div class="page-404-code">404</div><div class="page-404-text">页面未找到</div><p>您访问的页面不存在或已被移动。</p><a class="page-404-home" href="#/index">返回首页</a></div></div>';
+    document.title = SITE_TITLE + ' · 页面未找到';
+    window.scrollTo({top:0, behavior:'smooth'});
+    return;
+  }
   if (currentSlug === slug) return;
   currentSlug = slug;
   // Hash 路由：更新 URL 使文章可被链接分享（replaceState 不触发 hashchange，避免循环）
@@ -1211,9 +1245,26 @@ function show(slug){
   var isHome = (p.slug === 'index');
   var titleHtml = p.is_index ? '' : '<h1>' + esc(p.title) + '</h1>';
   var metaHtml = meta ? '<div class="meta">' + meta + '</div>' : '';
+  // 文章目录（TOC）：仅非目录页且有 h2/h3 标题时显示
+  var tocHtml = '';
+  if (!p.is_index && p.html){
+    var headings = [];
+    var tmp = document.createElement('div');
+    tmp.innerHTML = p.html;
+    tmp.querySelectorAll('h2[id^=toc-], h3[id^=toc-]').forEach(function(h){
+      headings.push({level: parseInt(h.tagName[1], 10), id: h.id, text: h.textContent});
+    });
+    if (headings.length > 1){
+      tocHtml = '<div class="article-toc"><div class="article-toc-head" onclick="this.parentElement.classList.toggle(\'open\')">📑 文章目录 <span class="article-toc-chev">▼</span></div><div class="article-toc-body">';
+      headings.forEach(function(h){
+        tocHtml += '<a class="article-toc-item article-toc-l' + h.level + '" href="#' + h.id + '" onclick="event.preventDefault(); document.getElementById(\'' + h.id + '\').scrollIntoView({behavior:\'smooth\'});">' + esc(h.text) + '</a>';
+      });
+      tocHtml += '</div></div>';
+    }
+  }
   // 文章页（非目录 index）加分享按钮
   var shareBar = (p.is_index || isHome) ? '' : '<div class="article-actions"><button class="share-btn" id="shareArticleBtn">分享本文</button></div>';
-  var inner = titleHtml + shareBar + metaHtml + p.html;
+  var inner = titleHtml + shareBar + metaHtml + tocHtml + p.html;
   if (isHome){
     inner = '<div class="welcome"><div class="big">' + esc(SITE_TITLE) + '</div>'
           + '<div class="welcome-sub">龙钦宁提资料库 · 学习整理与分享</div></div>'
@@ -1912,6 +1963,18 @@ playerAudio.preload = 'metadata';   // iOS 需预加载元数据才能在锁屏�
 try{ playerAudio.playsInline = true; playerAudio.setAttribute('playsinline', ''); }catch(e){}
 playerAudio.style.display = 'none';
 document.body.appendChild(playerAudio);
+// 播放进度记忆：每5秒保存一次
+playerAudio.addEventListener('timeupdate', function(){
+  if (curIdx >= 0 && playerAudio.currentTime > 5) {
+    try { localStorage.setItem('longchen-audio-pos-' + curIdx, String(playerAudio.currentTime)); } catch(e){}
+  }
+});
+// 播放结束时清除进度记忆
+playerAudio.addEventListener('ended', function(){
+  if (curIdx >= 0) {
+    try { localStorage.removeItem('longchen-audio-pos-' + curIdx); } catch(e){}
+  }
+});
 var curIdx = -1;
 var SPEEDS = [0.5, 0.75, 1, 1.25, 1.5, 2];   // 倍速预设档位
 var speedIdx = 2;                              // 默认 1x
@@ -2004,7 +2067,15 @@ function playTrack(idx){
   var t = AUDIO_TRACKS[idx];
   playerAudio.src = t.src;
   playerAudio.playbackRate = SPEEDS[speedIdx];
+  // 恢复上次播放进度（如果有保存）
+  var savedPos = 0;
+  try { savedPos = parseFloat(localStorage.getItem('longchen-audio-pos-' + idx) || '0'); } catch(e){}
+  if (savedPos > 0 && savedPos < (t.duration || 99999)) {
+    playerAudio.currentTime = savedPos;
+  }
   playerAudio.play();
+  // 保存当前播放
+  try { localStorage.setItem('longchen-audio-cur', String(idx)); } catch(e){}
   document.getElementById('pStatusText').innerHTML = '正在播放：<b>' + esc(t.title) + '</b>';
   document.getElementById('pPlay').textContent = '⏸';
   showPlayer();
@@ -2451,7 +2522,7 @@ function slugFromHash(){
     var h = location.hash.slice(2).split('/').map(function(s){
       try { return decodeURIComponent(s); } catch(e){ return s; }
     }).join('/');
-    if (bySlug[h]) return h;
+    return h;  // 不管页面是否存在都返回，由 show() 处理 404
   }
   return null;
 }
@@ -2463,7 +2534,37 @@ window.addEventListener('hashchange', function(){
 var initSlug = slugFromHash();
 if (initSlug){ show(initSlug); }
 else { var home = TREE.children && TREE.children.find(function(c){ return c.is_index; }); show(home ? home.slug : PAGES[0].slug); }
+// 恢复上次播放的音频（仅加载，不自动播放）
+setTimeout(function(){
+  try {
+    var savedIdx = parseInt(localStorage.getItem('longchen-audio-cur') || '-1', 10);
+    if (savedIdx >= 0 && savedIdx < AUDIO_TRACKS.length) {
+      curIdx = savedIdx;
+      var t = AUDIO_TRACKS[savedIdx];
+      playerAudio.src = t.src;
+      var savedPos = parseFloat(localStorage.getItem('longchen-audio-pos-' + savedIdx) || '0');
+      if (savedPos > 0) playerAudio.currentTime = savedPos;
+      document.getElementById('pStatusText').innerHTML = '上次播放：<b>' + esc(t.title) + '</b>' + (savedPos > 0 ? '（点击继续）' : '');
+      document.getElementById('pPlay').textContent = '▶';
+      showPlayer();
+      renderPlist();
+      updatePlayBtns();
+    }
+  } catch(e){}
+}, 1000);
 
+// ---- 返回顶部按钮 ----
+window.addEventListener('scroll', function(){
+  var btn = document.getElementById('backToTop');
+  if (!btn) return;
+  if (window.scrollY > 400) btn.classList.add('visible');
+  else btn.classList.remove('visible');
+});
+document.addEventListener('click', function(e){
+  if (e.target.id === 'backToTop'){
+    window.scrollTo({top:0, behavior:'smooth'});
+  }
+});
 // ---- 页面访问次数统计（localStorage 本地计数，每页独立）----
 // 说明：纯静态站无后端，用 localStorage 记录每个页面在本设备的访问次数。
 // 如需跨用户统计，可接入 GoatCounter（免费）等服务。
@@ -2500,6 +2601,7 @@ trackPageView();
   </div>
 </footer>
 <a class="ai-ask-fab" id="aiAskFab" target="_blank" rel="noopener" title="AI 问答 · 基于本站资料">💬</a>
+<button id="backToTop" class="back-to-top" title="返回顶部">↑</button>
 <button class="back-top" id="backTop" title="回到顶部">↑</button>
 <script>
 // AI 问答浮动按钮：设置链接并根据当前页面控制显示
