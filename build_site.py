@@ -782,6 +782,29 @@ a:hover{color:var(--accent-soft)}
   .ai-ask-fab{right:1rem; bottom:5rem; width:44px; height:44px; font-size:1.15em}
 }
 
+/* ===== 法音卡片式布局 ===== */
+.audio-card{display:flex; gap:1rem; padding:1rem; margin-bottom:1rem; border:1px solid var(--line); border-radius:12px; background:var(--surface-soft); transition:all .2s}
+.audio-card:hover{border-color:var(--accent); box-shadow:0 4px 12px rgba(0,0,0,.08)}
+.audio-card-poster{width:100px; height:140px; object-fit:cover; border-radius:8px; cursor:pointer; flex:0 0 auto; transition:transform .2s}
+.audio-card-poster:hover{transform:scale(1.05)}
+.audio-card-info{flex:1; min-width:0; display:flex; flex-direction:column; justify-content:center}
+.audio-card-title{font-size:1.1em; font-weight:700; color:var(--ink); margin-bottom:.3rem}
+.audio-card-author{font-size:.85em; color:var(--ink-faint); margin-bottom:.8rem}
+.audio-card-actions{display:flex; gap:.6rem}
+.audio-card-btn{display:inline-flex; align-items:center; gap:.3rem; padding:.45rem .9rem; border-radius:8px; font-size:.9em; text-decoration:none; cursor:pointer; border:none; transition:all .15s}
+.audio-card-play{background:var(--accent); color:#fff}
+.audio-card-play:hover{background:var(--accent-deep)}
+.audio-card-download{background:var(--surface-hover); color:var(--ink-soft); border:1px solid var(--line)}
+.audio-card-download:hover{border-color:var(--accent); color:var(--accent)}
+/* 海报大图查看 */
+.poster-overlay{position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,.85); z-index:1000; display:flex; align-items:center; justify-content:center; cursor:zoom-out}
+.poster-overlay img{max-height:90vh; max-width:90vw; border-radius:8px; box-shadow:0 8px 32px rgba(0,0,0,.5)}
+@media(max-width:760px){
+  .audio-card{flex-direction:column; align-items:center; text-align:center}
+  .audio-card-poster{width:140px; height:196px}
+  .audio-card-actions{justify-content:center}
+}
+
 /* ===== 划线与分享 ===== */
 /* 划线高亮：金色底纹（类似微信读书划线） */
 .hl{background:linear-gradient(transparent 55%, rgba(184,137,59,.38) 55%); cursor:pointer; border-radius:2px; padding:0 1px; transition:background .2s}
@@ -1749,11 +1772,37 @@ function renderAudioListByFolder(folderKey){
   keys.forEach(function(g){
     if (g) html += '<div class="audio-group-title">' + esc(cleanDirName(g)) + '</div>';
     groups[g].forEach(function(o){
-      html += '<a class="hn-link hn-audio" data-idx="' + o.i + '">🔊 ' + esc(o.t.title) + '</a>';
+      if (o.t.poster){
+        // 有海报：卡片式布局（海报 + 标题 + 诵者 + 播放/下载）
+        html += '<div class="audio-card" data-idx="' + o.i + '">'
+          + '<img class="audio-card-poster" src="' + o.t.poster + '" alt="' + esc(o.t.title) + '" onclick="showPosterBig(this.src, this.alt)">'
+          + '<div class="audio-card-info">'
+          + '<div class="audio-card-title">' + esc(o.t.title) + '</div>'
+          + '<div class="audio-card-author">第五世多智钦·龙洋仁波切亲诵</div>'
+          + '<div class="audio-card-actions">'
+          + '<button class="audio-card-btn audio-card-play" onclick="playTrack(' + o.i + ')">▶ 播放</button>'
+          + '<a class="audio-card-btn audio-card-download" href="' + o.t.src + '" download="' + esc(o.t.file) + '">⬇ 下载</a>'
+          + '</div></div></div>';
+      } else {
+        // 无海报：保持原列表样式
+        html += '<a class="hn-link hn-audio" data-idx="' + o.i + '">🔊 ' + esc(o.t.title) + '</a>';
+      }
     });
   });
   html += '</div>';
   return html;
+}
+
+// 海报大图查看
+function showPosterBig(src, alt){
+  var overlay = document.createElement('div');
+  overlay.className = 'poster-overlay';
+  overlay.onclick = function(){ document.body.removeChild(overlay); };
+  var img = document.createElement('img');
+  img.src = src;
+  img.alt = alt || '';
+  overlay.appendChild(img);
+  document.body.appendChild(overlay);
 }
 
 function matchByTitle(t){
@@ -2465,6 +2514,14 @@ def main():
 
     AGG_PREFIXES = ("音频资源",)
     AGG_SLUGS = ("本次更新内容",)
+    # 扫描法音海报文件（文件名与音频文件名对应，如 百字明.png ↔ 百字明.mp3）
+    poster_dir = os.path.join(CONTENT_DIR, "assets", "法音海报")
+    poster_map = {}
+    if os.path.isdir(poster_dir):
+        for pname in os.listdir(poster_dir):
+            if pname.lower().endswith((".png", ".jpg", ".jpeg", ".webp")):
+                key = os.path.splitext(pname)[0]
+                poster_map[key] = "assets/assets/法音海报/" + pname
     audio_tracks = []
     for fname in sorted(LOCAL_AUDIO.keys()):
         title = fname[:-4] if fname.lower().endswith(".mp3") else fname
@@ -2481,6 +2538,7 @@ def main():
             "slug": slug,
             "src": "audio/" + quote(fname),
             "file": fname,
+            "poster": poster_map.get(title, ""),
         }
         t["group"] = audio_group(fname)
         t["folder"] = audio_folder_rel(fname)
