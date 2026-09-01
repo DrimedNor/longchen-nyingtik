@@ -1286,9 +1286,10 @@ function show(slug){
       if (hit) show(hit.slug); else alert('未找到页面：' + target);
     };
   });
-  // 首页导览音频项 → 直接播放
+  // 首页导览音频项 → 直接播放（有详情页链接的除外，让其正常跳转）
   document.querySelectorAll('.hn-audio').forEach(function(a){
     a.onclick = function(ev){
+      if (a.getAttribute('href') && a.getAttribute('href').indexOf('#/') === 0) return;  // 有详情页链接，正常跳转
       ev.preventDefault();
       playTrack(parseInt(a.dataset.idx, 10));
     };
@@ -2616,9 +2617,12 @@ def main():
         t["folder"] = audio_folder_rel(fname)
         audio_tracks.append(t)
 
-    # 为有海报的经咒自动生成独立详情页（参考多智钦寺网站样式）
+    # 为有海报的经咒自动生成独立详情页（参考多智钦寺网站样式）+ 海报压缩
+    from PIL import Image
+    _poster_dist_dir = os.path.join(DIST_DIR, "assets", "法音海报")
+    os.makedirs(_poster_dist_dir, exist_ok=True)
     mantra_detail_slugs = set()
-    for _t in audio_tracks:
+    for _i, _t in enumerate(audio_tracks):
         if not _t.get("poster"):
             continue
         _title = _t["title"]
@@ -2626,16 +2630,36 @@ def main():
         if _slug in mantra_detail_slugs:
             continue
         mantra_detail_slugs.add(_slug)
+        # 生成压缩版 WebP（最大宽度 800px，质量 80%，大幅减小加载体积）
+        _poster_src = os.path.join(CONTENT_DIR, _t["poster"].replace("assets/assets/", "assets/"))
+        _webp_url = _t["poster"]
+        if os.path.exists(_poster_src):
+            _webp_name = _title + ".webp"
+            _webp_path = os.path.join(_poster_dist_dir, _webp_name)
+            try:
+                _img = Image.open(_poster_src)
+                _max_w = 800
+                if _img.width > _max_w:
+                    _ratio = _max_w / _img.width
+                    _img = _img.resize((_max_w, int(_img.height * _ratio)), Image.LANCZOS)
+                _img.save(_webp_path, "WEBP", quality=80, method=6)
+                _webp_url = "assets/法音海报/" + _webp_name
+                _t["poster_webp"] = _webp_url
+            except Exception as _e:
+                print("海报压缩失败 %s: %s" % (_title, _e))
+        _t["detail_slug"] = _slug  # 供 JS 端 Index 页链接用
         _detail_html = (
             '<div class="mantra-detail">'
-            + '<div class="mantra-detail-poster"><img src="' + _t["poster"] + '" alt="' + _title + '" loading="lazy"></div>'
+            + '<div class="mantra-detail-poster"><img src="' + _webp_url + '" alt="' + _title + '" loading="lazy" onclick="showPosterBig(this.src, this.alt)"></div>'
             + '<div class="mantra-detail-info">'
             + '<h1 class="mantra-detail-title">' + _title + '</h1>'
             + '<p class="mantra-detail-author">第五世多智钦·龙洋仁波切亲诵</p>'
             + '<div class="mantra-detail-actions">'
-            + '<button class="mantra-detail-btn mantra-detail-play" onclick="playMantra(\'' + _title.replace("'", "\\'") + '\')">▶ 在线播放</button>'
+            + '<button class="mantra-detail-btn mantra-detail-play" onclick="playTrack(' + str(_i) + ')">▶ 在线播放</button>'
             + '<a class="mantra-detail-btn mantra-detail-download" href="' + _t["src"] + '" download="' + _t["file"] + '">⬇ 下载音频</a>'
-            + '</div></div></div>'
+            + '</div>'
+            + '<p class="mantra-detail-tip">点击海报可查看大图</p>'
+            + '</div></div>'
         )
         pages.append({
             "slug": _slug,
@@ -2643,68 +2667,15 @@ def main():
             "rel": _slug + ".md",
             "dir": "法音详情",
             "is_index": False,
-            "meta": {},
-            "html": _detail_html,
-            "hide_from_nav": True,
-        })
-
-
-    # ===== 为有海报的音频生成压缩版海报 + 独立详情页 =====
-    from PIL import Image
-    poster_dist_dir = os.path.join(DIST_DIR, "assets", "法音海报")
-    os.makedirs(poster_dist_dir, exist_ok=True)
-    audio_detail_map = {}  # title -> detail_slug
-    for _i, _t in enumerate(audio_tracks):
-        if not _t.get("poster"):
-            continue
-        _poster_src = os.path.join(CONTENT_DIR, _t["poster"].replace("assets/assets/", "assets/"))
-        if not os.path.exists(_poster_src):
-            continue
-        # 生成压缩版 WebP（最大宽度 800px，质量 80%，大幅减小体积）
-        _webp_name = _t["title"] + ".webp"
-        _webp_path = os.path.join(poster_dist_dir, _webp_name)
-        try:
-            _img = Image.open(_poster_src)
-            _max_w = 800
-            if _img.width > _max_w:
-                _ratio = _max_w / _img.width
-                _img = _img.resize((_max_w, int(_img.height * _ratio)), Image.LANCZOS)
-            _img.save(_webp_path, "WEBP", quality=80, method=6)
-            _t["poster_webp"] = "assets/法音海报/" + _webp_name
-        except Exception as _e:
-            print("海报压缩失败 %s: %s" % (_t["title"], _e))
-            _t["poster_webp"] = _t["poster"]
-        # 生成详情页
-        _detail_slug = "音频资源/2. 上师法音/详情/" + _t["title"]
-        audio_detail_map[_t["title"]] = _detail_slug
-        _detail_html = (
-            '<div class="audio-detail">'
-            '<img class="audio-detail-poster" src="' + _t["poster_webp"] + '" alt="' + _t["title"].replace('"','&quot;') + '" loading="lazy" onclick="showPosterBig(this.src, this.alt)">'
-            '<h1 class="audio-detail-title">' + _t["title"] + '</h1>'
-            '<p class="audio-detail-author">第五世多智钦·龙洋仁波切亲诵</p>'
-            '<div class="audio-detail-actions">'
-            '<button class="audio-detail-btn audio-detail-play" onclick="playTrack(' + str(_i) + ')">▶ 在线播放</button>'
-            '<a class="audio-detail-btn audio-detail-download" href="' + _t["src"] + '" download="' + _t["file"].replace('"','&quot;') + '">⬇ 下载音频</a>'
-            '</div>'
-            '<p class="audio-detail-tip">点击海报可查看大图</p>'
-            '</div>'
-        )
-        pages.append({
-            "slug": _detail_slug,
-            "title": _t["title"],
-            "rel": _detail_slug + ".md",
-            "dir": "音频资源/2. 上师法音/详情",
-            "is_index": False,
             "is_audio_detail": True,
             "audio_idx": _i,
             "meta": {},
             "html": _detail_html,
+            "hide_from_nav": True,
         })
-    # 把详情页映射注入 audio_tracks（供 JS 端 Index 页链接用）
-    for _t in audio_tracks:
-        _t["detail_slug"] = audio_detail_map.get(_t["title"], "")
-    # 重新生成 tree（包含详情页，但渲染时会过滤 is_audio_detail）
+    # 重新生成 tree（包含详情页，但渲染时过滤 is_audio_detail / hide_from_nav）
     tree = build_tree(pages)
+
 
     html_out = PAGE_TEMPLATE
     html_out = html_out.replace("@@SITE_TITLE_JSON@@", json.dumps(site_title, ensure_ascii=False))
