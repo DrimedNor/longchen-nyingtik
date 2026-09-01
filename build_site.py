@@ -286,6 +286,8 @@ def discover_pages():
 # ---------------------------------------------------------------- 目录树
 def build_tree(pages):
     nodes = {"children": [], "dirs": {}}
+    # 排除标记为 hide_from_nav 的页面（如法音详情页）
+    pages = [p for p in pages if not p.get("hide_from_nav")]
 
     def ensure_dir(path_parts, nodes_ref):
         cur = nodes_ref
@@ -799,6 +801,52 @@ a:hover{color:var(--accent-soft)}
 /* 海报大图查看 */
 .poster-overlay{position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,.85); z-index:1000; display:flex; align-items:center; justify-content:center; cursor:zoom-out}
 .poster-overlay img{max-height:90vh; max-width:90vw; border-radius:8px; box-shadow:0 8px 32px rgba(0,0,0,.5)}
+
+/* ===== 法音详情页 ===== */
+.audio-detail{max-width:520px; margin:0 auto; padding:1rem 0 2rem; text-align:center}
+.audio-detail-poster{width:100%; max-width:400px; border-radius:12px; box-shadow:0 8px 32px rgba(0,0,0,.15); margin-bottom:1.5rem; cursor:zoom-in; transition:transform .2s}
+.audio-detail-poster:hover{transform:scale(1.02)}
+.audio-detail-title{font-size:1.6em; font-weight:700; color:var(--ink); margin-bottom:.5rem}
+.audio-detail-author{font-size:.95em; color:var(--ink-faint); margin-bottom:1.5rem}
+.audio-detail-actions{display:flex; gap:1rem; justify-content:center; margin-bottom:1rem}
+.audio-detail-btn{display:inline-flex; align-items:center; gap:.4rem; padding:.7rem 1.5rem; border-radius:10px; font-size:1em; font-weight:600; text-decoration:none; cursor:pointer; border:none; transition:all .15s}
+.audio-detail-play{background:var(--accent); color:#fff}
+.audio-detail-play:hover{background:var(--accent-deep); transform:translateY(-1px)}
+.audio-detail-download{background:var(--surface-hover); color:var(--ink-soft); border:1px solid var(--line)}
+.audio-detail-download:hover{border-color:var(--accent); color:var(--accent)}
+.audio-detail-tip{font-size:.8em; color:var(--ink-faint); margin-top:.5rem}
+@media(max-width:760px){
+  .audio-detail-poster{max-width:300px}
+  .audio-detail-title{font-size:1.3em}
+  .audio-detail-actions{flex-direction:column; align-items:center}
+  .audio-detail-btn{width:80%; justify-content:center}
+}
+
+/* ===== Index 页音频缩略图列表 ===== */
+.hn-audio-with-poster{display:flex !important; align-items:center; gap:.8rem; padding:.6rem .8rem !important; border-radius:10px}
+.hn-audio-with-poster:hover{background:var(--surface-hover)}
+.audio-list-thumb{width:42px; height:56px; border-radius:6px; background-size:cover; background-position:center; flex:0 0 auto; box-shadow:0 2px 8px rgba(0,0,0,.1)}
+.audio-list-title{flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.audio-list-arrow{color:var(--ink-faint); font-size:1.2em; flex:0 0 auto}
+
+/* ===== 法音详情页 ===== */
+.mantra-detail{max-width:600px; margin:0 auto; text-align:center}
+.mantra-detail-poster{margin-bottom:1.5rem}
+.mantra-detail-poster img{max-width:100%; max-height:70vh; border-radius:12px; box-shadow:0 8px 32px rgba(0,0,0,.15)}
+.mantra-detail-title{font-size:1.6em; font-weight:700; color:var(--ink); margin-bottom:.5rem}
+.mantra-detail-author{font-size:.95em; color:var(--ink-faint); margin-bottom:1.5rem}
+.mantra-detail-actions{display:flex; gap:1rem; justify-content:center; flex-wrap:wrap}
+.mantra-detail-btn{display:inline-flex; align-items:center; gap:.4rem; padding:.7rem 1.5rem; border-radius:10px; font-size:1em; text-decoration:none; cursor:pointer; border:none; transition:all .15s}
+.mantra-detail-play{background:var(--accent); color:#fff}
+.mantra-detail-play:hover{background:var(--accent-deep); transform:translateY(-1px)}
+.mantra-detail-download{background:var(--surface-hover); color:var(--ink-soft); border:1px solid var(--line)}
+.mantra-detail-download:hover{border-color:var(--accent); color:var(--accent)}
+
+/* Index 页：有海报的经咒条目（带缩略图） */
+.hn-audio-with-poster{display:flex; align-items:center; gap:.8rem; padding:.6rem .8rem}
+.audio-list-thumb{width:40px; height:56px; object-fit:cover; border-radius:4px; flex:0 0 auto}
+.audio-list-title{flex:1; text-align:left}
+.audio-list-arrow{color:var(--ink-faint); font-size:1.2em; flex:0 0 auto}
 @media(max-width:760px){
   .audio-card{flex-direction:column; align-items:center; text-align:center}
   .audio-card-poster{width:140px; height:196px}
@@ -1772,19 +1820,14 @@ function renderAudioListByFolder(folderKey){
   keys.forEach(function(g){
     if (g) html += '<div class="audio-group-title">' + esc(cleanDirName(g)) + '</div>';
     groups[g].forEach(function(o){
-      if (o.t.poster){
-        // 有海报：卡片式布局（海报 + 标题 + 诵者 + 播放/下载）
-        html += '<div class="audio-card" data-idx="' + o.i + '">'
-          + '<img class="audio-card-poster" src="' + o.t.poster + '" alt="' + esc(o.t.title) + '" onclick="showPosterBig(this.src, this.alt)">'
-          + '<div class="audio-card-info">'
-          + '<div class="audio-card-title">' + esc(o.t.title) + '</div>'
-          + '<div class="audio-card-author">第五世多智钦·龙洋仁波切亲诵</div>'
-          + '<div class="audio-card-actions">'
-          + '<button class="audio-card-btn audio-card-play" onclick="playTrack(' + o.i + ')">▶ 播放</button>'
-          + '<a class="audio-card-btn audio-card-download" href="' + o.t.src + '" download="' + esc(o.t.file) + '">⬇ 下载</a>'
-          + '</div></div></div>';
+      if (o.t.detail_slug){
+        // 有海报：链接到独立详情页（用压缩版海报缩略图）
+        html += '<a class="hn-link hn-audio hn-audio-with-poster" href="#/' + o.t.detail_slug + '">'
+          + '<span class="audio-list-thumb" style="background-image:url(\'' + (o.t.poster_webp || o.t.poster) + '\')"></span>'
+          + '<span class="audio-list-title">' + esc(o.t.title) + '</span>'
+          + '<span class="audio-list-arrow">›</span></a>';
       } else {
-        // 无海报：保持原列表样式
+        // 无海报：保持原列表样式，点击直接播放
         html += '<a class="hn-link hn-audio" data-idx="' + o.i + '">🔊 ' + esc(o.t.title) + '</a>';
       }
     });
@@ -1803,6 +1846,16 @@ function showPosterBig(src, alt){
   img.alt = alt || '';
   overlay.appendChild(img);
   document.body.appendChild(overlay);
+}
+
+// 根据经咒标题播放音频
+function playMantra(title){
+  for (var i = 0; i < AUDIO_TRACKS.length; i++){
+    if (AUDIO_TRACKS[i].title === title){
+      playTrack(i);
+      return;
+    }
+  }
 }
 
 function matchByTitle(t){
@@ -2514,13 +2567,32 @@ def main():
 
     AGG_PREFIXES = ("音频资源",)
     AGG_SLUGS = ("本次更新内容",)
-    # 扫描法音海报文件（文件名与音频文件名对应，如 百字明.png ↔ 百字明.mp3）
+    # 扫描法音海报文件，生成压缩版 WebP（比 PNG 小 60-80%，加载更快）
     poster_dir = os.path.join(CONTENT_DIR, "assets", "法音海报")
+    poster_dist_dir = os.path.join(DIST_DIR, "assets", "assets", "法音海报")
     poster_map = {}
     if os.path.isdir(poster_dir):
+        os.makedirs(poster_dist_dir, exist_ok=True)
         for pname in os.listdir(poster_dir):
-            if pname.lower().endswith((".png", ".jpg", ".jpeg", ".webp")):
-                key = os.path.splitext(pname)[0]
+            if not pname.lower().endswith((".png", ".jpg", ".jpeg", ".webp")):
+                continue
+            key = os.path.splitext(pname)[0]
+            src_path = os.path.join(poster_dir, pname)
+            webp_name = key + ".webp"
+            dst_path = os.path.join(poster_dist_dir, webp_name)
+            try:
+                from PIL import Image
+                img = Image.open(src_path)
+                # 详情页用：宽度限制 500px，质量 80
+                max_w = 500
+                if img.width > max_w:
+                    ratio = max_w / img.width
+                    img = img.resize((max_w, int(img.height * ratio)), Image.LANCZOS)
+                img.save(dst_path, "WEBP", quality=80, method=6)
+                poster_map[key] = "assets/assets/法音海报/" + webp_name
+            except Exception as e:
+                # 压缩失败则用原图
+                shutil.copy2(src_path, os.path.join(poster_dist_dir, pname))
                 poster_map[key] = "assets/assets/法音海报/" + pname
     audio_tracks = []
     for fname in sorted(LOCAL_AUDIO.keys()):
@@ -2544,6 +2616,95 @@ def main():
         t["folder"] = audio_folder_rel(fname)
         audio_tracks.append(t)
 
+    # 为有海报的经咒自动生成独立详情页（参考多智钦寺网站样式）
+    mantra_detail_slugs = set()
+    for _t in audio_tracks:
+        if not _t.get("poster"):
+            continue
+        _title = _t["title"]
+        _slug = "法音详情/" + _title
+        if _slug in mantra_detail_slugs:
+            continue
+        mantra_detail_slugs.add(_slug)
+        _detail_html = (
+            '<div class="mantra-detail">'
+            + '<div class="mantra-detail-poster"><img src="' + _t["poster"] + '" alt="' + _title + '" loading="lazy"></div>'
+            + '<div class="mantra-detail-info">'
+            + '<h1 class="mantra-detail-title">' + _title + '</h1>'
+            + '<p class="mantra-detail-author">第五世多智钦·龙洋仁波切亲诵</p>'
+            + '<div class="mantra-detail-actions">'
+            + '<button class="mantra-detail-btn mantra-detail-play" onclick="playMantra(\'' + _title.replace("'", "\\'") + '\')">▶ 在线播放</button>'
+            + '<a class="mantra-detail-btn mantra-detail-download" href="' + _t["src"] + '" download="' + _t["file"] + '">⬇ 下载音频</a>'
+            + '</div></div></div>'
+        )
+        pages.append({
+            "slug": _slug,
+            "title": _title,
+            "rel": _slug + ".md",
+            "dir": "法音详情",
+            "is_index": False,
+            "meta": {},
+            "html": _detail_html,
+            "hide_from_nav": True,
+        })
+
+
+    # ===== 为有海报的音频生成压缩版海报 + 独立详情页 =====
+    from PIL import Image
+    poster_dist_dir = os.path.join(DIST_DIR, "assets", "法音海报")
+    os.makedirs(poster_dist_dir, exist_ok=True)
+    audio_detail_map = {}  # title -> detail_slug
+    for _i, _t in enumerate(audio_tracks):
+        if not _t.get("poster"):
+            continue
+        _poster_src = os.path.join(CONTENT_DIR, _t["poster"].replace("assets/assets/", "assets/"))
+        if not os.path.exists(_poster_src):
+            continue
+        # 生成压缩版 WebP（最大宽度 800px，质量 80%，大幅减小体积）
+        _webp_name = _t["title"] + ".webp"
+        _webp_path = os.path.join(poster_dist_dir, _webp_name)
+        try:
+            _img = Image.open(_poster_src)
+            _max_w = 800
+            if _img.width > _max_w:
+                _ratio = _max_w / _img.width
+                _img = _img.resize((_max_w, int(_img.height * _ratio)), Image.LANCZOS)
+            _img.save(_webp_path, "WEBP", quality=80, method=6)
+            _t["poster_webp"] = "assets/法音海报/" + _webp_name
+        except Exception as _e:
+            print("海报压缩失败 %s: %s" % (_t["title"], _e))
+            _t["poster_webp"] = _t["poster"]
+        # 生成详情页
+        _detail_slug = "音频资源/2. 上师法音/详情/" + _t["title"]
+        audio_detail_map[_t["title"]] = _detail_slug
+        _detail_html = (
+            '<div class="audio-detail">'
+            '<img class="audio-detail-poster" src="' + _t["poster_webp"] + '" alt="' + _t["title"].replace('"','&quot;') + '" loading="lazy" onclick="showPosterBig(this.src, this.alt)">'
+            '<h1 class="audio-detail-title">' + _t["title"] + '</h1>'
+            '<p class="audio-detail-author">第五世多智钦·龙洋仁波切亲诵</p>'
+            '<div class="audio-detail-actions">'
+            '<button class="audio-detail-btn audio-detail-play" onclick="playTrack(' + str(_i) + ')">▶ 在线播放</button>'
+            '<a class="audio-detail-btn audio-detail-download" href="' + _t["src"] + '" download="' + _t["file"].replace('"','&quot;') + '">⬇ 下载音频</a>'
+            '</div>'
+            '<p class="audio-detail-tip">点击海报可查看大图</p>'
+            '</div>'
+        )
+        pages.append({
+            "slug": _detail_slug,
+            "title": _t["title"],
+            "rel": _detail_slug + ".md",
+            "dir": "音频资源/2. 上师法音/详情",
+            "is_index": False,
+            "is_audio_detail": True,
+            "audio_idx": _i,
+            "meta": {},
+            "html": _detail_html,
+        })
+    # 把详情页映射注入 audio_tracks（供 JS 端 Index 页链接用）
+    for _t in audio_tracks:
+        _t["detail_slug"] = audio_detail_map.get(_t["title"], "")
+    # 重新生成 tree（包含详情页，但渲染时会过滤 is_audio_detail）
+    tree = build_tree(pages)
 
     html_out = PAGE_TEMPLATE
     html_out = html_out.replace("@@SITE_TITLE_JSON@@", json.dumps(site_title, ensure_ascii=False))
