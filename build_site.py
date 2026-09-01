@@ -741,12 +741,20 @@ a:hover{color:var(--accent-soft)}
   background:var(--accent-soft); flex:0 0 5px; opacity:.6}
 .hn-link:hover::before{background:var(--accent); opacity:1}
 .hn-audio{cursor:pointer}
-.hn-link.hn-audio{font-size:1.2em; padding:.85rem 1rem}
+.hn-link.hn-audio{font-size:1.05em; padding:.7rem 1rem}
 .hn-audio.playing{color:var(--accent); font-weight:600; background:var(--surface-soft); border-color:var(--accent-soft)}
 .hn-audio.playing::before{background:var(--accent); opacity:1}
 .audio-list{margin-top:.5rem}
 .audio-list-title{font-size:.95em; color:var(--ink-faint); margin:1.2rem 0 .5rem; font-weight:600}
-.audio-group-title{font-size:.82em; color:var(--gold-deep); font-weight:700; letter-spacing:.04em; margin:1rem 0 .35rem; padding-left:.2rem; border-left:3px solid var(--gold); padding-left:.5rem}
+.audio-group{margin:.8rem 0; border:1px solid var(--line); border-radius:10px; overflow:hidden; background:var(--surface)}
+.audio-group-header{display:flex; align-items:center; gap:.5rem; padding:.7rem 1rem; cursor:pointer; user-select:none; background:var(--surface-soft); transition:background .15s}
+.audio-group-header:hover{background:var(--surface-hover)}
+.audio-group-chev{font-size:.7em; color:var(--gold-deep); transition:transform .2s; flex:0 0 auto}
+.audio-group-title{font-size:.95em; color:var(--gold-deep); font-weight:700; letter-spacing:.04em; flex:1}
+.audio-group-count{font-size:.82em; color:var(--ink-faint); flex:0 0 auto}
+.audio-group-hint{font-size:.75em; color:var(--ink-faint); opacity:.6; flex:0 0 auto}
+.audio-group-body{padding:.3rem .5rem .6rem}
+.audio-group-body .hn-link{margin:.15rem 0}
 .audio-note{color:var(--ink-soft); font-size:.95em; margin:.6rem 0 1rem; line-height:1.7}
 .hn-tips{margin:.4rem 0 1rem; padding-left:1.2rem; list-style:disc}
 .hn-tips li{color:var(--ink-soft); font-size:.9em; line-height:1.7; margin:.3rem 0}
@@ -759,7 +767,7 @@ a:hover{color:var(--accent-soft)}
 .home-update li{margin:.35em 0}
 .home-update .play-btn{margin:.2rem 0 .2rem 0}
 .dir-children{margin-top:.6rem}
-.dir-children .hn-link{font-size:1.02em}
+.dir-children .hn-link{font-size:.95em}
 /* 目录 Index 完整目录树容器 */
 .dir-full-tree{margin-top:1.4rem; padding-top:.6rem}
 
@@ -790,7 +798,7 @@ a:hover{color:var(--accent-soft)}
 .audio-card-poster{width:100px; height:140px; object-fit:cover; border-radius:8px; cursor:pointer; flex:0 0 auto; transition:transform .2s}
 .audio-card-poster:hover{transform:scale(1.05)}
 .audio-card-info{flex:1; min-width:0; display:flex; flex-direction:column; justify-content:center}
-.audio-card-title{font-size:1.1em; font-weight:700; color:var(--ink); margin-bottom:.3rem}
+.audio-card-title{font-size:1.15em; font-weight:700; color:var(--ink); margin-bottom:.3rem}
 .audio-card-author{font-size:.85em; color:var(--ink-faint); margin-bottom:.8rem}
 .audio-card-actions{display:flex; gap:.6rem}
 .audio-card-btn{display:inline-flex; align-items:center; gap:.3rem; padding:.45rem .9rem; border-radius:8px; font-size:.9em; text-decoration:none; cursor:pointer; border:none; transition:all .15s}
@@ -830,17 +838,16 @@ a:hover{color:var(--accent-soft)}
 .audio-list-arrow{color:var(--ink-faint); font-size:1.2em; flex:0 0 auto}
 
 /* ===== 法音详情页 ===== */
-.mantra-detail{max-width:600px; margin:0 auto; text-align:center}
-.mantra-detail-poster{margin-bottom:1.5rem}
-.mantra-detail-poster img{max-width:100%; max-height:70vh; border-radius:12px; box-shadow:0 8px 32px rgba(0,0,0,.15)}
-.mantra-detail-title{font-size:1.6em; font-weight:700; color:var(--ink); margin-bottom:.5rem}
-.mantra-detail-author{font-size:.95em; color:var(--ink-faint); margin-bottom:1.5rem}
-.mantra-detail-actions{display:flex; gap:1rem; justify-content:center; flex-wrap:wrap}
-.mantra-detail-btn{display:inline-flex; align-items:center; gap:.4rem; padding:.7rem 1.5rem; border-radius:10px; font-size:1em; text-decoration:none; cursor:pointer; border:none; transition:all .15s}
-.mantra-detail-play{background:var(--accent); color:#fff}
-.mantra-detail-play:hover{background:var(--accent-deep); transform:translateY(-1px)}
-.mantra-detail-download{background:var(--surface-hover); color:var(--ink-soft); border:1px solid var(--line)}
-.mantra-detail-download:hover{border-color:var(--accent); color:var(--accent)}
+.mantra-detail{max-width:600px; margin:0 auto; text-align:center; padding:1rem 0 2rem}
+.mantra-detail-title{font-size:1.7em; font-weight:400; color:var(--ink); margin-bottom:1.2rem; letter-spacing:.05em}
+.mantra-detail-player{display:flex; align-items:center; gap:.8rem; justify-content:center; margin-bottom:1.2rem}
+.mantra-detail-player audio{flex:1; max-width:480px; height:44px; border-radius:24px; box-shadow:0 4px 16px rgba(0,0,0,.12)}
+.mantra-detail-download{display:inline-flex; align-items:center; justify-content:center; width:44px; height:44px; border-radius:50%; background:var(--surface-hover); color:var(--ink-soft); border:1px solid var(--line); text-decoration:none; font-size:1.1em; flex-shrink:0; transition:all .15s}
+.mantra-detail-download:hover{border-color:var(--accent); color:var(--accent); transform:translateY(-1px)}
+.mantra-detail-author{font-size:.95em; color:var(--ink-faint); margin-bottom:1.5rem; letter-spacing:.08em}
+.mantra-detail-poster{margin-bottom:1rem}
+.mantra-detail-poster img{max-width:100%; max-height:75vh; border-radius:4px; box-shadow:0 8px 32px rgba(0,0,0,.15); cursor:zoom-in}
+.mantra-detail-tip{font-size:.85em; color:var(--ink-faint); opacity:.7}
 
 /* Index 页：有海报的经咒条目（带缩略图） */
 .hn-audio-with-poster{display:flex; align-items:center; gap:.8rem; padding:.6rem .8rem}
@@ -932,7 +939,7 @@ a:hover{color:var(--accent-soft)}
     <button id="fsInc" title="放大字号">A+</button>
   </div>
   <button id="themeToggle" class="theme-toggle" title="切换暗色/浅色模式">🌙</button>
-  <span id="hitStat" style="display:none; font-size:.82rem; color:var(--ink-faint); white-space:nowrap; margin-left:.4rem"></span>
+  <span id="pageViews" style="display:none; font-size:.78rem; color:var(--ink-faint); white-space:nowrap; margin-left:.4rem"></span>
 </div>
 
 <div class="layout">
@@ -1330,6 +1337,9 @@ function show(slug){
   } else {
     window.scrollTo({top:0, behavior:'smooth'});
   }
+  // 页面访问统计
+  if (typeof trackPageView === 'function') trackPageView();
+  if (typeof showPageViews === 'function') showPageViews();
 }
 
 // ==================== 划线与分享系统 ====================
@@ -1818,8 +1828,18 @@ function renderAudioListByFolder(folderKey){
     + '<p class="audio-note">因为服务器在国外，缓冲需要时间，请耐心等一会儿。</p>';
   var keys = Object.keys(groups);
   keys.sort(function(a, b){ if (a === '') return -1; if (b === '') return 1; return a < b ? -1 : 1; });
-  keys.forEach(function(g){
-    if (g) html += '<div class="audio-group-title">' + esc(cleanDirName(g)) + '</div>';
+  keys.forEach(function(g, gi){
+    if (g){
+      var groupId = 'ag-' + gi + '-' + g.replace(/[^a-z0-9]/gi, '');
+      html += '<div class="audio-group" data-group="' + groupId + '">'
+        + '<div class="audio-group-header" onclick="toggleAudioGroup(this)">'
+        + '<span class="audio-group-chev">▼</span>'
+        + '<span class="audio-group-title">' + esc(cleanDirName(g)) + '</span>'
+        + '<span class="audio-group-count">(' + groups[g].length + ')</span>'
+        + '<span class="audio-group-hint">点击收起</span>'
+        + '</div>'
+        + '<div class="audio-group-body">';
+    }
     groups[g].forEach(function(o){
       if (o.t.detail_slug){
         // 有海报：链接到独立详情页（用压缩版海报缩略图）
@@ -1832,11 +1852,27 @@ function renderAudioListByFolder(folderKey){
         html += '<a class="hn-link hn-audio" data-idx="' + o.i + '">🔊 ' + esc(o.t.title) + '</a>';
       }
     });
+    if (g) html += '</div></div>';
   });
   html += '</div>';
   return html;
 }
 
+// 音频分组折叠/展开
+function toggleAudioGroup(header){
+  var body = header.nextElementSibling;
+  var chev = header.querySelector('.audio-group-chev');
+  var hint = header.querySelector('.audio-group-hint');
+  if (body.style.display === 'none'){
+    body.style.display = '';
+    chev.textContent = '▼';
+    hint.textContent = '点击收起';
+  } else {
+    body.style.display = 'none';
+    chev.textContent = '▶';
+    hint.textContent = '点击展开';
+  }
+}
 // 海报大图查看
 function showPosterBig(src, alt){
   var overlay = document.createElement('div');
@@ -2428,39 +2464,34 @@ var initSlug = slugFromHash();
 if (initSlug){ show(initSlug); }
 else { var home = TREE.children && TREE.children.find(function(c){ return c.is_index; }); show(home ? home.slug : PAGES[0].slug); }
 
-// ---- 网页打开次数统计（仅作者/管理员可见）----
-// 说明：纯静态站无法做登录鉴权。此处用免注册的公开计数 API 累加打开次数，
-// 但仅在 URL 带管理员密钥（如 ?admin=longchen-admin）时才显示数字；
-// 首次用密钥访问后会记住（localStorage），之后直接可见。密钥请自行修改。
-var ADMIN_SECRET = 'longchen-admin';
-var HIT_NS = 'longchen-nyingtik', HIT_KEY = 'page-views';
-function isAdmin(){
+// ---- 页面访问次数统计（localStorage 本地计数，每页独立）----
+// 说明：纯静态站无后端，用 localStorage 记录每个页面在本设备的访问次数。
+// 如需跨用户统计，可接入 GoatCounter（免费）等服务。
+function trackPageView(){
   try {
-    if (new URLSearchParams(location.search).get('admin') === ADMIN_SECRET){
-      localStorage.setItem('longchen-admin', '1');
-      return true;
-    }
-    return localStorage.getItem('longchen-admin') === '1';
-  } catch(e){ return false; }
+    var slug = currentSlug || 'index';
+    var key = 'longchen-pv-' + slug;
+    var count = parseInt(localStorage.getItem(key) || '0', 10) + 1;
+    localStorage.setItem(key, String(count));
+    // 全站总访问
+    var totalKey = 'longchen-pv-total';
+    var total = parseInt(localStorage.getItem(totalKey) || '0', 10) + 1;
+    localStorage.setItem(totalKey, String(total));
+    return count;
+  } catch(e){ return 0; }
 }
-function trackVisit(){
-  // 每次打开页面异步 +1（不阻塞页面；统计服务不可达时静默失败）
+function showPageViews(){
+  var box = document.getElementById('pageViews');
+  if (!box) return;
   try {
-    fetch('https://api.countapi.xyz/hit/' + HIT_NS + '/' + HIT_KEY, {cache:'no-store'}).catch(function(){});
+    var slug = currentSlug || 'index';
+    var count = parseInt(localStorage.getItem('longchen-pv-' + slug) || '0', 10);
+    var total = parseInt(localStorage.getItem('longchen-pv-total') || '0', 10);
+    box.textContent = '本页已访问 ' + count + ' 次 · 全站累计 ' + total + ' 次';
+    box.style.display = 'inline-block';
   } catch(e){}
 }
-function showHitStat(){
-  var box = document.getElementById('hitStat');
-  if (!box) return;
-  box.style.display = 'inline-block';
-  box.textContent = '网页打开次数：加载中…';
-  fetch('https://api.countapi.xyz/get/' + HIT_NS + '/' + HIT_KEY, {cache:'no-store'})
-    .then(function(r){ return r.json(); })
-    .then(function(d){ box.textContent = '网页打开次数：' + (d.value != null ? d.value : 0); })
-    .catch(function(){ box.textContent = '网页打开次数：—（统计服务暂不可达）'; });
-}
-if (isAdmin()) showHitStat();
-trackVisit();
+trackPageView();
 </script>
 <footer class="site-footer">
   <div class="footer-inner">
@@ -2595,8 +2626,27 @@ def main():
                 # 压缩失败则用原图
                 shutil.copy2(src_path, os.path.join(poster_dist_dir, pname))
                 poster_map[key] = "assets/assets/法音海报/" + pname
+    # 建立上师开示文章的目录顺序映射（用于音频排序）
+    article_order = {}
+    _article_dir = os.path.join(CONTENT_DIR, "上师开示")
+    if os.path.isdir(_article_dir):
+        _idx = 0
+        for _dp, _dn, _fn in os.walk(_article_dir):
+            _dn.sort()  # 子目录按名称排序
+            for _f in sorted(_fn):
+                if _f.endswith(".md") and _f != "index.md":
+                    _title = re.sub(r"[🔊\"'“”\s]", "", _f[:-3]).strip()
+                    article_order[_title] = _idx
+                    _idx += 1
+    def audio_sort_key(fname):
+        _title = re.sub(r"[\"'“”\s]", "", fname[:-4] if fname.lower().endswith(".mp3") else fname).strip()
+        _folder = audio_folder_rel(fname)
+        # 上师开示（AI朗读）的音频按文章顺序排序
+        if "上师开示" in _folder and _title in article_order:
+            return (0, article_order[_title], _title)
+        return (1, _title)
     audio_tracks = []
-    for fname in sorted(LOCAL_AUDIO.keys()):
+    for fname in sorted(LOCAL_AUDIO.keys(), key=audio_sort_key):
         title = fname[:-4] if fname.lower().endswith(".mp3") else fname
         refs = ref_map.get(fname, [])
         slug = ""
@@ -2650,14 +2700,13 @@ def main():
         _t["detail_slug"] = _slug  # 供 JS 端 Index 页链接用
         _detail_html = (
             '<div class="mantra-detail">'
-            + '<div class="mantra-detail-poster"><img src="' + _webp_url + '" alt="' + _title + '" loading="lazy" onclick="showPosterBig(this.src, this.alt)"></div>'
-            + '<div class="mantra-detail-info">'
             + '<h1 class="mantra-detail-title">' + _title + '</h1>'
-            + '<p class="mantra-detail-author">第五世多智钦·龙洋仁波切亲诵</p>'
-            + '<div class="mantra-detail-actions">'
-            + '<button class="mantra-detail-btn mantra-detail-play" onclick="playTrack(' + str(_i) + ')">▶ 在线播放</button>'
-            + '<a class="mantra-detail-btn mantra-detail-download" href="' + _t["src"] + '" download="' + _t["file"] + '">⬇ 下载音频</a>'
+            + '<div class="mantra-detail-player">'
+            + '<audio controls preload="none" src="' + _t["src"] + '"></audio>'
+            + '<a class="mantra-detail-download" href="' + _t["src"] + '" download="' + _t["file"] + '" title="下载音频">⬇</a>'
             + '</div>'
+            + '<p class="mantra-detail-author">- 第五世多智钦·龙洋仁波切亲诵 -</p>'
+            + '<div class="mantra-detail-poster"><img src="' + _webp_url + '" alt="' + _title + '" loading="lazy" onclick="showPosterBig(this.src, this.alt)"></div>'
             + '<p class="mantra-detail-tip">点击海报可查看大图</p>'
             + '</div></div>'
         )
