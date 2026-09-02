@@ -1,0 +1,21 @@
+# ============================================================================
+# Cloudflare Pages 响应头策略（构建时由 build_site.py 复制到 dist/ 根）
+# 本项目：单文件 SPA（CSS/JS 全内联于 index.html）+ 音频在 /audio/ 下
+# ============================================================================
+
+# 1) HTML 不缓存：每次 push 后访客立即看到最新版（根治"看到旧版"痛点）
+/index.html
+  Cache-Control: no-cache
+
+# 2) 音频长缓存：文件名即内容指纹，更新即改名，可安全长缓存
+/audio/*
+  Cache-Control: public, max-age=86400, immutable
+
+# 3) 全局基础安全头
+/*
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: no-referrer
+
+# 4) 仅自己与朋友使用，不对外：阻止默认 pages.dev 子域被搜索引擎索引
+https://:project.pages.dev/*
+  X-Robots-Tag: noindex
