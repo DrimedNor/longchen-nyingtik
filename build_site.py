@@ -650,6 +650,9 @@ a:hover{color:var(--accent-soft)}
   white-space:nowrap}
 .player .p-pl-toggle:hover{background:var(--surface-soft)}
 .player .p-pl-hint{font-size:.8rem; color:var(--ink-faint)}
+.player .p-minimize{border:none; background:none; cursor:pointer; color:var(--ink-soft);
+  font-size:1.5rem; width:2.3rem; height:2.3rem; border-radius:8px; line-height:1; margin-left:auto}
+.player .p-minimize:hover{background:var(--surface-hover)}
 .player .p-close{border:none; background:none; cursor:pointer; color:var(--ink-soft);
   font-size:1.3rem; width:2.3rem; height:2.3rem; border-radius:8px; line-height:1}
 .player .p-close:hover{background:var(--surface-hover)}
@@ -688,8 +691,8 @@ a:hover{color:var(--accent-soft)}
   background:var(--accent); color:#fff; border:none; cursor:grab;
   padding:.7rem 1.1rem; border-radius:999px; font-size:1rem; font-weight:600;
   box-shadow:0 4px 14px rgba(59,42,34,.28); display:flex; align-items:center; gap:.4rem;
-  user-select:none;-webkit-user-select:none;touch-action:none}
-.player-launch:hover{background:var(--accent-soft)}
+  user-select:none;-webkit-user-select:none;touch-action:none; opacity:.75; transition:opacity .2s}
+.player-launch:hover{background:var(--accent-soft); opacity:1}
 .player-launch:active{cursor:grabbing}
 .player-launch.dragging{opacity:.85;box-shadow:0 6px 20px rgba(0,0,0,.4)}
 .player.show + .player-launch{display:none}
@@ -963,8 +966,8 @@ a:hover{color:var(--accent-soft)}
 .fab-search{position:fixed;top:70px;right:12px;z-index:100;padding:.7rem 1.1rem;border-radius:999px;
   background:var(--accent);color:#fff;border:none;cursor:grab;font-size:1rem;font-weight:600;
   box-shadow:0 4px 14px rgba(59,42,34,.28);display:flex;align-items:center;gap:.4rem;
-  transition:box-shadow .2s,opacity .2s;user-select:none;-webkit-user-select:none;touch-action:none}
-.fab-search:hover{background:var(--accent-soft)}
+  transition:box-shadow .2s,opacity .2s;user-select:none;-webkit-user-select:none;touch-action:none;opacity:.75}
+.fab-search:hover{background:var(--accent-soft);opacity:1}
 .fab-search:active{cursor:grabbing}
 .fab-search.dragging{opacity:.85;box-shadow:0 6px 20px rgba(0,0,0,.4)}
 .fab-search .fab-icon{font-size:1.1em}
@@ -1056,6 +1059,7 @@ a:hover{color:var(--accent-soft)}
   <!-- 第1行：状态栏（左：当前音频名 / 右：关闭叉号） -->
   <div class="p-status" id="pStatus">
     <span class="p-status-text" id="pStatusText">暂未播放</span>
+    <button class="p-minimize" id="pMinimize" title="最小化到迷你条">—</button>
     <button class="p-close" id="pClose" title="关闭播放器">✕</button>
   </div>
   <!-- 第2行：控制按钮（上一首 / 后退15秒 / 播放 / 下一首 / 前进15秒） -->
@@ -1210,11 +1214,11 @@ function renderNav(){
       + '<span class="nav-chev nav-chev-none">▸</span>'
       + '<span class="dir-label">' + esc(cleanDirName(name)) + '</span></div></div>';
   });
-  // AI 问答入口（外部链接，新窗口打开 ima 知识库）
+  // AI 问答入口（打开站内悬浮面板）
   html += '<div class="nav-sec nav-ai-ask" data-depth="0">'
-    + '<a class="nav-sec-head nav-external" href="' + AI_ASK_URL + '" target="_blank" rel="noopener">'
-    + '<span class="nav-chev nav-chev-none">↗</span>'
-    + '<span class="dir-label">AI 问答</span></a></div>';
+    + '<div class="nav-sec-head" onclick="openSearchPanel()">'
+    + '<span class="nav-chev nav-chev-none">💬</span>'
+    + '<span class="dir-label">AI 问答</span></div></div>';
   nav.innerHTML = html;
   // 一级菜单点击：直接进入该目录 Index 页面
   nav.querySelectorAll('.nav-sec-head').forEach(function(h){
@@ -2519,10 +2523,13 @@ document.getElementById('pPlToggle').onclick = function(){
   document.getElementById('pPlaylist').classList.toggle('open', open);
   document.getElementById('pPlHint').textContent = open ? '点击收起播放列表' : '点击展开播放列表';
 };
-// 关闭叉号：若正在播放（已选曲目）则折叠为底部迷你条，音频继续后台播放；否则完全关闭
+// 关闭叉号：完全关闭播放器，显示"播放器"悬浮按钮
 document.getElementById('pClose').onclick = function(){
-  if (curIdx >= 0) minimizePlayer();
-  else hidePlayer();
+  hidePlayer();
+};
+// 最小化按钮：折叠为底部迷你条，音频继续后台播放
+document.getElementById('pMinimize').onclick = function(){
+  minimizePlayer();
 };
 // 播放模式切换：点击在 顺序 / 逆序 / 随机 / 单曲循环 间循环，并刷新按钮文案
 document.getElementById('pMode').onclick = function(){
