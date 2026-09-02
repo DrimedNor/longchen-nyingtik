@@ -1851,7 +1851,7 @@ function renderHomeNav(){
   html.push('<div class="ai-ask-box" id="aiAskBox" style="display:none;margin-top:1rem;">');
   html.push('<div class="ai-ask-messages" id="aiAskMessages"></div>');
   html.push('<div class="ai-ask-input-row">');
-  html.push('<input type="text" id="aiAskInput" placeholder="输入你的问题，如：什么是菩提心？" onkeydown="if(event.key==='Enter')sendAiAsk()" style="flex:1;padding:.6rem .8rem;border:1px solid var(--line);border-radius:8px;font-size:1em;background:var(--surface);color:var(--ink);">');
+  html.push('<input type="text" id="aiAskInput" placeholder="输入你的问题，如：什么是菩提心？" onkeydown="if(event.key===\'Enter\')sendAiAsk()" style="flex:1;padding:.6rem .8rem;border:1px solid var(--line);border-radius:8px;font-size:1em;background:var(--surface);color:var(--ink);">');
   html.push('<button onclick="sendAiAsk()" style="padding:.6rem 1.2rem;background:var(--accent);color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:1em;margin-left:.5rem;">发送</button>');
   html.push('</div>');
   html.push('<p class="ai-ask-tip" style="font-size:.85em;color:var(--ink-faint);margin-top:.5rem;opacity:.7;">回答基于本站 ' + KNOWLEDGE_BASE.length + ' 篇文章，与外部信息不一致时以本站为准</p>');
