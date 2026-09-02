@@ -41,15 +41,21 @@ export default {
       // 解析请求体
       const { question, context, related } = await request.json();
 
-      if (!question || !context) {
-        return new Response(JSON.stringify({ error: '缺少 question 或 context 参数' }), {
+      if (!question) {
+        return new Response(JSON.stringify({ error: '缺少 question 参数' }), {
           status: 400,
           headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
         });
       }
 
-      // 构造 system prompt，要求基于提供的内容回答
-      const systemPrompt = `你是"龙的传人｜Longchen Nyingtik"网站的 AI 问答助手，专门解答关于龙钦宁提传承、上师开示、修行方法等问题。
+      // 判断是否有参考资料
+      const hasContext = context && context.trim().length > 0;
+
+      // 构造 system prompt
+      let systemPrompt;
+      if (hasContext) {
+        // 有参考资料：严格基于参考资料回答
+        systemPrompt = `你是"龙的传人｜Longchen Nyingtik"网站的 AI 问答助手，专门解答关于龙钦宁提传承、上师开示、修行方法等问题。
 
 请严格遵守以下规则：
 1. 只使用下方提供的参考资料中的信息回答，绝对不要使用你自己的知识或外部信息
@@ -62,6 +68,14 @@ export default {
 ---
 ${context}
 ---`;
+      } else {
+        // 无参考资料：用通用知识回答
+        systemPrompt = `你是"龙的传人｜Longchen Nyingtik"网站的 AI 问答助手，专门解答关于龙钦宁提传承、上师开示、修行方法、佛教基础知识等问题。
+
+本网站未收集到与用户问题相关的资料，请基于你的通用知识回答。
+回答使用中文，语气恭敬、温和，符合佛教网站的氛围。
+如果问题涉及敏感或不确定的内容，请谨慎表述。`;
+      }
 
       // 调用腾讯云 TokenHub 的 DeepSeek API
       const apiResponse = await fetch('https://tokenhub.tencentmaas.com/v1/chat/completions', {
@@ -101,6 +115,11 @@ ${context}
 
       // 清理回答中的多余空白
       answer = answer.trim();
+
+      // 无参考资料时，在回答开头加上提示
+      if (!hasContext) {
+        answer = '本网站未收集到相关资料，以下内容由 AI 基于通用知识生成，可能与本网站观点不一致，请谨慎参考。\n\n' + answer;
+      }
 
       // 添加相关文章链接
       if (related && related.length > 0) {

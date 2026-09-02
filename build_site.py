@@ -2164,26 +2164,27 @@ function sendAiAsk(question){
 
   // 搜索相关内容
   var related = searchKnowledge(question);
-  if (related.length === 0){
-    messages.innerHTML += '<div style="text-align:left;margin:.5rem 0;"><span style="display:inline-block;background:var(--surface-soft);color:var(--ink-soft);padding:.5rem .8rem;border-radius:12px 12px 12px 2px;max-width:80%;">本网站暂无相关内容，建议换个关键词提问，或浏览「上师开示」栏目。</span></div>';
-    messages.scrollTop = messages.scrollHeight;
-    return;
-  }
+  var hasContext = related.length > 0;
 
   // 显示"正在思考"
   var thinkingId = 'ai-thinking-' + Date.now();
-  messages.innerHTML += '<div id="' + thinkingId + '" style="text-align:left;margin:.5rem 0;color:var(--ink-faint);">正在基于本站内容思考...</div>';
+  var thinkingText = hasContext ? '正在基于本站内容思考...' : '正在基于通用知识思考...';
+  messages.innerHTML += '<div id="' + thinkingId + '" style="text-align:left;margin:.5rem 0;color:var(--ink-faint);">' + thinkingText + '</div>';
   messages.scrollTop = messages.scrollHeight;
 
   // 如果未配置 API，显示本地搜索结果（降级模式）
   if (!AI_API_ENDPOINT){
-    var answer = '根据本站相关文章：\n\n';
-    related.forEach(function(item, idx){
-      answer += (idx+1) + '. 《' + item.title + '》\n';
-      answer += item.content.slice(0, 200) + '...\n';
-      answer += '[查看全文](#' + item.slug + ')\n\n';
-    });
-    answer += '（AI 代理未配置，当前显示相关文章摘要。配置 API 后可获得智能回答。）';
+    if (hasContext){
+      var answer = '根据本站相关文章：\n\n';
+      related.forEach(function(item, idx){
+        answer += (idx+1) + '. 《' + item.title + '》\n';
+        answer += item.content.slice(0, 200) + '...\n';
+        answer += '[查看全文](#' + item.slug + ')\n\n';
+      });
+      answer += '（AI 代理未配置，当前显示相关文章摘要。配置 API 后可获得智能回答。）';
+    } else {
+      var answer = '本网站未收集到相关资料，以下内容由 AI 基于通用知识生成，可能与本网站观点不一致，请谨慎参考。\n\n（AI 代理未配置，无法生成智能回答。配置 API 后可获得基于通用知识的回答。）';
+    }
     document.getElementById(thinkingId).remove();
     messages.innerHTML += '<div style="text-align:left;margin:.5rem 0;"><span style="display:inline-block;background:var(--surface-soft);color:var(--ink);padding:.7rem 1rem;border-radius:12px 12px 12px 2px;max-width:90%;white-space:pre-wrap;line-height:1.7;">' + esc(answer) + '</span></div>';
     messages.scrollTop = messages.scrollHeight;
@@ -2191,9 +2192,9 @@ function sendAiAsk(question){
   }
 
   // 调用 API（通过 Cloudflare Workers 代理）
-  var context = related.map(function(item){
+  var context = hasContext ? related.map(function(item){
     return '《' + item.title + '》\n' + item.content;
-  }).join('\n\n---\n\n');
+  }).join('\n\n---\n\n') : '';
 
   fetch(AI_API_ENDPOINT, {
     method: 'POST',
