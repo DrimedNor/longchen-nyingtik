@@ -740,8 +740,8 @@ a:hover{color:var(--accent-soft)}
 .hn-desc{color:var(--ink-faint); font-size:.88em; margin:0 0 .8rem}
 .hn-dir{font-size:.82em; color:#9b8475; font-weight:700; letter-spacing:.05em;
   margin:.9rem 0 .35rem}
-.hn-dir[data-depth="0"]{margin-top:.5rem; font-size:1.05em; color:#6e1614}
-.hn-dir[data-depth="1"]{margin-top:.7rem; font-size:.98em; color:#8a1f1c; font-weight:600}
+.hn-dir[data-depth="0"]{margin-top:.5rem; font-size:1.0em; color:#6e1614; font-weight:700}
+.hn-dir[data-depth="1"]{margin-top:.6rem; font-size:.95em; color:#8a1f1c; font-weight:600}
 .hn-dir[data-depth="2"]{margin-top:.55rem; font-size:.9em; color:#b8893b; font-weight:500}
 .hn-link{display:flex; align-items:center; gap:.4rem; padding:.42rem .7rem;
   border-radius:8px; color:var(--ink-soft); font-size:.95em; cursor:pointer;
@@ -751,7 +751,7 @@ a:hover{color:var(--accent-soft)}
   background:var(--accent-soft); flex:0 0 5px; opacity:.6}
 .hn-link:hover::before{background:var(--accent); opacity:1}
 .hn-audio{cursor:pointer}
-.hn-link.hn-audio{font-size:1.05em; padding:.7rem 1rem}
+.hn-link.hn-audio{font-size:.95em; padding:.55rem .8rem}
 .hn-audio.playing{color:var(--accent); font-weight:600; background:var(--surface-soft); border-color:var(--accent-soft)}
 .hn-audio.playing::before{background:var(--accent); opacity:1}
 .audio-list{margin-top:.5rem}
@@ -772,7 +772,7 @@ a:hover{color:var(--accent-soft)}
 .home-update{border:1px solid var(--gold-soft); border-left:4px solid var(--accent);
   border-radius:12px; padding:1.1rem 1.4rem; margin:1.6rem 0; background:var(--surface-soft)}
 .home-update .hn-sec-title{margin-top:0}
-.home-update h3{font-size:1.05em; color:var(--gold-deep); margin:1.2em 0 .4em; font-weight:600}
+.home-update h3{font-size:1.0em; color:var(--gold-deep); margin:1.2em 0 .4em; font-weight:600}
 .home-update ul{margin:.4em 0 .8em 1.4em; padding:0}
 .home-update li{margin:.35em 0}
 .home-update .play-btn{margin:.2rem 0 .2rem 0}
@@ -862,7 +862,7 @@ a:hover{color:var(--accent-soft)}
 /* ===== Index 页音频缩略图列表 ===== */
 .hn-audio-with-poster{display:flex !important; align-items:center; gap:.8rem; padding:.6rem .8rem !important; border-radius:10px}
 .hn-audio-with-poster:hover{background:var(--surface-hover)}
-.audio-list-thumb{width:42px; height:56px; border-radius:6px; background-size:cover; background-position:center; flex:0 0 auto; box-shadow:0 2px 8px rgba(0,0,0,.1)}
+.audio-list-thumb{width:42px; height:56px; border-radius:6px; background-size:contain; background-position:center; background-repeat:no-repeat; flex:0 0 auto; box-shadow:0 2px 8px rgba(0,0,0,.1)}
 .audio-list-title{flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
 .audio-list-arrow{color:var(--ink-faint); font-size:1.2em; flex:0 0 auto}
 
@@ -875,7 +875,7 @@ a:hover{color:var(--accent-soft)}
 .mantra-detail-download:hover{border-color:var(--accent); color:var(--accent); transform:translateY(-1px)}
 .mantra-detail-author{font-size:.95em; color:var(--ink-faint); margin-bottom:1.5rem; letter-spacing:.08em}
 .mantra-detail-poster{margin-bottom:1rem}
-.mantra-detail-poster img{max-width:100%; max-height:75vh; border-radius:4px; box-shadow:0 8px 32px rgba(0,0,0,.15); cursor:zoom-in}
+.mantra-detail-poster img{max-width:100%; height:auto; border-radius:4px; box-shadow:0 8px 32px rgba(0,0,0,.15); cursor:zoom-in; display:block; margin:0 auto}
 .mantra-detail-tip{font-size:.85em; color:var(--ink-faint); opacity:.7}
 
 /* Index 页：有海报的经咒条目（带缩略图） */
@@ -1712,19 +1712,41 @@ function walkBlock(node, prefix, depth, parentNum){
     var target = full + '/index';
     if (!bySlug[target]) target = firstPageUnder(full);
     var hasSub = sub.dirs && Object.keys(sub.dirs).length;
-    if (!target && !hasSub) return;   // 空目录（无 index / 无首篇 / 无子目录）→ 跳过
-    arr.push('<div class="hn-dir" data-depth="' + depth + '">' + esc(num) + '. ' + esc(cleanDirName(name)) + '</div>');
+    var hasPages = sub.children && sub.children.length;
+    if (!target && !hasSub && !hasPages) return;   // 空目录 → 跳过
+    var isDefaultOpen = (depth === 0);  // 一级目录默认展开，二级及以下默认收起
+    var groupId = 'dir-' + depth + '-' + full.replace(/[^a-z0-9]/gi, '');
+    arr.push('<div class="dir-group" data-depth="' + depth + '" id="' + groupId + '">');
+    arr.push('<div class="dir-group-header" onclick="toggleDirGroup(this)" style="cursor:pointer;user-select:none;display:flex;align-items:center;gap:.4rem;">'
+      + '<span class="dir-group-chev" style="font-size:.7em;color:var(--gold-deep);transition:transform .2s;flex:0 0 auto;">' + (isDefaultOpen ? '▼' : '▶') + '</span>'
+      + '<span class="hn-dir" data-depth="' + depth + '" style="margin:0;flex:1;">' + esc(num) + '. ' + esc(cleanDirName(name)) + '</span>'
+      + '</div>');
+    arr.push('<div class="dir-group-body" style="' + (isDefaultOpen ? '' : 'display:none;') + 'padding-left:1rem;">');
     walkBlock(sub, full, depth + 1, num).forEach(function(x){ arr.push(x); });
+    arr.push('</div></div>');
   });
   (node.children || []).forEach(function(c){
     if (c.type === 'page' && !c.is_index){
       var p = bySlug[c.slug];
       var hasAudio = p && p.html.indexOf('play-btn') >= 0;
-      arr.push('<a class="hn-link" data-page="' + esc(c.slug) + '">'
+      arr.push('<a class="hn-link" data-page="' + esc(c.slug) + '" style="margin-left:1rem;">'
         + esc(c.title) + (hasAudio ? ' 🔊' : '') + '</a>');
     }
   });
   return arr;
+}
+
+// 目录分组折叠/展开
+function toggleDirGroup(header){
+  var body = header.nextElementSibling;
+  var chev = header.querySelector('.dir-group-chev');
+  if (body.style.display === 'none'){
+    body.style.display = '';
+    chev.textContent = '▼';
+  } else {
+    body.style.display = 'none';
+    chev.textContent = '▶';
+  }
 }
 
 function renderHomeNav(){
@@ -1758,17 +1780,44 @@ function renderHomeNav(){
     }
     if (meta.audio){
       if (meta.note) html.push('<p class="audio-note">因为服务器在国外，缓冲需要时间，请耐心等一会儿。</p>');
-      // 按一级文件夹分组展示全部音频（与折叠导航的层级一致，避免平铺 70+ 条）
+      // 按一级文件夹分组展示全部音频（折叠卡片样式，与音频资源页一致）
       var _agroups = {};
       AUDIO_TRACKS.forEach(function(t, i){
         var g = cleanDirName((t.folder || '其他音频').split('/')[0]);
         (_agroups[g] = _agroups[g] || []).push({t: t, i: i});
       });
-      Object.keys(_agroups).sort().forEach(function(g){
-        html.push('<div class="audio-group-title">' + esc(g) + '</div>');
+      var _akeys = Object.keys(_agroups).sort(function(a, b){
+        // 上师开示（AI朗读）排最前，上师法音排第二，其余按名称
+        if (a.indexOf('上师开示') >= 0) return -1;
+        if (b.indexOf('上师开示') >= 0) return 1;
+        if (a.indexOf('上师法音') >= 0) return -1;
+        if (b.indexOf('上师法音') >= 0) return 1;
+        return a < b ? -1 : 1;
+      });
+      _akeys.forEach(function(g, gi){
+        var groupId = 'hag-' + gi + '-' + g.replace(/[^a-z0-9]/gi, '');
+        var isDefaultOpen = g.indexOf('上师开示') >= 0;  // 上师开示（AI朗读）默认展开
+        html.push('<div class="audio-group" data-group="' + groupId + '">'
+          + '<div class="audio-group-header" onclick="toggleAudioGroup(this)">'
+          + '<span class="audio-group-chev">' + (isDefaultOpen ? '▼' : '▶') + '</span>'
+          + '<span class="audio-group-title">' + esc(g) + '</span>'
+          + '<span class="audio-group-count">(' + _agroups[g].length + ')</span>'
+          + '<span class="audio-group-hint">' + (isDefaultOpen ? '点击收起' : '点击展开') + '</span>'
+          + '</div>'
+          + '<div class="audio-group-body"' + (isDefaultOpen ? '' : ' style="display:none"') + '>');
         _agroups[g].forEach(function(o){
-          html.push('<a class="hn-link hn-audio" data-idx="' + o.i + '">🔊 ' + esc(o.t.title) + '</a>');
+          if (o.t.detail_slug){
+            // 有海报：链接到独立详情页（用压缩版海报缩略图）
+            html.push('<a class="hn-link hn-audio hn-audio-with-poster" href="#/' + o.t.detail_slug + '">'
+              + '<span class="audio-list-thumb" style="background-image:url(\'' + (o.t.poster_webp || o.t.poster) + '\')"></span>'
+              + '<span class="audio-list-title">' + esc(o.t.title) + '</span>'
+              + '<span class="audio-list-arrow">›</span></a>');
+          } else {
+            // 无海报：保持原列表样式，点击直接播放
+            html.push('<a class="hn-link hn-audio" data-idx="' + o.i + '">🔊 ' + esc(o.t.title) + '</a>');
+          }
         });
+        html.push('</div></div>');
       });
       html.push('<div class="album-card"><div class="t">《大圆满前行》有声书（226 集）</div>'
         + '<div class="d">嘎玛仁波切译 · 昌列寺收录。因音频体积较大，点击前往昌列寺官网在线收听。</div>'
@@ -2789,7 +2838,12 @@ def main():
         audio_tracks.append(t)
 
     # 为有海报的经咒自动生成独立详情页（参考多智钦寺网站样式）+ 海报压缩
-    from PIL import Image
+    try:
+        from PIL import Image
+        HAS_PIL = True
+    except ImportError:
+        HAS_PIL = False
+        print("提示：未安装 Pillow，海报将使用原图（不压缩）")
     _poster_dist_dir = os.path.join(DIST_DIR, "assets", "法音海报")
     os.makedirs(_poster_dist_dir, exist_ok=True)
     mantra_detail_slugs = set()
@@ -2804,7 +2858,7 @@ def main():
         # 生成压缩版 WebP（最大宽度 800px，质量 80%，大幅减小加载体积）
         _poster_src = os.path.join(CONTENT_DIR, _t["poster"].replace("assets/assets/", "assets/"))
         _webp_url = _t["poster"]
-        if os.path.exists(_poster_src):
+        if os.path.exists(_poster_src) and HAS_PIL:
             _webp_name = _title + ".webp"
             _webp_path = os.path.join(_poster_dist_dir, _webp_name)
             try:
