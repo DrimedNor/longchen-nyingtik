@@ -3,17 +3,17 @@
  * 
  * 功能：
  * 1. 接收前端发送的问题和相关文章内容
- * 2. 调用腾讯混元 API（OpenAI 兼容接口）
+ * 2. 调用腾讯云 TokenHub 的 DeepSeek API
  * 3. 要求模型基于提供的内容回答，不一致时以提供的内容为准
  * 4. 返回回答给前端
  * 
  * 部署步骤：
- * 1. 注册 Cloudflare 账号（免费）
+ * 1. 注册 Cloudflare 账号（免费）：https://workers.cloudflare.com/
  * 2. 创建 Workers 服务，粘贴此代码
- * 3. 配置环境变量 HUNYUAN_API_KEY（格式：SecretId:SecretKey）
+ * 3. 配置环境变量 API_KEY（值为你的腾讯云 TokenHub API Key）
  * 4. 获取 Workers 访问地址，配置到网站前端
  * 
- * 腾讯混元 API 开通：https://cloud.tencent.com/product/hunyuan
+ * 模型：deepseek-v4-flash-0731（腾讯云 TokenHub）
  */
 
 export default {
@@ -63,27 +63,28 @@ export default {
 ${context}
 ---`;
 
-      // 调用腾讯混元 API（OpenAI 兼容接口）
-      const apiResponse = await fetch('https://api.hunyuan.cloud.tencent.com/v1/chat/completions', {
+      // 调用腾讯云 TokenHub 的 DeepSeek API
+      const apiResponse = await fetch('https://tokenhub.tencentmaas.com/v1/chat/completions', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${env.HUNYUAN_API_KEY}`,
+          'Authorization': `Bearer ${env.API_KEY}`,
         },
         body: JSON.stringify({
-          model: 'hunyuan-lite',  // 免费模型，可改为 hunyuan-turbo（付费但能力更强）
+          model: 'deepseek-v4-flash-0731',
           messages: [
             { role: 'system', content: systemPrompt },
             { role: 'user', content: question },
           ],
           temperature: 0.3,  // 低温度，回答更稳定准确
           max_tokens: 1500,  // 最大回答长度
+          stream: false,
         }),
       });
 
       if (!apiResponse.ok) {
         const errorText = await apiResponse.text();
-        console.error('腾讯混元 API 错误:', apiResponse.status, errorText);
+        console.error('API 错误:', apiResponse.status, errorText);
         return new Response(JSON.stringify({ 
           error: `API 调用失败: ${apiResponse.status}`,
           detail: errorText.slice(0, 200)

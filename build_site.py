@@ -2136,7 +2136,7 @@ function doPanelSearch(){
 }
 
 // ===== AI 问答功能 =====
-var AI_API_ENDPOINT = '';  // Cloudflare Workers 代理地址（配置后启用）
+var AI_API_ENDPOINT = 'https://steep-rain-0d77longchen-ai-ask.drimednor.workers.dev';  // Cloudflare Workers 代理地址（配置后启用）
 var AI_API_KEY = '';        // API Key（通过代理传递，不在前端暴露）
 
 // 展开/收起问答框

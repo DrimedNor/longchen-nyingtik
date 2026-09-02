@@ -1,0 +1,6 @@
+name = "steep-rain-0d77longchen-ai-ask"
+main = "ai-ask-worker.js"
+compatibility_date = "2024-09-02"
+account_id = "36e5618995c36274b4b7b6c7200a2fac"
+
+# API_KEY 通过 wrangler secret put API_KEY 设置，不写在这里
