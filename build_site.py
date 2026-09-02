@@ -735,23 +735,23 @@ a:hover{color:var(--accent-soft)}
 /* 首页导览 */
 .home-nav{margin-top:2.2rem; border-top:1px solid var(--line); padding-top:1.8rem}
 .hn-sec{margin-bottom:2.2rem}
-.hn-sec-title{font-size:1.15em; font-weight:700; color:var(--ink); margin:0 0 .3rem;
+.hn-sec-title{font-size:1.25em; font-weight:700; color:var(--ink); margin:0 0 .3rem;
   display:flex; align-items:center; gap:.5rem; letter-spacing:.02em}
-.hn-desc{color:var(--ink-faint); font-size:.88em; margin:0 0 .8rem}
+.hn-desc{color:var(--ink-faint); font-size:.98em; margin:0 0 .8rem}
 .hn-dir{font-size:.82em; color:#9b8475; font-weight:700; letter-spacing:.05em;
   margin:.9rem 0 .35rem}
-.hn-dir[data-depth="0"]{margin-top:.5rem; font-size:1.0em; color:#6e1614; font-weight:700}
-.hn-dir[data-depth="1"]{margin-top:.6rem; font-size:.95em; color:#8a1f1c; font-weight:600}
-.hn-dir[data-depth="2"]{margin-top:.55rem; font-size:.9em; color:#b8893b; font-weight:500}
+.hn-dir[data-depth="0"]{margin-top:.5rem; font-size:1.1em; color:#6e1614; font-weight:700}
+.hn-dir[data-depth="1"]{margin-top:.6rem; font-size:1.05em; color:#8a1f1c; font-weight:600}
+.hn-dir[data-depth="2"]{margin-top:.55rem; font-size:1.0em; color:#b8893b; font-weight:500}
 .hn-link{display:flex; align-items:center; gap:.4rem; padding:.42rem .7rem;
-  border-radius:8px; color:var(--ink-soft); font-size:.95em; cursor:pointer;
+  border-radius:8px; color:var(--ink-soft); font-size:1.05em; cursor:pointer;
   border:1px solid transparent; transition:all .15s}
 .hn-link:hover{background:var(--surface-hover); color:var(--ink); border-color:var(--line)}
 .hn-link::before{content:""; width:5px; height:5px; border-radius:50%;
   background:var(--accent-soft); flex:0 0 5px; opacity:.6}
 .hn-link:hover::before{background:var(--accent); opacity:1}
 .hn-audio{cursor:pointer}
-.hn-link.hn-audio{font-size:.95em; padding:.55rem .8rem}
+.hn-link.hn-audio{font-size:1.05em; padding:.6rem .9rem}
 .hn-audio.playing{color:var(--accent); font-weight:600; background:var(--surface-soft); border-color:var(--accent-soft)}
 .hn-audio.playing::before{background:var(--accent); opacity:1}
 .audio-list{margin-top:.5rem}
@@ -760,7 +760,7 @@ a:hover{color:var(--accent-soft)}
 .audio-group-header{display:flex; align-items:center; gap:.5rem; padding:.7rem 1rem; cursor:pointer; user-select:none; background:var(--surface-soft); transition:background .15s}
 .audio-group-header:hover{background:var(--surface-hover)}
 .audio-group-chev{font-size:.7em; color:var(--gold-deep); transition:transform .2s; flex:0 0 auto}
-.audio-group-title{font-size:.95em; color:var(--gold-deep); font-weight:700; letter-spacing:.04em; flex:1}
+.audio-group-title{font-size:1.05em; color:var(--gold-deep); font-weight:700; letter-spacing:.04em; flex:1}
 .audio-group-count{font-size:.82em; color:var(--ink-faint); flex:0 0 auto}
 .audio-group-hint{font-size:.75em; color:var(--ink-faint); opacity:.6; flex:0 0 auto}
 .audio-group-body{padding:.3rem .5rem .6rem}
@@ -772,7 +772,7 @@ a:hover{color:var(--accent-soft)}
 .home-update{border:1px solid var(--gold-soft); border-left:4px solid var(--accent);
   border-radius:12px; padding:1.1rem 1.4rem; margin:1.6rem 0; background:var(--surface-soft)}
 .home-update .hn-sec-title{margin-top:0}
-.home-update h3{font-size:1.0em; color:var(--gold-deep); margin:1.2em 0 .4em; font-weight:600}
+.home-update h3{font-size:1.1em; color:var(--gold-deep); margin:1.2em 0 .4em; font-weight:600}
 .home-update ul{margin:.4em 0 .8em 1.4em; padding:0}
 .home-update li{margin:.35em 0}
 .home-update .play-btn{margin:.2rem 0 .2rem 0}
@@ -1753,7 +1753,7 @@ function renderHomeNav(){
   var html = [];
   // 每个顶层目录板块的定制元信息（未配置的目录使用默认图标/说明）
   var META = {
-    '上师开示': {icon:'📖', title:'上师开示', desc:'按主题整理的上师开示，点击标题直接阅读。', tips:true},
+    '上师开示': {icon:'📖', title:'上师开示', desc:'按主题整理的上师开示，点击标题直接阅读；点击标题栏左侧的三角符号，可展开或折叠子目录。', tips:true},
     '龙钦宁提传承': {icon:'🐉', title:'龙钦宁提传承', desc:'龙钦宁提传承相关资料与祖师传记，点击进入查看。'},
     '音频资源': {icon:'🎧', title:'音频资料', desc:'文字转语音版开示，点击标题即可在当前页面直接收听，也可用底部播放器连播。', audio:true, note:true},
     '书籍': {icon:'📚', title:'书籍', desc:'精选读物与参考资料，点击进入查看。'}
@@ -1796,7 +1796,7 @@ function renderHomeNav(){
       });
       _akeys.forEach(function(g, gi){
         var groupId = 'hag-' + gi + '-' + g.replace(/[^a-z0-9]/gi, '');
-        var isDefaultOpen = g.indexOf('上师开示') >= 0;  // 上师开示（AI朗读）默认展开
+        var isDefaultOpen = false;  // 所有音频分组默认收起，用户点击展开
         html.push('<div class="audio-group" data-group="' + groupId + '">'
           + '<div class="audio-group-header" onclick="toggleAudioGroup(this)">'
           + '<span class="audio-group-chev">' + (isDefaultOpen ? '▼' : '▶') + '</span>'
@@ -2766,7 +2766,7 @@ def main():
         t = re.sub(r'短(仪轨|心咒|咒)$', r'\1', t)
         return t
     poster_dir = os.path.join(CONTENT_DIR, "assets", "法音海报")
-    poster_dist_dir = os.path.join(DIST_DIR, "assets", "assets", "法音海报")
+    poster_dist_dir = os.path.join(DIST_DIR, "assets", "法音海报")
     poster_map = {}
     if os.path.isdir(poster_dir):
         os.makedirs(poster_dist_dir, exist_ok=True)
@@ -2787,13 +2787,13 @@ def main():
                     ratio = max_w / img.width
                     img = img.resize((max_w, int(img.height * ratio)), Image.LANCZOS)
                 img.save(dst_path, "WEBP", quality=80, method=6)
-                poster_url = "assets/assets/法音海报/" + webp_name
+                poster_url = "assets/法音海报/" + webp_name
                 poster_map[key] = poster_url
                 poster_map[norm_key] = poster_url
             except Exception as e:
                 # 压缩失败则用原图
                 shutil.copy2(src_path, os.path.join(poster_dist_dir, pname))
-                poster_url = "assets/assets/法音海报/" + pname
+                poster_url = "assets/法音海报/" + pname
                 poster_map[key] = poster_url
                 poster_map[norm_key] = poster_url
     # 建立上师开示文章的目录顺序映射（用于音频排序）
