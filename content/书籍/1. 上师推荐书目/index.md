@@ -1,8 +1,4 @@
----
-title: 书籍
----
 
-## 恩师推荐书目
 
 
 - ### 《大圆满龙钦宁提传承祖师传》(东珠仁波切撰著　土登华丹译中)
@@ -24,13 +20,5 @@ http://www.duozhiqin.com/#/article/details?articleCode=AT2024010512063190&column
 
 
 - ### 《释迦牟尼佛广传·白莲花论》
+- 
 - ### 《莲花生大师传》
-
-## 其他相关书籍推荐
-
-- ### 《大圆满传承源流蓝宝石》(辽西堪布蒋扬多杰 撰著)
-
-这个网站上有很多珍贵资料，可以自行搜索下载
-https://www.buli.page/zh-hans/view/lessons/by/search/
-
-[[关于本站/index|← 返回首页]]
