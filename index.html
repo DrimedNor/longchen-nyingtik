@@ -1428,7 +1428,7 @@ function renderHomeNav(){
   var html = [];
   // 每个顶层目录板块的定制元信息（未配置的目录使用默认图标/说明）
   var META = {
-    '上师开示': {icon:'📖', title:'上师开示', desc:'按主题整理的上师开示，点击标题直接阅读；点击标题栏左侧的三角符号，可展开或折叠子目录。', tips:true},
+    '上师开示': {icon:'📖', title:'上师开示', desc:'', tips:true},
     '龙钦宁提传承': {icon:'🐉', title:'龙钦宁提传承', desc:'龙钦宁提传承相关资料与祖师传记，点击进入查看。'},
     '音频资源': {icon:'🎧', title:'音频资料', desc:'文字转语音版开示，点击标题即可在当前页面直接收听，也可用底部播放器连播。', audio:true, note:true},
     '书籍': {icon:'📚', title:'书籍', desc:'精选读物与参考资料，点击进入查看。'}
@@ -1450,8 +1450,13 @@ function renderHomeNav(){
     html.push('<h2 class="hn-sec-title">' + meta.icon + ' ' + esc(meta.title) + '</h2>');
     if (meta.desc) html.push('<p class="hn-desc">' + meta.desc + '</p>');
     if (meta.tips){
-      html.push('<ul class="hn-tips"><li>🔊 带有小喇叭标志的文章表示有配套音频，可直接点击收听；</li>'
-        + '<li>未带小喇叭标志的文章暂无音频，正在陆续添加中，敬请期待。</li></ul>');
+      html.push('<ul class="hn-tips">'
+        + '<li>按主题整理的上师开示；</li>'
+        + '<li>点击标题栏左侧的三角符号，可展开或折叠子目录；</li>'
+        + '<li>点击「文章」标题直接阅读；</li>'
+        + '<li>带有小喇叭 🔊 标志的文章表示有配套音频，可直接点击收听；</li>'
+        + '<li>未带小喇叭标志的文章暂无音频，正在陆续添加中，敬请期待。</li>'
+        + '</ul>');
     }
     if (meta.audio){
       if (meta.note) html.push('<p class="audio-note">因为服务器在国外，缓冲需要时间，请耐心等一会儿。</p>');
@@ -2435,7 +2440,7 @@ trackPageView();
 <footer class="site-footer">
   <div class="footer-inner">
     <span class="footer-copy">© 2026 龙的传人｜Longchen Nyingtik · 个人学习整理，非商业用途</span>
-    <span class="footer-build">构建于 2026-09-02 19:27</span>
+    <span class="footer-build">构建于 2026-09-02 20:59</span>
   </div>
 </footer>
 <a class="ai-ask-fab" id="aiAskFab" target="_blank" rel="noopener" title="AI 问答 · 基于本站资料">💬</a>
