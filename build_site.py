@@ -966,7 +966,7 @@ a:hover{color:var(--accent-soft)}
     <button id="fsInc" title="放大字号">A+</button>
   </div>
   <button id="themeToggle" class="theme-toggle" title="切换暗色/浅色模式">🌙</button>
-  <span id="pageViews" style="display:none; font-size:.78rem; color:var(--ink-faint); white-space:nowrap; margin-left:.4rem"></span>
+
 </div>
 
 <div class="layout">
@@ -1389,9 +1389,8 @@ function show(slug){
   } else {
     window.scrollTo({top:0, behavior:'smooth'});
   }
-  // 页面访问统计
+  // 页面访问统计（本地记录，不显示；GoatCounter 后台统计真实访问量）
   if (typeof trackPageView === 'function') trackPageView();
-  if (typeof showPageViews === 'function') showPageViews();
   // GoatCounter SPA 页面切换统计
   if (window.goatcounter && window.goatcounter.count){
     try { window.goatcounter.count({path: location.pathname + location.hash}); } catch(e){}
