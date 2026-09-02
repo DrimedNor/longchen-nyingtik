@@ -953,6 +953,7 @@ a:hover{color:var(--accent-soft)}
   transition:opacity .3s; box-shadow:0 2px 8px rgba(0,0,0,.2); z-index:20}
 .back-top:hover{background:var(--accent-deep)}
 </style>
+<script data-goatcounter="https://drimed.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
 </head>
 <body>
 <div class="topbar">
@@ -1391,6 +1392,10 @@ function show(slug){
   // 页面访问统计
   if (typeof trackPageView === 'function') trackPageView();
   if (typeof showPageViews === 'function') showPageViews();
+  // GoatCounter SPA 页面切换统计
+  if (window.goatcounter && window.goatcounter.count){
+    try { window.goatcounter.count({path: location.pathname + location.hash}); } catch(e){}
+  }
 }
 
 // ==================== 划线与分享系统 ====================
