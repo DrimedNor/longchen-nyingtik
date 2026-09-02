@@ -685,10 +685,13 @@ a:hover{color:var(--accent-soft)}
 .player .pl-item.playing .pl-dot{background:var(--turq)}
 /* 悬浮打开播放器按钮 */
 .player-launch{position:fixed; right:1.1rem; bottom:1.1rem; z-index:41;
-  background:var(--accent); color:#fff; border:none; cursor:pointer;
+  background:var(--accent); color:#fff; border:none; cursor:grab;
   padding:.7rem 1.1rem; border-radius:999px; font-size:1rem; font-weight:600;
-  box-shadow:0 4px 14px rgba(59,42,34,.28); display:flex; align-items:center; gap:.4rem}
+  box-shadow:0 4px 14px rgba(59,42,34,.28); display:flex; align-items:center; gap:.4rem;
+  user-select:none;-webkit-user-select:none;touch-action:none}
 .player-launch:hover{background:var(--accent-soft)}
+.player-launch:active{cursor:grabbing}
+.player-launch.dragging{opacity:.85;box-shadow:0 6px 20px rgba(0,0,0,.4)}
 .player.show + .player-launch{display:none}
 
 /* 底部迷你条：关闭整屏播放器但音频仍在播放时，常驻一行 */
@@ -957,11 +960,11 @@ a:hover{color:var(--accent-soft)}
 .back-top:hover{background:var(--accent-deep)}
 
 /* 悬浮搜索/AI问答按钮（可拖动） */
-.fab-search{position:fixed;top:12px;right:12px;z-index:100;padding:8px 16px 8px 12px;border-radius:24px;
-  background:var(--accent);color:#fff;border:none;cursor:grab;font-size:.95em;font-weight:500;
-  box-shadow:0 2px 10px rgba(0,0,0,.25);display:flex;align-items:center;gap:6px;
+.fab-search{position:fixed;top:12px;right:12px;z-index:100;padding:.7rem 1.1rem;border-radius:999px;
+  background:var(--accent);color:#fff;border:none;cursor:grab;font-size:1rem;font-weight:600;
+  box-shadow:0 4px 14px rgba(59,42,34,.28);display:flex;align-items:center;gap:.4rem;
   transition:box-shadow .2s,opacity .2s;user-select:none;-webkit-user-select:none;touch-action:none}
-.fab-search:hover{box-shadow:0 4px 15px rgba(0,0,0,.3)}
+.fab-search:hover{background:var(--accent-soft)}
 .fab-search:active{cursor:grabbing}
 .fab-search.dragging{opacity:.85;box-shadow:0 6px 20px rgba(0,0,0,.4)}
 .fab-search .fab-icon{font-size:1.1em}
@@ -2576,12 +2579,7 @@ document.querySelectorAll('.p-speed-menu .sp-item, .pm-speed-menu .sp-item').for
 document.addEventListener('click', closeAllSpeedMenus);
 document.addEventListener('keydown', function(e){ if (e.key === 'Escape') closeAllSpeedMenus(); });
 applySpeed();   // 初始化按钮文案与默认高亮
-// 悬浮按钮：打开播放器
-document.getElementById('playerLaunch').onclick = function(){
-  document.getElementById('player').classList.add('show');
-  document.getElementById('playerMini').classList.remove('show');
-  refreshLaunch();
-};
+// 悬浮按钮：打开播放器（点击事件已在拖动功能中处理）
 // 迷你条：播放/暂停
 document.getElementById('pmPlay').onclick = function(){
   if (curIdx < 0 && AUDIO_TRACKS.length) playTrack(0);
@@ -2758,6 +2756,105 @@ doPanelSearch();
       return;
     }
     openSearchPanel('search');
+  });
+
+  btn.addEventListener('mousedown', onStart);
+  document.addEventListener('mousemove', onMove);
+  document.addEventListener('mouseup', onEnd);
+  btn.addEventListener('touchstart', onStart, { passive: false });
+  document.addEventListener('touchmove', onMove, { passive: false });
+  document.addEventListener('touchend', onEnd);
+})();
+
+// ---- 播放器按钮拖动功能 ----
+(function(){
+  var btn = document.getElementById('playerLaunch');
+  if (!btn) return;
+
+  var isDragging = false;
+  var startX, startY, startLeft, startTop;
+  var hasMoved = false;
+  var suppressClick = false;
+
+  // 从 localStorage 恢复位置
+  var savedPos = localStorage.getItem('playerLaunchPos');
+  if (savedPos) {
+    try {
+      var pos = JSON.parse(savedPos);
+      btn.style.left = pos.left + 'px';
+      btn.style.top = pos.top + 'px';
+      btn.style.right = 'auto';
+      btn.style.bottom = 'auto';
+    } catch(e) {}
+  }
+
+  function getEventPos(e) {
+    if (e.touches && e.touches.length > 0) {
+      return { x: e.touches[0].clientX, y: e.touches[0].clientY };
+    }
+    return { x: e.clientX, y: e.clientY };
+  }
+
+  function onStart(e) {
+    isDragging = true;
+    hasMoved = false;
+    var pos = getEventPos(e);
+    startX = pos.x;
+    startY = pos.y;
+    var rect = btn.getBoundingClientRect();
+    startLeft = rect.left;
+    startTop = rect.top;
+    btn.classList.add('dragging');
+  }
+
+  function onMove(e) {
+    if (!isDragging) return;
+    var pos = getEventPos(e);
+    var dx = pos.x - startX;
+    var dy = pos.y - startY;
+    if (Math.abs(dx) > 3 || Math.abs(dy) > 3) {
+      hasMoved = true;
+      suppressClick = true;
+    }
+    if (!hasMoved) return;
+    var newLeft = startLeft + dx;
+    var newTop = startTop + dy;
+    var maxLeft = window.innerWidth - btn.offsetWidth - 5;
+    var maxTop = window.innerHeight - btn.offsetHeight - 5;
+    newLeft = Math.max(5, Math.min(newLeft, maxLeft));
+    newTop = Math.max(5, Math.min(newTop, maxTop));
+    btn.style.left = newLeft + 'px';
+    btn.style.top = newTop + 'px';
+    btn.style.right = 'auto';
+    btn.style.bottom = 'auto';
+    e.preventDefault();
+  }
+
+  function onEnd(e) {
+    if (!isDragging) return;
+    isDragging = false;
+    btn.classList.remove('dragging');
+    if (hasMoved) {
+      var rect = btn.getBoundingClientRect();
+      localStorage.setItem('playerLaunchPos', JSON.stringify({
+        left: rect.left,
+        top: rect.top
+      }));
+      setTimeout(function(){ suppressClick = false; }, 100);
+    }
+  }
+
+  // 点击事件（拖动时被阻止）
+  btn.addEventListener('click', function(e){
+    if (suppressClick) {
+      e.preventDefault();
+      e.stopPropagation();
+      return;
+    }
+    // 打开播放器
+    document.getElementById('player').classList.add('show');
+    document.getElementById('playerMini').classList.remove('show');
+    refreshLaunch();
   });
 
   btn.addEventListener('mousedown', onStart);
