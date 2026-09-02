@@ -2710,6 +2710,12 @@ def main():
     AGG_PREFIXES = ("音频资源",)
     AGG_SLUGS = ("本次更新内容",)
     # 扫描法音海报文件，生成压缩版 WebP（比 PNG 小 60-80%，加载更快）
+    # 规范化标题用于海报匹配（去除版本后缀、"短"字等，让"度母短仪轨"匹配"度母仪轨"海报）
+    def normalize_poster_title(title):
+        t = re.sub(r'[\s\(\)（）\[\]【】]', '', title)
+        t = re.sub(r'(回音版|快|慢|21|42|7|8|16分钟|25分钟版|5分钟|7分钟)$', '', t)
+        t = re.sub(r'短(仪轨|心咒|咒)$', r'\1', t)
+        return t
     poster_dir = os.path.join(CONTENT_DIR, "assets", "法音海报")
     poster_dist_dir = os.path.join(DIST_DIR, "assets", "assets", "法音海报")
     poster_map = {}
@@ -2719,6 +2725,7 @@ def main():
             if not pname.lower().endswith((".png", ".jpg", ".jpeg", ".webp")):
                 continue
             key = os.path.splitext(pname)[0]
+            norm_key = normalize_poster_title(key)
             src_path = os.path.join(poster_dir, pname)
             webp_name = key + ".webp"
             dst_path = os.path.join(poster_dist_dir, webp_name)
@@ -2731,11 +2738,15 @@ def main():
                     ratio = max_w / img.width
                     img = img.resize((max_w, int(img.height * ratio)), Image.LANCZOS)
                 img.save(dst_path, "WEBP", quality=80, method=6)
-                poster_map[key] = "assets/assets/法音海报/" + webp_name
+                poster_url = "assets/assets/法音海报/" + webp_name
+                poster_map[key] = poster_url
+                poster_map[norm_key] = poster_url
             except Exception as e:
                 # 压缩失败则用原图
                 shutil.copy2(src_path, os.path.join(poster_dist_dir, pname))
-                poster_map[key] = "assets/assets/法音海报/" + pname
+                poster_url = "assets/assets/法音海报/" + pname
+                poster_map[key] = poster_url
+                poster_map[norm_key] = poster_url
     # 建立上师开示文章的目录顺序映射（用于音频排序）
     article_order = {}
     _article_dir = os.path.join(CONTENT_DIR, "上师开示")
@@ -2771,7 +2782,7 @@ def main():
             "slug": slug,
             "src": "audio/" + quote(fname),
             "file": fname,
-            "poster": poster_map.get(title, ""),
+            "poster": poster_map.get(normalize_poster_title(title), poster_map.get(title, "")),
         }
         t["group"] = audio_group(fname)
         t["folder"] = audio_folder_rel(fname)
