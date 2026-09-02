@@ -1060,6 +1060,7 @@ var AUDIO_ALBUM = @@AUDIO_ALBUM_JSON@@;
 var AUDIO_TRACKS = @@AUDIO_TRACKS_JSON@@;
 var HOME_UPDATE_HTML = @@HOME_UPDATE_JSON@@;   // 首页「本次更新内容」区块（纯用户资料，不含技术调整）
 var HOME_UPDATE_DATE = "@@HOME_UPDATE_DATE@@"; // 首页公告区标题用的更新日期（取自内容文件 frontmatter date 字段）
+var KNOWLEDGE_BASE = @@KNOWLEDGE_BASE_JSON@@;  // AI问答知识库索引（构建时生成，标题+正文摘要）
 // AI 问答入口：ima 知识库（基于本站资料的外部 AI 问答页面，新窗口打开）
 var AI_ASK_URL = "https://ima.qq.com/wiki/?shareId=588af6f2d87e769588a77ab9deda499bd5d63994b176841528534a103547ca3f";
 
@@ -1837,15 +1838,24 @@ function renderHomeNav(){
       html.push('</section>');
     }
   });
-  // AI 问答入口（外部链接，新窗口打开 ima 知识库）
+  // AI 问答入口（站内问答，点击展开问答框）
   html.push('<section class="hn-sec ai-ask-sec">');
   html.push('<h2 class="hn-sec-title">🤖 AI 问答</h2>');
-  html.push('<p class="hn-desc">基于本站整理的上师开示等资料，有问题随时向 AI 提问。点击下方卡片前往提问。</p>');
-  html.push('<a class="ai-ask-card" href="' + AI_ASK_URL + '" target="_blank" rel="noopener">');
+  html.push('<p class="hn-desc">基于本站整理的上师开示等资料，有问题随时向 AI 提问。回答仅基于本站内容，与外部信息不一致时以本站为准。</p>');
+  html.push('<div class="ai-ask-card" onclick="toggleAiAsk()" style="cursor:pointer;">');
   html.push('<div class="ai-ask-icon">💬</div>');
-  html.push('<div class="ai-ask-text"><div class="ai-ask-title">龙的传人 · AI 知识库</div><div class="ai-ask-desc">输入你的问题，AI 基于上师开示等资料为你解答</div></div>');
-  html.push('<div class="ai-ask-arrow">前往提问 ↗</div>');
-  html.push('</a>');
+  html.push('<div class="ai-ask-text"><div class="ai-ask-title">龙的传人 · AI 问答</div><div class="ai-ask-desc">输入你的问题，AI 基于上师开示等资料为你解答</div></div>');
+  html.push('<div class="ai-ask-arrow" id="aiAskArrow">点击开始提问 ▼</div>');
+  html.push('</div>');
+  // 问答框（默认隐藏）
+  html.push('<div class="ai-ask-box" id="aiAskBox" style="display:none;margin-top:1rem;">');
+  html.push('<div class="ai-ask-messages" id="aiAskMessages"></div>');
+  html.push('<div class="ai-ask-input-row">');
+  html.push('<input type="text" id="aiAskInput" placeholder="输入你的问题，如：什么是菩提心？" onkeydown="if(event.key==='Enter')sendAiAsk()" style="flex:1;padding:.6rem .8rem;border:1px solid var(--line);border-radius:8px;font-size:1em;background:var(--surface);color:var(--ink);">');
+  html.push('<button onclick="sendAiAsk()" style="padding:.6rem 1.2rem;background:var(--accent);color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:1em;margin-left:.5rem;">发送</button>');
+  html.push('</div>');
+  html.push('<p class="ai-ask-tip" style="font-size:.85em;color:var(--ink-faint);margin-top:.5rem;opacity:.7;">回答基于本站 ' + KNOWLEDGE_BASE.length + ' 篇文章，与外部信息不一致时以本站为准</p>');
+  html.push('</div>');
   html.push('</section>');
   return '<div class="home-nav">' + html.join('') + '</div>';
 }
@@ -1990,6 +2000,104 @@ function showPosterBig(src, alt){
   img.alt = alt || '';
   overlay.appendChild(img);
   document.body.appendChild(overlay);
+}
+
+// ===== AI 问答功能 =====
+var AI_API_ENDPOINT = '';  // Cloudflare Workers 代理地址（配置后启用）
+var AI_API_KEY = '';        // API Key（通过代理传递，不在前端暴露）
+
+// 展开/收起问答框
+function toggleAiAsk(){
+  var box = document.getElementById('aiAskBox');
+  var arrow = document.getElementById('aiAskArrow');
+  if (box.style.display === 'none'){
+    box.style.display = 'block';
+    arrow.textContent = '收起 ▲';
+    document.getElementById('aiAskInput').focus();
+  } else {
+    box.style.display = 'none';
+    arrow.textContent = '点击开始提问 ▼';
+  }
+}
+
+// 本地知识库搜索：关键词匹配，返回最相关的前3篇文章
+function searchKnowledge(question){
+  var keywords = question.split(/[\s，。？！、；：]+/).filter(function(k){ return k.length >= 2; });
+  var results = [];
+  KNOWLEDGE_BASE.forEach(function(item){
+    var score = 0;
+    keywords.forEach(function(kw){
+      if (item.title.indexOf(kw) >= 0) score += 5;
+      if (item.content.indexOf(kw) >= 0) score += 1;
+    });
+    if (score > 0) results.push({item: item, score: score});
+  });
+  results.sort(function(a, b){ return b.score - a.score; });
+  return results.slice(0, 3).map(function(r){ return r.item; });
+}
+
+// 发送问题
+function sendAiAsk(){
+  var input = document.getElementById('aiAskInput');
+  var question = input.value.trim();
+  if (!question) return;
+  var messages = document.getElementById('aiAskMessages');
+
+  // 显示用户问题
+  messages.innerHTML += '<div style="text-align:right;margin:.5rem 0;"><span style="display:inline-block;background:var(--accent);color:#fff;padding:.5rem .8rem;border-radius:12px 12px 2px 12px;max-width:80%;">' + esc(question) + '</span></div>';
+  input.value = '';
+
+  // 搜索相关内容
+  var related = searchKnowledge(question);
+  if (related.length === 0){
+    messages.innerHTML += '<div style="text-align:left;margin:.5rem 0;"><span style="display:inline-block;background:var(--surface-soft);color:var(--ink-soft);padding:.5rem .8rem;border-radius:12px 12px 12px 2px;max-width:80%;">本网站暂无相关内容，建议换个关键词提问，或浏览「上师开示」栏目。</span></div>';
+    messages.scrollTop = messages.scrollHeight;
+    return;
+  }
+
+  // 显示"正在思考"
+  var thinkingId = 'ai-thinking-' + Date.now();
+  messages.innerHTML += '<div id="' + thinkingId + '" style="text-align:left;margin:.5rem 0;color:var(--ink-faint);">正在基于本站内容思考...</div>';
+  messages.scrollTop = messages.scrollHeight;
+
+  // 如果未配置 API，显示本地搜索结果（降级模式）
+  if (!AI_API_ENDPOINT){
+    var answer = '根据本站相关文章：\n\n';
+    related.forEach(function(item, idx){
+      answer += (idx+1) + '. 《' + item.title + '》\n';
+      answer += item.content.slice(0, 200) + '...\n';
+      answer += '[查看全文](#' + item.slug + ')\n\n';
+    });
+    answer += '（AI 代理未配置，当前显示相关文章摘要。配置 API 后可获得智能回答。）';
+    document.getElementById(thinkingId).remove();
+    messages.innerHTML += '<div style="text-align:left;margin:.5rem 0;"><span style="display:inline-block;background:var(--surface-soft);color:var(--ink);padding:.7rem 1rem;border-radius:12px 12px 12px 2px;max-width:90%;white-space:pre-wrap;line-height:1.7;">' + esc(answer) + '</span></div>';
+    messages.scrollTop = messages.scrollHeight;
+    return;
+  }
+
+  // 调用 API（通过 Cloudflare Workers 代理）
+  var context = related.map(function(item){
+    return '《' + item.title + '》\n' + item.content;
+  }).join('\n\n---\n\n');
+
+  fetch(AI_API_ENDPOINT, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({
+      question: question,
+      context: context,
+      related: related.map(function(r){ return {title: r.title, slug: r.slug}; })
+    })
+  }).then(function(r){ return r.json(); })
+  .then(function(data){
+    document.getElementById(thinkingId).remove();
+    var answer = data.answer || data.response || '抱歉，AI 暂时无法回答，请稍后再试。';
+    messages.innerHTML += '<div style="text-align:left;margin:.5rem 0;"><span style="display:inline-block;background:var(--surface-soft);color:var(--ink);padding:.7rem 1rem;border-radius:12px 12px 12px 2px;max-width:90%;white-space:pre-wrap;line-height:1.7;">' + esc(answer) + '</span></div>';
+    messages.scrollTop = messages.scrollHeight;
+  }).catch(function(err){
+    document.getElementById(thinkingId).remove();
+    messages.innerHTML += '<div style="text-align:left;margin:.5rem 0;color:#c0392b;">调用失败：' + esc(err.message) + '</div>';
+  });
 }
 
 // 根据经咒标题播放音频
@@ -2900,6 +3008,24 @@ def main():
     # 重新生成 tree（包含详情页，但渲染时过滤 is_audio_detail / hide_from_nav）
     tree = build_tree(pages)
 
+    # 生成 AI 问答知识库索引：提取所有文章的标题+正文（去HTML标签，截取前3000字）
+    knowledge_base = []
+    for p in pages:
+        if p.get("is_audio_detail") or p.get("hide_from_nav") or p.get("is_index"):
+            continue
+        if p["slug"] in ("index", "更新日志", "本次更新内容"):
+            continue
+        # 去掉 HTML 标签，提取纯文本
+        text = re.sub(r'<[^>]+>', ' ', p.get("html", ""))
+        text = re.sub(r'\s+', ' ', text).strip()
+        if len(text) < 50:  # 内容太短的跳过
+            continue
+        knowledge_base.append({
+            "slug": p["slug"],
+            "title": p["title"],
+            "content": text[:3000]  # 每篇截取前3000字，控制索引体积
+        })
+    print(f"AI知识库索引: {len(knowledge_base)} 篇文章")
 
     html_out = PAGE_TEMPLATE
     html_out = html_out.replace("@@SITE_TITLE_JSON@@", json.dumps(site_title, ensure_ascii=False))
@@ -2907,6 +3033,7 @@ def main():
     html_out = html_out.replace("@@AUDIO_TRACKS_JSON@@", json.dumps(audio_tracks, ensure_ascii=False))
     html_out = html_out.replace("@@PAGES_JSON@@", json.dumps(pages, ensure_ascii=False))
     html_out = html_out.replace("@@TREE_JSON@@", json.dumps(tree, ensure_ascii=False))
+    html_out = html_out.replace("@@KNOWLEDGE_BASE_JSON@@", json.dumps(knowledge_base, ensure_ascii=False))
     html_out = html_out.replace("@@HOME_UPDATE_JSON@@", json.dumps(home_update_html, ensure_ascii=False))
     html_out = html_out.replace("@@HOME_UPDATE_DATE@@", home_update_date)
     html_out = html_out.replace("@@SITE_TITLE@@", site_title)
