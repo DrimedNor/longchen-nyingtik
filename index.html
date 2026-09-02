@@ -621,13 +621,15 @@ a:hover{color:var(--accent-soft)}
   transition:opacity .3s; box-shadow:0 2px 8px rgba(0,0,0,.2); z-index:20}
 .back-top:hover{background:var(--accent-deep)}
 
-/* 悬浮搜索/AI问答按钮 */
-.fab-search{position:fixed;top:12px;right:12px;z-index:100;width:42px;height:42px;border-radius:50%;
-  background:var(--accent);color:#fff;border:none;cursor:pointer;font-size:1.1em;
-  box-shadow:0 2px 10px rgba(0,0,0,.25);display:flex;align-items:center;justify-content:center;
-  transition:transform .2s,box-shadow .2s}
-.fab-search:hover{transform:scale(1.08);box-shadow:0 4px 15px rgba(0,0,0,.3)}
-.fab-search:active{transform:scale(0.95)}
+/* 悬浮搜索/AI问答按钮（可拖动） */
+.fab-search{position:fixed;top:12px;right:12px;z-index:100;padding:8px 16px 8px 12px;border-radius:24px;
+  background:var(--accent);color:#fff;border:none;cursor:grab;font-size:.95em;font-weight:500;
+  box-shadow:0 2px 10px rgba(0,0,0,.25);display:flex;align-items:center;gap:6px;
+  transition:box-shadow .2s,opacity .2s;user-select:none;-webkit-user-select:none;touch-action:none}
+.fab-search:hover{box-shadow:0 4px 15px rgba(0,0,0,.3)}
+.fab-search:active{cursor:grabbing}
+.fab-search.dragging{opacity:.85;box-shadow:0 6px 20px rgba(0,0,0,.4)}
+.fab-search .fab-icon{font-size:1.1em}
 
 /* 悬浮搜索面板 */
 .search-panel{position:fixed;top:0;left:0;right:0;bottom:0;z-index:200;display:none;
@@ -678,7 +680,9 @@ a:hover{color:var(--accent-soft)}
     <button id="fsInc" title="放大字号">A+</button>
   </div>
   <button id="themeToggle" class="theme-toggle" title="切换暗色/浅色模式">🌙</button>
-  <button class="fab-search" id="fabSearch" title="搜索 / AI 问答">🔍</button>
+  <button class="fab-search" id="fabSearch" title="点击搜索 / AI 问答，可拖动位置">
+    <span class="fab-icon">🔍</span><span>AI 搜索</span>
+  </button>
 </div>
 
 <div class="layout">
@@ -2330,8 +2334,6 @@ renderNav();
 updateModeBtn();
 
 // ---- 悬浮搜索/AI问答面板 ----
-var fabBtn = document.getElementById('fabSearch');
-if (fabBtn) fabBtn.addEventListener('click', function(){ openSearchPanel('search'); });
 var searchPanel = document.getElementById('searchPanel');
 if (searchPanel) searchPanel.addEventListener('click', function(e){
   if (e.target === searchPanel) closeSearchPanel();
@@ -2342,6 +2344,103 @@ document.addEventListener('keydown', function(e){
   }
 });
 doPanelSearch();
+
+// ---- 悬浮按钮拖动功能 ----
+(function(){
+  var btn = document.getElementById('fabSearch');
+  if (!btn) return;
+
+  var isDragging = false;
+  var startX, startY, startLeft, startTop;
+  var hasMoved = false;
+  var suppressClick = false;
+
+  // 从 localStorage 恢复位置
+  var savedPos = localStorage.getItem('fabSearchPos');
+  if (savedPos) {
+    try {
+      var pos = JSON.parse(savedPos);
+      btn.style.left = pos.left + 'px';
+      btn.style.top = pos.top + 'px';
+      btn.style.right = 'auto';
+    } catch(e) {}
+  }
+
+  function getEventPos(e) {
+    if (e.touches && e.touches.length > 0) {
+      return { x: e.touches[0].clientX, y: e.touches[0].clientY };
+    }
+    return { x: e.clientX, y: e.clientY };
+  }
+
+  function onStart(e) {
+    isDragging = true;
+    hasMoved = false;
+    var pos = getEventPos(e);
+    startX = pos.x;
+    startY = pos.y;
+    var rect = btn.getBoundingClientRect();
+    startLeft = rect.left;
+    startTop = rect.top;
+    btn.classList.add('dragging');
+  }
+
+  function onMove(e) {
+    if (!isDragging) return;
+    var pos = getEventPos(e);
+    var dx = pos.x - startX;
+    var dy = pos.y - startY;
+    if (Math.abs(dx) > 3 || Math.abs(dy) > 3) {
+      hasMoved = true;
+      suppressClick = true;
+    }
+    if (!hasMoved) return;  // 还没开始拖动，不移动
+    var newLeft = startLeft + dx;
+    var newTop = startTop + dy;
+    // 限制在视口范围内
+    var maxLeft = window.innerWidth - btn.offsetWidth - 5;
+    var maxTop = window.innerHeight - btn.offsetHeight - 5;
+    newLeft = Math.max(5, Math.min(newLeft, maxLeft));
+    newTop = Math.max(5, Math.min(newTop, maxTop));
+    btn.style.left = newLeft + 'px';
+    btn.style.top = newTop + 'px';
+    btn.style.right = 'auto';
+    e.preventDefault();
+  }
+
+  function onEnd(e) {
+    if (!isDragging) return;
+    isDragging = false;
+    btn.classList.remove('dragging');
+    if (hasMoved) {
+      // 保存位置
+      var rect = btn.getBoundingClientRect();
+      localStorage.setItem('fabSearchPos', JSON.stringify({
+        left: rect.left,
+        top: rect.top
+      }));
+      // 拖动后阻止 click 事件
+      setTimeout(function(){ suppressClick = false; }, 100);
+    }
+  }
+
+  // 点击事件（拖动时被 suppressClick 阻止）
+  btn.addEventListener('click', function(e){
+    if (suppressClick) {
+      e.preventDefault();
+      e.stopPropagation();
+      return;
+    }
+    openSearchPanel('search');
+  });
+
+  btn.addEventListener('mousedown', onStart);
+  document.addEventListener('mousemove', onMove);
+  document.addEventListener('mouseup', onEnd);
+  btn.addEventListener('touchstart', onStart, { passive: false });
+  document.addEventListener('touchmove', onMove, { passive: false });
+  document.addEventListener('touchend', onEnd);
+})();
 
 // ---- 划线系统：选中文字弹出工具栏，已划线点击取消 ----
 // 用 selectionchange 检测选区（比 mouseup/touchend 更可靠，尤其手机端长按选中）
@@ -2540,7 +2639,7 @@ trackPageView();
 <footer class="site-footer">
   <div class="footer-inner">
     <span class="footer-copy">© 2026 龙的传人｜Longchen Nyingtik · 个人学习整理，非商业用途</span>
-    <span class="footer-build">构建于 2026-09-02 21:06</span>
+    <span class="footer-build">构建于 2026-09-02 21:19</span>
   </div>
 </footer>
 <a class="ai-ask-fab" id="aiAskFab" target="_blank" rel="noopener" title="AI 问答 · 基于本站资料">💬</a>
