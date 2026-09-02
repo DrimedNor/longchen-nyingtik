@@ -960,7 +960,7 @@ a:hover{color:var(--accent-soft)}
 .back-top:hover{background:var(--accent-deep)}
 
 /* 悬浮搜索/AI问答按钮（可拖动） */
-.fab-search{position:fixed;top:12px;right:12px;z-index:100;padding:.7rem 1.1rem;border-radius:999px;
+.fab-search{position:fixed;top:70px;right:12px;z-index:100;padding:.7rem 1.1rem;border-radius:999px;
   background:var(--accent);color:#fff;border:none;cursor:grab;font-size:1rem;font-weight:600;
   box-shadow:0 4px 14px rgba(59,42,34,.28);display:flex;align-items:center;gap:.4rem;
   transition:box-shadow .2s,opacity .2s;user-select:none;-webkit-user-select:none;touch-action:none}
@@ -978,6 +978,7 @@ a:hover{color:var(--accent-soft)}
   box-shadow:0 10px 40px rgba(0,0,0,.3);overflow:hidden;max-height:80vh;display:flex;flex-direction:column}
 .search-panel-header{display:flex;align-items:center;padding:1rem 1.2rem;border-bottom:1px solid var(--line)}
 .search-panel-tabs{display:flex;gap:.5rem}
+.search-panel-title{font-weight:600;font-size:1.05em;color:var(--ink)}
 .search-panel-tab{padding:.4rem 1rem;border-radius:20px;cursor:pointer;font-size:.95em;
   background:var(--surface-soft);color:var(--ink-soft);border:none;transition:all .2s}
 .search-panel-tab.active{background:var(--accent);color:#fff}
@@ -1038,27 +1039,14 @@ a:hover{color:var(--accent-soft)}
 <div class="search-panel" id="searchPanel">
   <div class="search-panel-box">
     <div class="search-panel-header">
-      <div class="search-panel-tabs">
-        <button class="search-panel-tab active" data-tab="search" onclick="switchSearchTab('search')">🔍 搜索</button>
-        <button class="search-panel-tab" data-tab="ai" onclick="switchSearchTab('ai')">🤖 AI 问答</button>
-      </div>
+      <div class="search-panel-title">🔍 AI 搜索</div>
       <button class="search-panel-close" onclick="closeSearchPanel()">✕</button>
     </div>
     <div class="search-panel-body">
-      <!-- 搜索 Tab -->
-      <div id="searchTabContent">
-        <input class="search-panel-input" id="searchPanelInput" type="text" placeholder="输入关键词搜索文章..." oninput="doPanelSearch()">
-        <div class="search-panel-results" id="searchPanelResults"></div>
-      </div>
-      <!-- AI 问答 Tab -->
-      <div id="aiTabContent" style="display:none">
-        <div class="ai-ask-messages" id="aiAskMessages"></div>
-        <div class="ai-ask-input-row">
-          <input type="text" id="aiAskInput" placeholder="输入你的问题，如：什么是菩提心？" onkeydown="if(event.key==='Enter')sendAiAsk()">
-          <button onclick="sendAiAsk()">发送</button>
-        </div>
-        <p style="font-size:.85em;color:var(--ink-faint);margin-top:.5rem;opacity:.7;">回答基于本站 41 篇文章，与外部信息不一致时以本站为准</p>
-      </div>
+      <input class="search-panel-input" id="searchPanelInput" type="text" placeholder="输入关键词或问题，如：什么是菩提心？" onkeydown="if(event.key==='Enter')doPanelSearch()">
+      <div class="ai-ask-messages" id="aiAskMessages"></div>
+      <div class="search-panel-results" id="searchPanelResults"></div>
+      <p style="font-size:.85em;color:var(--ink-faint);margin-top:.5rem;opacity:.7;">回答基于本站所收集整理的龙钦宁提相关资料，仅供参考。</p>
     </div>
   </div>
 </div>
@@ -1925,8 +1913,8 @@ function renderHomeNav(){
   // AI 问答入口（点击打开悬浮面板）
   html.push('<section class="hn-sec ai-ask-sec">');
   html.push('<h2 class="hn-sec-title">🤖 AI 问答</h2>');
-  html.push('<p class="hn-desc">基于本站整理的上师开示等资料，有问题随时向 AI 提问。回答仅基于本站内容，与外部信息不一致时以本站为准。</p>');
-  html.push('<div class="ai-ask-card" onclick="openSearchPanel(\'ai\')" style="cursor:pointer;">');
+  html.push('<p class="hn-desc">基于本站所收集整理的龙钦宁提相关资料，有问题随时向 AI 提问。回答仅供参考。</p>');
+  html.push('<div class="ai-ask-card" onclick="openSearchPanel()" style="cursor:pointer;">');
   html.push('<div class="ai-ask-icon">💬</div>');
   html.push('<div class="ai-ask-text"><div class="ai-ask-title">龙的传人 · AI 问答</div><div class="ai-ask-desc">点击打开问答面板，AI 基于上师开示等资料为你解答</div></div>');
   html.push('<div class="ai-ask-arrow">点击开始提问 →</div>');
@@ -2078,17 +2066,12 @@ function showPosterBig(src, alt){
 }
 
 // ===== 悬浮搜索/AI问答面板 =====
-function openSearchPanel(tab){
+function openSearchPanel(){
   var panel = document.getElementById('searchPanel');
   panel.classList.add('open');
-  if (tab) switchSearchTab(tab);
-  // 聚焦到对应输入框
+  // 聚焦到输入框
   setTimeout(function(){
-    if (tab === 'ai'){
-      document.getElementById('aiAskInput').focus();
-    } else {
-      document.getElementById('searchPanelInput').focus();
-    }
+    document.getElementById('searchPanelInput').focus();
   }, 100);
 }
 
@@ -2105,34 +2088,41 @@ function switchSearchTab(tab){
   document.getElementById('aiTabContent').style.display = tab === 'ai' ? 'block' : 'none';
 }
 
-// 面板搜索功能
+// 面板搜索 + AI 问答（自动触发）
 function doPanelSearch(){
-  var q = document.getElementById('searchPanelInput').value.trim().toLowerCase();
+  var q = document.getElementById('searchPanelInput').value.trim();
   var results = document.getElementById('searchPanelResults');
+  var messages = document.getElementById('aiAskMessages');
   if (!q){
-    results.innerHTML = '<p style="color:var(--ink-faint);font-size:.9em;text-align:center;padding:1rem;">输入关键词开始搜索</p>';
+    results.innerHTML = '<p style="color:var(--ink-faint);font-size:.9em;text-align:center;padding:1rem;">输入关键词或问题开始搜索</p>';
+    messages.innerHTML = '';
     return;
   }
+  // 1. 本地关键词搜索
+  var ql = q.toLowerCase();
   var matched = [];
   PAGES.forEach(function(p){
     if (p.is_index || p.is_audio_detail || p.hide_from_nav) return;
     var title = (p.title || '').toLowerCase();
     var slug = (p.slug || '').toLowerCase();
     var text = (p.html || '').replace(/<[^>]+>/g, '').toLowerCase();
-    if (title.indexOf(q) >= 0 || slug.indexOf(q) >= 0 || text.indexOf(q) >= 0){
+    if (title.indexOf(ql) >= 0 || slug.indexOf(ql) >= 0 || text.indexOf(ql) >= 0){
       matched.push(p);
     }
   });
   if (matched.length === 0){
     results.innerHTML = '<p style="color:var(--ink-faint);font-size:.9em;text-align:center;padding:1rem;">未找到相关文章</p>';
-    return;
+  } else {
+    results.innerHTML = '<div style="font-weight:600;margin-bottom:.5rem;color:var(--ink-soft);">📚 相关文章（' + matched.length + '）</div>' +
+      matched.slice(0, 10).map(function(p){
+        var path = p.slug.replace(/\//g, ' / ');
+        return '<div class="search-result-item" onclick="closeSearchPanel();show(\'' + p.slug.replace(/'/g, "\\'") + '\')">'
+          + '<div class="sr-title">' + esc(p.title) + '</div>'
+          + '<div class="sr-path">' + esc(path) + '</div></div>';
+      }).join('');
   }
-  results.innerHTML = matched.slice(0, 20).map(function(p){
-    var path = p.slug.replace(/\//g, ' / ');
-    return '<div class="search-result-item" onclick="closeSearchPanel();show(\'' + p.slug.replace(/'/g, "\\'") + '\')">'
-      + '<div class="sr-title">' + esc(p.title) + '</div>'
-      + '<div class="sr-path">' + esc(path) + '</div></div>';
-  }).join('');
+  // 2. AI 问答（自动触发）
+  sendAiAsk(q);
 }
 
 // ===== AI 问答功能 =====
@@ -2141,8 +2131,8 @@ var AI_API_KEY = '';        // API Key（通过代理传递，不在前端暴露
 
 // 展开/收起问答框
 function toggleAiAsk(){
-  // 兼容旧调用：打开悬浮面板的 AI 问答 Tab
-  openSearchPanel('ai');
+  // 兼容旧调用：打开悬浮面板
+  openSearchPanel();
 }
 
 // 本地知识库搜索：关键词匹配，返回最相关的前3篇文章
@@ -2161,16 +2151,16 @@ function searchKnowledge(question){
   return results.slice(0, 3).map(function(r){ return r.item; });
 }
 
-// 发送问题
-function sendAiAsk(){
-  var input = document.getElementById('aiAskInput');
-  var question = input.value.trim();
+// 发送问题（接受可选 question 参数）
+function sendAiAsk(question){
+  if (!question){
+    question = document.getElementById('searchPanelInput').value.trim();
+  }
   if (!question) return;
   var messages = document.getElementById('aiAskMessages');
 
   // 显示用户问题
-  messages.innerHTML += '<div style="text-align:right;margin:.5rem 0;"><span style="display:inline-block;background:var(--accent);color:#fff;padding:.5rem .8rem;border-radius:12px 12px 2px 12px;max-width:80%;">' + esc(question) + '</span></div>';
-  input.value = '';
+  messages.innerHTML = '<div style="text-align:right;margin:.5rem 0;"><span style="display:inline-block;background:var(--accent);color:#fff;padding:.5rem .8rem;border-radius:12px 12px 2px 12px;max-width:80%;">' + esc(question) + '</span></div>';
 
   // 搜索相关内容
   var related = searchKnowledge(question);
