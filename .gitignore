@@ -23,3 +23,6 @@ __pycache__/
 
 watch_log.txt
 watch_err.txt
+
+# 标注「不推送」的文件夹（用户不想公开的资料，仅本地保留）
+*不推送*/
