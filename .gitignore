@@ -20,3 +20,6 @@ build_site.log
 *.log
 __pycache__/
 *.pyc
+
+watch_log.txt
+watch_err.txt
