@@ -1,0 +1,13 @@
+=== 首次构建 ===
+封面图生成: D:\Users\Drime\Projects\龙的传人-website\dist\assets\cover.png
+已生成: D:\Users\Drime\Projects\龙的传人-website\dist\index.html
+文章数: 42
+本地音频复制: 69 个
+图片复制: 4 个
+HTML 大小: 501.2 KB
+
+=== 热更新模式已启动 ===
+预览地址: http://localhost:8765
+监控目录: D:\Users\Drime\Projects\龙的传人-website\content
+按 Ctrl+C 退出
+

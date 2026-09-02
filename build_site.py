@@ -266,6 +266,9 @@ def discover_pages():
             rel = os.path.relpath(full, CONTENT_DIR).replace("\\", "/")
             txt = open(full, encoding="utf-8").read()
             meta, body = parse_frontmatter(txt)
+            # draft: true 的文章为草稿，不发布
+            if str(meta.get("draft", "")).lower() in ("true", "yes", "1"):
+                continue
             fallback = re.sub(r"🔊\s*", "", f[:-3]).strip()
             title = meta.get("title") or fallback or rel
             title = title.strip('"').strip()
@@ -2620,6 +2623,7 @@ window.addEventListener('scroll', function(){
   document.getElementById('backTop').style.opacity = window.scrollY > 300 ? '1' : '0';
 });
 </script>
+@@WATCH_SCRIPT@@
 </body>
 </html>
 """
@@ -2842,6 +2846,25 @@ def main():
     html_out = html_out.replace("@@HOME_UPDATE_DATE@@", home_update_date)
     html_out = html_out.replace("@@SITE_TITLE@@", site_title)
     html_out = html_out.replace("@@BUILD_TIME@@", time.strftime("%Y-%m-%d %H:%M"))
+    # 热更新脚本：仅 watch 模式注入，定期检查构建时间变化并自动刷新
+    watch_script = ""
+    if WATCH_MODE:
+        watch_script = """<script>
+(function(){
+  var lastBuild = "@@BUILD_TIME@@";
+  setInterval(function(){
+    fetch(location.pathname + '?t=' + Date.now(), {cache:'no-store'})
+      .then(function(r){ return r.text(); })
+      .then(function(t){
+        var m = t.match(/构建于 ([0-9\-: ]+)/);
+        if (m && m[1] !== lastBuild){
+          location.reload();
+        }
+      }).catch(function(){});
+  }, 2000);
+})();
+</script>"""
+    html_out = html_out.replace("@@WATCH_SCRIPT@@", watch_script)
     # 内联二维码生成库（qrcode.min.js，用于分享卡片生成文章链接二维码）
     qrcode_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "qrcode.min.js")
     if os.path.exists(qrcode_path):
@@ -2971,5 +2994,72 @@ def gen_cover_png(path, size=512):
         f.write(png)
 
 
-if __name__ == "__main__":
+# ---- 热更新模式：文件变化自动重建 + 浏览器自动刷新 ----
+WATCH_MODE = False
+
+def watch_and_serve():
+    import http.server, socketserver, threading, time
+    global WATCH_MODE
+    WATCH_MODE = True
+    PORT = 8765
+
+    # 先构建一次
+    print("=== 首次构建 ===")
     main()
+
+    # 记录 content/ 目录下所有文件的修改时间
+    def get_mtimes():
+        mtimes = {}
+        for dp, dn, fn in os.walk(CONTENT_DIR):
+            for f in fn:
+                fp = os.path.join(dp, f)
+                try:
+                    mtimes[fp] = os.path.getmtime(fp)
+                except:
+                    pass
+        # 也监控 build_site.py 自身
+        mtimes[os.path.abspath(__file__)] = os.path.getmtime(os.path.abspath(__file__))
+        return mtimes
+
+    last_mtimes = get_mtimes()
+
+    # 启动 HTTP 服务器
+    os.chdir(DIST_DIR)
+    handler = http.server.SimpleHTTPRequestHandler
+    httpd = socketserver.TCPServer(("", PORT), handler)
+    server_thread = threading.Thread(target=httpd.serve_forever, daemon=True)
+    server_thread.start()
+    print("\n=== 热更新模式已启动 ===")
+    print("预览地址: http://localhost:%d" % PORT)
+    print("监控目录: %s" % CONTENT_DIR)
+    print("按 Ctrl+C 退出\n")
+
+    try:
+        while True:
+            time.sleep(1)
+            current_mtimes = get_mtimes()
+            changed = False
+            for fp, mt in current_mtimes.items():
+                if fp not in last_mtimes or last_mtimes[fp] != mt:
+                    changed = True
+                    print("检测到变化: %s" % os.path.basename(fp))
+                    break
+            if changed:
+                print("重新构建...")
+                try:
+                    main()
+                    print("构建完成，浏览器将自动刷新\n")
+                except Exception as e:
+                    print("构建失败: %s\n" % e)
+                last_mtimes = get_mtimes()
+    except KeyboardInterrupt:
+        print("\n退出热更新模式")
+        httpd.shutdown()
+
+
+if __name__ == "__main__":
+    import sys as _sys
+    if "--watch" in _sys.argv or "-w" in _sys.argv:
+        watch_and_serve()
+    else:
+        main()
