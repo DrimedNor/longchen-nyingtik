@@ -376,6 +376,20 @@ PAGE_TEMPLATE = r"""<!DOCTYPE html>
   --indigo-soft:#4a577e;   /* 浅靛蓝：悬停 */
   --fs:1rem;
 }
+
+/* 访问密码保护遮罩层 */
+.access-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.85);z-index:9999;display:flex;align-items:center;justify-content:center;padding:1rem}
+.access-box{background:var(--surface);border-radius:16px;padding:2.5rem 2rem;max-width:420px;width:100%;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.3)}
+.access-box .access-icon{font-size:3rem;margin-bottom:1rem}
+.access-box h2{font-size:1.4rem;color:var(--ink);margin-bottom:.5rem;font-weight:700}
+.access-box .access-desc{font-size:.9rem;color:var(--ink-soft);margin-bottom:1.5rem;line-height:1.6}
+.access-box input[type="password"]{width:100%;padding:.8rem 1rem;border:2px solid var(--line);border-radius:10px;font-size:1rem;font-family:inherit;background:var(--surface-soft);color:var(--ink);box-sizing:border-box;margin-bottom:1rem;transition:border-color .2s}
+.access-box input[type="password"]:focus{outline:none;border-color:var(--accent)}
+.access-box .access-btn{width:100%;padding:.8rem;background:var(--accent);color:#fff;border:none;border-radius:10px;font-size:1rem;font-weight:600;cursor:pointer;font-family:inherit;transition:opacity .2s}
+.access-box .access-btn:hover{opacity:.9}
+.access-box .access-error{color:#c0392b;font-size:.85rem;margin-top:.8rem;min-height:1.2rem}
+.access-box .access-footer{margin-top:1.2rem;font-size:.75rem;color:var(--ink-faint);line-height:1.5}
+
 /* 暗色模式：深棕底 + 藏红/金黄调整亮度，保证可读性 */
 [data-theme="dark"]{
   --bg:#1a1410;
@@ -428,6 +442,20 @@ a:hover{color:var(--accent-soft)}
   font-size:.95rem; width:1.9rem; height:1.9rem; border-radius:999px; line-height:1}
 .fs-pill button:hover{background:var(--bg); color:var(--ink)}
 .fs-pill .fs-cap{font-size:.7rem; color:var(--ink-faint); padding:0 .15rem}
+
+/* 访问密码保护遮罩层 */
+.access-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.85);z-index:9999;display:flex;align-items:center;justify-content:center;padding:1rem}
+.access-box{background:var(--surface);border-radius:16px;padding:2.5rem 2rem;max-width:420px;width:100%;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.3)}
+.access-box .access-icon{font-size:3rem;margin-bottom:1rem}
+.access-box h2{font-size:1.4rem;color:var(--ink);margin-bottom:.5rem;font-weight:700}
+.access-box .access-desc{font-size:.9rem;color:var(--ink-soft);margin-bottom:1.5rem;line-height:1.6}
+.access-box input[type="password"]{width:100%;padding:.8rem 1rem;border:2px solid var(--line);border-radius:10px;font-size:1rem;font-family:inherit;background:var(--surface-soft);color:var(--ink);box-sizing:border-box;margin-bottom:1rem;transition:border-color .2s}
+.access-box input[type="password"]:focus{outline:none;border-color:var(--accent)}
+.access-box .access-btn{width:100%;padding:.8rem;background:var(--accent);color:#fff;border:none;border-radius:10px;font-size:1rem;font-weight:600;cursor:pointer;font-family:inherit;transition:opacity .2s}
+.access-box .access-btn:hover{opacity:.9}
+.access-box .access-error{color:#c0392b;font-size:.85rem;margin-top:.8rem;min-height:1.2rem}
+.access-box .access-footer{margin-top:1.2rem;font-size:.75rem;color:var(--ink-faint);line-height:1.5}
+
 /* 暗色模式切换按钮 */
 .theme-toggle{width:2rem; height:2rem; font-size:1rem; border:1px solid var(--line);
   background:var(--surface); color:var(--ink-soft); border-radius:999px; cursor:pointer; margin-left:.3rem; line-height:1}
@@ -1012,6 +1040,23 @@ a:hover{color:var(--accent-soft)}
 <script data-goatcounter="https://drimed.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
 </head>
 <body>
+
+<!-- 访问密码保护遮罩层（默认隐藏） -->
+<div class="access-overlay" id="accessOverlay" style="display:none">
+  <div class="access-box">
+    <div class="access-icon">🔒</div>
+    <h2>访问验证</h2>
+    <p class="access-desc">本站为个人学佛资料整理，仅对认识的师兄开放。<br>请输入访问密码：</p>
+    <input type="password" id="accessPasswordInput" placeholder="请输入访问密码" />
+    <button class="access-btn" id="accessSubmitBtn">进入网站</button>
+    <div class="access-error" id="accessError"></div>
+    <div class="access-footer">
+      本站仅为个人学佛资料整理与学习交流，非宗教活动场所，不传教、不募捐、不组织宗教活动。<br>
+      如有问题请联系站长。
+    </div>
+  </div>
+</div>
+
 <div class="topbar">
   <button class="menu-btn" id="menuBtn">☰</button>
   <span class="brand" id="brandHome" style="cursor:pointer">@@SITE_TITLE@@<small id="pageCrumbs"></small></span>
@@ -1124,6 +1169,128 @@ if ('serviceWorker' in navigator){
     navigator.serviceWorker.register('sw.js').catch(function(e){ console.warn('SW 注册失败:', e); });
   });
 }
+
+
+// ---- 访问统计与密码保护 ----
+var STATS_API = "https://steep-rain-0d77longchen-ai-ask.drimednor.workers.dev"; // 统计与密码验证 API 地址（等域名生效后改为自定义域名）
+var ACCESS_KEY = "longchen-access-granted"; // localStorage 中记录已验证的 key
+var IP_THRESHOLD = 10; // 独立 IP 阈值，超过则需要密码
+
+// 检查是否需要密码验证
+async function checkAccess() {
+  // 先检查今天是否已经验证过
+  var today = new Date().toISOString().split('T')[0];
+  var granted = localStorage.getItem(ACCESS_KEY);
+  if (granted === today) {
+    return true; // 今天已验证，直接通过
+  }
+  
+  try {
+    // 调用统计 API，获取当日独立 IP 数
+    var response = await fetch(STATS_API + "/api/stats");
+    var data = await response.json();
+    
+    // 如果独立 IP 数未超过阈值，不需要密码
+    if (!data.needPassword || data.uniqueIPs < IP_THRESHOLD) {
+      return true;
+    }
+    
+    // 超过阈值，显示密码输入界面
+    showAccessOverlay();
+    return false;
+  } catch (e) {
+    console.warn("统计 API 调用失败，默认放行:", e);
+    return true; // API 调用失败时默认放行，避免影响正常访问
+  }
+}
+
+// 显示密码输入界面
+function showAccessOverlay() {
+  var overlay = document.getElementById('accessOverlay');
+  if (overlay) {
+    overlay.style.display = 'flex';
+    document.body.style.overflow = 'hidden'; // 禁止背景滚动
+    
+    // 聚焦到密码输入框
+    setTimeout(function(){
+      var input = document.getElementById('accessPasswordInput');
+      if (input) input.focus();
+    }, 100);
+  }
+}
+
+// 隐藏密码输入界面
+function hideAccessOverlay() {
+  var overlay = document.getElementById('accessOverlay');
+  if (overlay) {
+    overlay.style.display = 'none';
+    document.body.style.overflow = '';
+  }
+}
+
+// 验证密码
+async function verifyAccessPassword() {
+  var input = document.getElementById('accessPasswordInput');
+  var errorDiv = document.getElementById('accessError');
+  var password = input ? input.value : '';
+  
+  if (!password) {
+    if (errorDiv) errorDiv.textContent = '请输入访问密码';
+    return;
+  }
+  
+  try {
+    var response = await fetch(STATS_API + "/api/verify-password", {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password: password })
+    });
+    var data = await response.json();
+    
+    if (data.success) {
+      // 验证通过，记录今天已验证
+      var today = new Date().toISOString().split('T')[0];
+      localStorage.setItem(ACCESS_KEY, today);
+      hideAccessOverlay();
+    } else {
+      if (errorDiv) errorDiv.textContent = data.message || '密码错误，请重试';
+      if (input) input.value = '';
+    }
+  } catch (e) {
+    console.warn("密码验证 API 调用失败:", e);
+    if (errorDiv) errorDiv.textContent = '网络错误，请稍后重试';
+  }
+}
+
+// 初始化访问控制
+function initAccessControl() {
+  // 绑定提交按钮点击事件
+  var submitBtn = document.getElementById('accessSubmitBtn');
+  if (submitBtn) {
+    submitBtn.onclick = verifyAccessPassword;
+  }
+  
+  // 绑定回车键提交
+  var input = document.getElementById('accessPasswordInput');
+  if (input) {
+    input.addEventListener('keydown', function(e){
+      if (e.key === 'Enter') {
+        verifyAccessPassword();
+      }
+    });
+  }
+  
+  // 检查访问权限
+  checkAccess();
+}
+
+// 页面加载完成后初始化访问控制
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initAccessControl);
+} else {
+  initAccessControl();
+}
+
 var SITE_TITLE = @@SITE_TITLE_JSON@@;
 var PAGES = @@PAGES_JSON@@;
 var TREE = @@TREE_JSON@@;
@@ -1241,6 +1408,128 @@ function renderNav(){
   });
 }
 
+
+// ---- 访问统计与密码保护 ----
+var STATS_API = "https://steep-rain-0d77longchen-ai-ask.drimednor.workers.dev"; // 统计与密码验证 API 地址（等域名生效后改为自定义域名）
+var ACCESS_KEY = "longchen-access-granted"; // localStorage 中记录已验证的 key
+var IP_THRESHOLD = 10; // 独立 IP 阈值，超过则需要密码
+
+// 检查是否需要密码验证
+async function checkAccess() {
+  // 先检查今天是否已经验证过
+  var today = new Date().toISOString().split('T')[0];
+  var granted = localStorage.getItem(ACCESS_KEY);
+  if (granted === today) {
+    return true; // 今天已验证，直接通过
+  }
+  
+  try {
+    // 调用统计 API，获取当日独立 IP 数
+    var response = await fetch(STATS_API + "/api/stats");
+    var data = await response.json();
+    
+    // 如果独立 IP 数未超过阈值，不需要密码
+    if (!data.needPassword || data.uniqueIPs < IP_THRESHOLD) {
+      return true;
+    }
+    
+    // 超过阈值，显示密码输入界面
+    showAccessOverlay();
+    return false;
+  } catch (e) {
+    console.warn("统计 API 调用失败，默认放行:", e);
+    return true; // API 调用失败时默认放行，避免影响正常访问
+  }
+}
+
+// 显示密码输入界面
+function showAccessOverlay() {
+  var overlay = document.getElementById('accessOverlay');
+  if (overlay) {
+    overlay.style.display = 'flex';
+    document.body.style.overflow = 'hidden'; // 禁止背景滚动
+    
+    // 聚焦到密码输入框
+    setTimeout(function(){
+      var input = document.getElementById('accessPasswordInput');
+      if (input) input.focus();
+    }, 100);
+  }
+}
+
+// 隐藏密码输入界面
+function hideAccessOverlay() {
+  var overlay = document.getElementById('accessOverlay');
+  if (overlay) {
+    overlay.style.display = 'none';
+    document.body.style.overflow = '';
+  }
+}
+
+// 验证密码
+async function verifyAccessPassword() {
+  var input = document.getElementById('accessPasswordInput');
+  var errorDiv = document.getElementById('accessError');
+  var password = input ? input.value : '';
+  
+  if (!password) {
+    if (errorDiv) errorDiv.textContent = '请输入访问密码';
+    return;
+  }
+  
+  try {
+    var response = await fetch(STATS_API + "/api/verify-password", {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password: password })
+    });
+    var data = await response.json();
+    
+    if (data.success) {
+      // 验证通过，记录今天已验证
+      var today = new Date().toISOString().split('T')[0];
+      localStorage.setItem(ACCESS_KEY, today);
+      hideAccessOverlay();
+    } else {
+      if (errorDiv) errorDiv.textContent = data.message || '密码错误，请重试';
+      if (input) input.value = '';
+    }
+  } catch (e) {
+    console.warn("密码验证 API 调用失败:", e);
+    if (errorDiv) errorDiv.textContent = '网络错误，请稍后重试';
+  }
+}
+
+// 初始化访问控制
+function initAccessControl() {
+  // 绑定提交按钮点击事件
+  var submitBtn = document.getElementById('accessSubmitBtn');
+  if (submitBtn) {
+    submitBtn.onclick = verifyAccessPassword;
+  }
+  
+  // 绑定回车键提交
+  var input = document.getElementById('accessPasswordInput');
+  if (input) {
+    input.addEventListener('keydown', function(e){
+      if (e.key === 'Enter') {
+        verifyAccessPassword();
+      }
+    });
+  }
+  
+  // 检查访问权限
+  checkAccess();
+}
+
+// 页面加载完成后初始化访问控制
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initAccessControl);
+} else {
+  initAccessControl();
+}
+
+
 // ---- 目录弹层：手机端点面包屑目录层级时，弹出该目录下的子目录+文章列表 ----
 function treeNode(path){
   var node = TREE;
@@ -1292,6 +1581,128 @@ function openDirList(path){
     };
   });
 }
+
+
+// ---- 访问统计与密码保护 ----
+var STATS_API = "https://steep-rain-0d77longchen-ai-ask.drimednor.workers.dev"; // 统计与密码验证 API 地址（等域名生效后改为自定义域名）
+var ACCESS_KEY = "longchen-access-granted"; // localStorage 中记录已验证的 key
+var IP_THRESHOLD = 10; // 独立 IP 阈值，超过则需要密码
+
+// 检查是否需要密码验证
+async function checkAccess() {
+  // 先检查今天是否已经验证过
+  var today = new Date().toISOString().split('T')[0];
+  var granted = localStorage.getItem(ACCESS_KEY);
+  if (granted === today) {
+    return true; // 今天已验证，直接通过
+  }
+  
+  try {
+    // 调用统计 API，获取当日独立 IP 数
+    var response = await fetch(STATS_API + "/api/stats");
+    var data = await response.json();
+    
+    // 如果独立 IP 数未超过阈值，不需要密码
+    if (!data.needPassword || data.uniqueIPs < IP_THRESHOLD) {
+      return true;
+    }
+    
+    // 超过阈值，显示密码输入界面
+    showAccessOverlay();
+    return false;
+  } catch (e) {
+    console.warn("统计 API 调用失败，默认放行:", e);
+    return true; // API 调用失败时默认放行，避免影响正常访问
+  }
+}
+
+// 显示密码输入界面
+function showAccessOverlay() {
+  var overlay = document.getElementById('accessOverlay');
+  if (overlay) {
+    overlay.style.display = 'flex';
+    document.body.style.overflow = 'hidden'; // 禁止背景滚动
+    
+    // 聚焦到密码输入框
+    setTimeout(function(){
+      var input = document.getElementById('accessPasswordInput');
+      if (input) input.focus();
+    }, 100);
+  }
+}
+
+// 隐藏密码输入界面
+function hideAccessOverlay() {
+  var overlay = document.getElementById('accessOverlay');
+  if (overlay) {
+    overlay.style.display = 'none';
+    document.body.style.overflow = '';
+  }
+}
+
+// 验证密码
+async function verifyAccessPassword() {
+  var input = document.getElementById('accessPasswordInput');
+  var errorDiv = document.getElementById('accessError');
+  var password = input ? input.value : '';
+  
+  if (!password) {
+    if (errorDiv) errorDiv.textContent = '请输入访问密码';
+    return;
+  }
+  
+  try {
+    var response = await fetch(STATS_API + "/api/verify-password", {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password: password })
+    });
+    var data = await response.json();
+    
+    if (data.success) {
+      // 验证通过，记录今天已验证
+      var today = new Date().toISOString().split('T')[0];
+      localStorage.setItem(ACCESS_KEY, today);
+      hideAccessOverlay();
+    } else {
+      if (errorDiv) errorDiv.textContent = data.message || '密码错误，请重试';
+      if (input) input.value = '';
+    }
+  } catch (e) {
+    console.warn("密码验证 API 调用失败:", e);
+    if (errorDiv) errorDiv.textContent = '网络错误，请稍后重试';
+  }
+}
+
+// 初始化访问控制
+function initAccessControl() {
+  // 绑定提交按钮点击事件
+  var submitBtn = document.getElementById('accessSubmitBtn');
+  if (submitBtn) {
+    submitBtn.onclick = verifyAccessPassword;
+  }
+  
+  // 绑定回车键提交
+  var input = document.getElementById('accessPasswordInput');
+  if (input) {
+    input.addEventListener('keydown', function(e){
+      if (e.key === 'Enter') {
+        verifyAccessPassword();
+      }
+    });
+  }
+  
+  // 检查访问权限
+  checkAccess();
+}
+
+// 页面加载完成后初始化访问控制
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initAccessControl);
+} else {
+  initAccessControl();
+}
+
 function closeDirPop(){
   document.getElementById('dirPop').classList.remove('show');
 }
@@ -1501,6 +1912,128 @@ function initSelToolbar(){
     };
   });
 }
+
+
+// ---- 访问统计与密码保护 ----
+var STATS_API = "https://steep-rain-0d77longchen-ai-ask.drimednor.workers.dev"; // 统计与密码验证 API 地址（等域名生效后改为自定义域名）
+var ACCESS_KEY = "longchen-access-granted"; // localStorage 中记录已验证的 key
+var IP_THRESHOLD = 10; // 独立 IP 阈值，超过则需要密码
+
+// 检查是否需要密码验证
+async function checkAccess() {
+  // 先检查今天是否已经验证过
+  var today = new Date().toISOString().split('T')[0];
+  var granted = localStorage.getItem(ACCESS_KEY);
+  if (granted === today) {
+    return true; // 今天已验证，直接通过
+  }
+  
+  try {
+    // 调用统计 API，获取当日独立 IP 数
+    var response = await fetch(STATS_API + "/api/stats");
+    var data = await response.json();
+    
+    // 如果独立 IP 数未超过阈值，不需要密码
+    if (!data.needPassword || data.uniqueIPs < IP_THRESHOLD) {
+      return true;
+    }
+    
+    // 超过阈值，显示密码输入界面
+    showAccessOverlay();
+    return false;
+  } catch (e) {
+    console.warn("统计 API 调用失败，默认放行:", e);
+    return true; // API 调用失败时默认放行，避免影响正常访问
+  }
+}
+
+// 显示密码输入界面
+function showAccessOverlay() {
+  var overlay = document.getElementById('accessOverlay');
+  if (overlay) {
+    overlay.style.display = 'flex';
+    document.body.style.overflow = 'hidden'; // 禁止背景滚动
+    
+    // 聚焦到密码输入框
+    setTimeout(function(){
+      var input = document.getElementById('accessPasswordInput');
+      if (input) input.focus();
+    }, 100);
+  }
+}
+
+// 隐藏密码输入界面
+function hideAccessOverlay() {
+  var overlay = document.getElementById('accessOverlay');
+  if (overlay) {
+    overlay.style.display = 'none';
+    document.body.style.overflow = '';
+  }
+}
+
+// 验证密码
+async function verifyAccessPassword() {
+  var input = document.getElementById('accessPasswordInput');
+  var errorDiv = document.getElementById('accessError');
+  var password = input ? input.value : '';
+  
+  if (!password) {
+    if (errorDiv) errorDiv.textContent = '请输入访问密码';
+    return;
+  }
+  
+  try {
+    var response = await fetch(STATS_API + "/api/verify-password", {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password: password })
+    });
+    var data = await response.json();
+    
+    if (data.success) {
+      // 验证通过，记录今天已验证
+      var today = new Date().toISOString().split('T')[0];
+      localStorage.setItem(ACCESS_KEY, today);
+      hideAccessOverlay();
+    } else {
+      if (errorDiv) errorDiv.textContent = data.message || '密码错误，请重试';
+      if (input) input.value = '';
+    }
+  } catch (e) {
+    console.warn("密码验证 API 调用失败:", e);
+    if (errorDiv) errorDiv.textContent = '网络错误，请稍后重试';
+  }
+}
+
+// 初始化访问控制
+function initAccessControl() {
+  // 绑定提交按钮点击事件
+  var submitBtn = document.getElementById('accessSubmitBtn');
+  if (submitBtn) {
+    submitBtn.onclick = verifyAccessPassword;
+  }
+  
+  // 绑定回车键提交
+  var input = document.getElementById('accessPasswordInput');
+  if (input) {
+    input.addEventListener('keydown', function(e){
+      if (e.key === 'Enter') {
+        verifyAccessPassword();
+      }
+    });
+  }
+  
+  // 检查访问权限
+  checkAccess();
+}
+
+// 页面加载完成后初始化访问控制
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initAccessControl);
+} else {
+  initAccessControl();
+}
+
 function getSelText(){
   var sel = window.getSelection();
   return sel ? sel.toString().trim() : '';
@@ -1651,6 +2184,128 @@ function openSharePanel(opts){
     };
   });
 }
+
+
+// ---- 访问统计与密码保护 ----
+var STATS_API = "https://steep-rain-0d77longchen-ai-ask.drimednor.workers.dev"; // 统计与密码验证 API 地址（等域名生效后改为自定义域名）
+var ACCESS_KEY = "longchen-access-granted"; // localStorage 中记录已验证的 key
+var IP_THRESHOLD = 10; // 独立 IP 阈值，超过则需要密码
+
+// 检查是否需要密码验证
+async function checkAccess() {
+  // 先检查今天是否已经验证过
+  var today = new Date().toISOString().split('T')[0];
+  var granted = localStorage.getItem(ACCESS_KEY);
+  if (granted === today) {
+    return true; // 今天已验证，直接通过
+  }
+  
+  try {
+    // 调用统计 API，获取当日独立 IP 数
+    var response = await fetch(STATS_API + "/api/stats");
+    var data = await response.json();
+    
+    // 如果独立 IP 数未超过阈值，不需要密码
+    if (!data.needPassword || data.uniqueIPs < IP_THRESHOLD) {
+      return true;
+    }
+    
+    // 超过阈值，显示密码输入界面
+    showAccessOverlay();
+    return false;
+  } catch (e) {
+    console.warn("统计 API 调用失败，默认放行:", e);
+    return true; // API 调用失败时默认放行，避免影响正常访问
+  }
+}
+
+// 显示密码输入界面
+function showAccessOverlay() {
+  var overlay = document.getElementById('accessOverlay');
+  if (overlay) {
+    overlay.style.display = 'flex';
+    document.body.style.overflow = 'hidden'; // 禁止背景滚动
+    
+    // 聚焦到密码输入框
+    setTimeout(function(){
+      var input = document.getElementById('accessPasswordInput');
+      if (input) input.focus();
+    }, 100);
+  }
+}
+
+// 隐藏密码输入界面
+function hideAccessOverlay() {
+  var overlay = document.getElementById('accessOverlay');
+  if (overlay) {
+    overlay.style.display = 'none';
+    document.body.style.overflow = '';
+  }
+}
+
+// 验证密码
+async function verifyAccessPassword() {
+  var input = document.getElementById('accessPasswordInput');
+  var errorDiv = document.getElementById('accessError');
+  var password = input ? input.value : '';
+  
+  if (!password) {
+    if (errorDiv) errorDiv.textContent = '请输入访问密码';
+    return;
+  }
+  
+  try {
+    var response = await fetch(STATS_API + "/api/verify-password", {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password: password })
+    });
+    var data = await response.json();
+    
+    if (data.success) {
+      // 验证通过，记录今天已验证
+      var today = new Date().toISOString().split('T')[0];
+      localStorage.setItem(ACCESS_KEY, today);
+      hideAccessOverlay();
+    } else {
+      if (errorDiv) errorDiv.textContent = data.message || '密码错误，请重试';
+      if (input) input.value = '';
+    }
+  } catch (e) {
+    console.warn("密码验证 API 调用失败:", e);
+    if (errorDiv) errorDiv.textContent = '网络错误，请稍后重试';
+  }
+}
+
+// 初始化访问控制
+function initAccessControl() {
+  // 绑定提交按钮点击事件
+  var submitBtn = document.getElementById('accessSubmitBtn');
+  if (submitBtn) {
+    submitBtn.onclick = verifyAccessPassword;
+  }
+  
+  // 绑定回车键提交
+  var input = document.getElementById('accessPasswordInput');
+  if (input) {
+    input.addEventListener('keydown', function(e){
+      if (e.key === 'Enter') {
+        verifyAccessPassword();
+      }
+    });
+  }
+  
+  // 检查访问权限
+  checkAccess();
+}
+
+// 页面加载完成后初始化访问控制
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initAccessControl);
+} else {
+  initAccessControl();
+}
+
 function closeSharePanel(){
   if (shareMask) shareMask.classList.remove('show');
   if (sharePanel) sharePanel.classList.remove('show');
@@ -1671,6 +2326,128 @@ function shareHighlight(text){
     highlight: text
   });
 }
+
+
+// ---- 访问统计与密码保护 ----
+var STATS_API = "https://steep-rain-0d77longchen-ai-ask.drimednor.workers.dev"; // 统计与密码验证 API 地址（等域名生效后改为自定义域名）
+var ACCESS_KEY = "longchen-access-granted"; // localStorage 中记录已验证的 key
+var IP_THRESHOLD = 10; // 独立 IP 阈值，超过则需要密码
+
+// 检查是否需要密码验证
+async function checkAccess() {
+  // 先检查今天是否已经验证过
+  var today = new Date().toISOString().split('T')[0];
+  var granted = localStorage.getItem(ACCESS_KEY);
+  if (granted === today) {
+    return true; // 今天已验证，直接通过
+  }
+  
+  try {
+    // 调用统计 API，获取当日独立 IP 数
+    var response = await fetch(STATS_API + "/api/stats");
+    var data = await response.json();
+    
+    // 如果独立 IP 数未超过阈值，不需要密码
+    if (!data.needPassword || data.uniqueIPs < IP_THRESHOLD) {
+      return true;
+    }
+    
+    // 超过阈值，显示密码输入界面
+    showAccessOverlay();
+    return false;
+  } catch (e) {
+    console.warn("统计 API 调用失败，默认放行:", e);
+    return true; // API 调用失败时默认放行，避免影响正常访问
+  }
+}
+
+// 显示密码输入界面
+function showAccessOverlay() {
+  var overlay = document.getElementById('accessOverlay');
+  if (overlay) {
+    overlay.style.display = 'flex';
+    document.body.style.overflow = 'hidden'; // 禁止背景滚动
+    
+    // 聚焦到密码输入框
+    setTimeout(function(){
+      var input = document.getElementById('accessPasswordInput');
+      if (input) input.focus();
+    }, 100);
+  }
+}
+
+// 隐藏密码输入界面
+function hideAccessOverlay() {
+  var overlay = document.getElementById('accessOverlay');
+  if (overlay) {
+    overlay.style.display = 'none';
+    document.body.style.overflow = '';
+  }
+}
+
+// 验证密码
+async function verifyAccessPassword() {
+  var input = document.getElementById('accessPasswordInput');
+  var errorDiv = document.getElementById('accessError');
+  var password = input ? input.value : '';
+  
+  if (!password) {
+    if (errorDiv) errorDiv.textContent = '请输入访问密码';
+    return;
+  }
+  
+  try {
+    var response = await fetch(STATS_API + "/api/verify-password", {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password: password })
+    });
+    var data = await response.json();
+    
+    if (data.success) {
+      // 验证通过，记录今天已验证
+      var today = new Date().toISOString().split('T')[0];
+      localStorage.setItem(ACCESS_KEY, today);
+      hideAccessOverlay();
+    } else {
+      if (errorDiv) errorDiv.textContent = data.message || '密码错误，请重试';
+      if (input) input.value = '';
+    }
+  } catch (e) {
+    console.warn("密码验证 API 调用失败:", e);
+    if (errorDiv) errorDiv.textContent = '网络错误，请稍后重试';
+  }
+}
+
+// 初始化访问控制
+function initAccessControl() {
+  // 绑定提交按钮点击事件
+  var submitBtn = document.getElementById('accessSubmitBtn');
+  if (submitBtn) {
+    submitBtn.onclick = verifyAccessPassword;
+  }
+  
+  // 绑定回车键提交
+  var input = document.getElementById('accessPasswordInput');
+  if (input) {
+    input.addEventListener('keydown', function(e){
+      if (e.key === 'Enter') {
+        verifyAccessPassword();
+      }
+    });
+  }
+  
+  // 检查访问权限
+  checkAccess();
+}
+
+// 页面加载完成后初始化访问控制
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initAccessControl);
+} else {
+  initAccessControl();
+}
+
 
 // ---- Canvas 分享卡片 ----
 function drawQRCode(ctx, text, x, y, size){
@@ -2220,6 +2997,128 @@ function sendAiAsk(question){
   });
 }
 
+
+// ---- 访问统计与密码保护 ----
+var STATS_API = "https://steep-rain-0d77longchen-ai-ask.drimednor.workers.dev"; // 统计与密码验证 API 地址（等域名生效后改为自定义域名）
+var ACCESS_KEY = "longchen-access-granted"; // localStorage 中记录已验证的 key
+var IP_THRESHOLD = 10; // 独立 IP 阈值，超过则需要密码
+
+// 检查是否需要密码验证
+async function checkAccess() {
+  // 先检查今天是否已经验证过
+  var today = new Date().toISOString().split('T')[0];
+  var granted = localStorage.getItem(ACCESS_KEY);
+  if (granted === today) {
+    return true; // 今天已验证，直接通过
+  }
+  
+  try {
+    // 调用统计 API，获取当日独立 IP 数
+    var response = await fetch(STATS_API + "/api/stats");
+    var data = await response.json();
+    
+    // 如果独立 IP 数未超过阈值，不需要密码
+    if (!data.needPassword || data.uniqueIPs < IP_THRESHOLD) {
+      return true;
+    }
+    
+    // 超过阈值，显示密码输入界面
+    showAccessOverlay();
+    return false;
+  } catch (e) {
+    console.warn("统计 API 调用失败，默认放行:", e);
+    return true; // API 调用失败时默认放行，避免影响正常访问
+  }
+}
+
+// 显示密码输入界面
+function showAccessOverlay() {
+  var overlay = document.getElementById('accessOverlay');
+  if (overlay) {
+    overlay.style.display = 'flex';
+    document.body.style.overflow = 'hidden'; // 禁止背景滚动
+    
+    // 聚焦到密码输入框
+    setTimeout(function(){
+      var input = document.getElementById('accessPasswordInput');
+      if (input) input.focus();
+    }, 100);
+  }
+}
+
+// 隐藏密码输入界面
+function hideAccessOverlay() {
+  var overlay = document.getElementById('accessOverlay');
+  if (overlay) {
+    overlay.style.display = 'none';
+    document.body.style.overflow = '';
+  }
+}
+
+// 验证密码
+async function verifyAccessPassword() {
+  var input = document.getElementById('accessPasswordInput');
+  var errorDiv = document.getElementById('accessError');
+  var password = input ? input.value : '';
+  
+  if (!password) {
+    if (errorDiv) errorDiv.textContent = '请输入访问密码';
+    return;
+  }
+  
+  try {
+    var response = await fetch(STATS_API + "/api/verify-password", {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password: password })
+    });
+    var data = await response.json();
+    
+    if (data.success) {
+      // 验证通过，记录今天已验证
+      var today = new Date().toISOString().split('T')[0];
+      localStorage.setItem(ACCESS_KEY, today);
+      hideAccessOverlay();
+    } else {
+      if (errorDiv) errorDiv.textContent = data.message || '密码错误，请重试';
+      if (input) input.value = '';
+    }
+  } catch (e) {
+    console.warn("密码验证 API 调用失败:", e);
+    if (errorDiv) errorDiv.textContent = '网络错误，请稍后重试';
+  }
+}
+
+// 初始化访问控制
+function initAccessControl() {
+  // 绑定提交按钮点击事件
+  var submitBtn = document.getElementById('accessSubmitBtn');
+  if (submitBtn) {
+    submitBtn.onclick = verifyAccessPassword;
+  }
+  
+  // 绑定回车键提交
+  var input = document.getElementById('accessPasswordInput');
+  if (input) {
+    input.addEventListener('keydown', function(e){
+      if (e.key === 'Enter') {
+        verifyAccessPassword();
+      }
+    });
+  }
+  
+  // 检查访问权限
+  checkAccess();
+}
+
+// 页面加载完成后初始化访问控制
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initAccessControl);
+} else {
+  initAccessControl();
+}
+
+
 // 根据经咒标题播放音频
 function playMantra(title){
   for (var i = 0; i < AUDIO_TRACKS.length; i++){
@@ -2403,6 +3302,128 @@ function updatePlayBtns(){
   });
 }
 
+
+// ---- 访问统计与密码保护 ----
+var STATS_API = "https://steep-rain-0d77longchen-ai-ask.drimednor.workers.dev"; // 统计与密码验证 API 地址（等域名生效后改为自定义域名）
+var ACCESS_KEY = "longchen-access-granted"; // localStorage 中记录已验证的 key
+var IP_THRESHOLD = 10; // 独立 IP 阈值，超过则需要密码
+
+// 检查是否需要密码验证
+async function checkAccess() {
+  // 先检查今天是否已经验证过
+  var today = new Date().toISOString().split('T')[0];
+  var granted = localStorage.getItem(ACCESS_KEY);
+  if (granted === today) {
+    return true; // 今天已验证，直接通过
+  }
+  
+  try {
+    // 调用统计 API，获取当日独立 IP 数
+    var response = await fetch(STATS_API + "/api/stats");
+    var data = await response.json();
+    
+    // 如果独立 IP 数未超过阈值，不需要密码
+    if (!data.needPassword || data.uniqueIPs < IP_THRESHOLD) {
+      return true;
+    }
+    
+    // 超过阈值，显示密码输入界面
+    showAccessOverlay();
+    return false;
+  } catch (e) {
+    console.warn("统计 API 调用失败，默认放行:", e);
+    return true; // API 调用失败时默认放行，避免影响正常访问
+  }
+}
+
+// 显示密码输入界面
+function showAccessOverlay() {
+  var overlay = document.getElementById('accessOverlay');
+  if (overlay) {
+    overlay.style.display = 'flex';
+    document.body.style.overflow = 'hidden'; // 禁止背景滚动
+    
+    // 聚焦到密码输入框
+    setTimeout(function(){
+      var input = document.getElementById('accessPasswordInput');
+      if (input) input.focus();
+    }, 100);
+  }
+}
+
+// 隐藏密码输入界面
+function hideAccessOverlay() {
+  var overlay = document.getElementById('accessOverlay');
+  if (overlay) {
+    overlay.style.display = 'none';
+    document.body.style.overflow = '';
+  }
+}
+
+// 验证密码
+async function verifyAccessPassword() {
+  var input = document.getElementById('accessPasswordInput');
+  var errorDiv = document.getElementById('accessError');
+  var password = input ? input.value : '';
+  
+  if (!password) {
+    if (errorDiv) errorDiv.textContent = '请输入访问密码';
+    return;
+  }
+  
+  try {
+    var response = await fetch(STATS_API + "/api/verify-password", {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password: password })
+    });
+    var data = await response.json();
+    
+    if (data.success) {
+      // 验证通过，记录今天已验证
+      var today = new Date().toISOString().split('T')[0];
+      localStorage.setItem(ACCESS_KEY, today);
+      hideAccessOverlay();
+    } else {
+      if (errorDiv) errorDiv.textContent = data.message || '密码错误，请重试';
+      if (input) input.value = '';
+    }
+  } catch (e) {
+    console.warn("密码验证 API 调用失败:", e);
+    if (errorDiv) errorDiv.textContent = '网络错误，请稍后重试';
+  }
+}
+
+// 初始化访问控制
+function initAccessControl() {
+  // 绑定提交按钮点击事件
+  var submitBtn = document.getElementById('accessSubmitBtn');
+  if (submitBtn) {
+    submitBtn.onclick = verifyAccessPassword;
+  }
+  
+  // 绑定回车键提交
+  var input = document.getElementById('accessPasswordInput');
+  if (input) {
+    input.addEventListener('keydown', function(e){
+      if (e.key === 'Enter') {
+        verifyAccessPassword();
+      }
+    });
+  }
+  
+  // 检查访问权限
+  checkAccess();
+}
+
+// 页面加载完成后初始化访问控制
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initAccessControl);
+} else {
+  initAccessControl();
+}
+
+
 document.getElementById('pPlay').onclick = function(){
   if (curIdx < 0 && AUDIO_TRACKS.length) playTrack(0);
   else if (playerAudio.paused){ playerAudio.play(); this.textContent = '⏸'; }
@@ -2516,6 +3537,128 @@ function renderPlist(){
     };
   });
 }
+
+
+// ---- 访问统计与密码保护 ----
+var STATS_API = "https://steep-rain-0d77longchen-ai-ask.drimednor.workers.dev"; // 统计与密码验证 API 地址（等域名生效后改为自定义域名）
+var ACCESS_KEY = "longchen-access-granted"; // localStorage 中记录已验证的 key
+var IP_THRESHOLD = 10; // 独立 IP 阈值，超过则需要密码
+
+// 检查是否需要密码验证
+async function checkAccess() {
+  // 先检查今天是否已经验证过
+  var today = new Date().toISOString().split('T')[0];
+  var granted = localStorage.getItem(ACCESS_KEY);
+  if (granted === today) {
+    return true; // 今天已验证，直接通过
+  }
+  
+  try {
+    // 调用统计 API，获取当日独立 IP 数
+    var response = await fetch(STATS_API + "/api/stats");
+    var data = await response.json();
+    
+    // 如果独立 IP 数未超过阈值，不需要密码
+    if (!data.needPassword || data.uniqueIPs < IP_THRESHOLD) {
+      return true;
+    }
+    
+    // 超过阈值，显示密码输入界面
+    showAccessOverlay();
+    return false;
+  } catch (e) {
+    console.warn("统计 API 调用失败，默认放行:", e);
+    return true; // API 调用失败时默认放行，避免影响正常访问
+  }
+}
+
+// 显示密码输入界面
+function showAccessOverlay() {
+  var overlay = document.getElementById('accessOverlay');
+  if (overlay) {
+    overlay.style.display = 'flex';
+    document.body.style.overflow = 'hidden'; // 禁止背景滚动
+    
+    // 聚焦到密码输入框
+    setTimeout(function(){
+      var input = document.getElementById('accessPasswordInput');
+      if (input) input.focus();
+    }, 100);
+  }
+}
+
+// 隐藏密码输入界面
+function hideAccessOverlay() {
+  var overlay = document.getElementById('accessOverlay');
+  if (overlay) {
+    overlay.style.display = 'none';
+    document.body.style.overflow = '';
+  }
+}
+
+// 验证密码
+async function verifyAccessPassword() {
+  var input = document.getElementById('accessPasswordInput');
+  var errorDiv = document.getElementById('accessError');
+  var password = input ? input.value : '';
+  
+  if (!password) {
+    if (errorDiv) errorDiv.textContent = '请输入访问密码';
+    return;
+  }
+  
+  try {
+    var response = await fetch(STATS_API + "/api/verify-password", {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password: password })
+    });
+    var data = await response.json();
+    
+    if (data.success) {
+      // 验证通过，记录今天已验证
+      var today = new Date().toISOString().split('T')[0];
+      localStorage.setItem(ACCESS_KEY, today);
+      hideAccessOverlay();
+    } else {
+      if (errorDiv) errorDiv.textContent = data.message || '密码错误，请重试';
+      if (input) input.value = '';
+    }
+  } catch (e) {
+    console.warn("密码验证 API 调用失败:", e);
+    if (errorDiv) errorDiv.textContent = '网络错误，请稍后重试';
+  }
+}
+
+// 初始化访问控制
+function initAccessControl() {
+  // 绑定提交按钮点击事件
+  var submitBtn = document.getElementById('accessSubmitBtn');
+  if (submitBtn) {
+    submitBtn.onclick = verifyAccessPassword;
+  }
+  
+  // 绑定回车键提交
+  var input = document.getElementById('accessPasswordInput');
+  if (input) {
+    input.addEventListener('keydown', function(e){
+      if (e.key === 'Enter') {
+        verifyAccessPassword();
+      }
+    });
+  }
+  
+  // 检查访问权限
+  checkAccess();
+}
+
+// 页面加载完成后初始化访问控制
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initAccessControl);
+} else {
+  initAccessControl();
+}
+
 // 播放列表：点击展开 / 收起（默认收起）
 document.getElementById('pPlToggle').onclick = function(){
   var p = document.getElementById('player');
@@ -2548,6 +3691,128 @@ function applySpeed(){
     el.classList.toggle('active', parseFloat(el.getAttribute('data-rate')) === r);
   });
 }
+
+
+// ---- 访问统计与密码保护 ----
+var STATS_API = "https://steep-rain-0d77longchen-ai-ask.drimednor.workers.dev"; // 统计与密码验证 API 地址（等域名生效后改为自定义域名）
+var ACCESS_KEY = "longchen-access-granted"; // localStorage 中记录已验证的 key
+var IP_THRESHOLD = 10; // 独立 IP 阈值，超过则需要密码
+
+// 检查是否需要密码验证
+async function checkAccess() {
+  // 先检查今天是否已经验证过
+  var today = new Date().toISOString().split('T')[0];
+  var granted = localStorage.getItem(ACCESS_KEY);
+  if (granted === today) {
+    return true; // 今天已验证，直接通过
+  }
+  
+  try {
+    // 调用统计 API，获取当日独立 IP 数
+    var response = await fetch(STATS_API + "/api/stats");
+    var data = await response.json();
+    
+    // 如果独立 IP 数未超过阈值，不需要密码
+    if (!data.needPassword || data.uniqueIPs < IP_THRESHOLD) {
+      return true;
+    }
+    
+    // 超过阈值，显示密码输入界面
+    showAccessOverlay();
+    return false;
+  } catch (e) {
+    console.warn("统计 API 调用失败，默认放行:", e);
+    return true; // API 调用失败时默认放行，避免影响正常访问
+  }
+}
+
+// 显示密码输入界面
+function showAccessOverlay() {
+  var overlay = document.getElementById('accessOverlay');
+  if (overlay) {
+    overlay.style.display = 'flex';
+    document.body.style.overflow = 'hidden'; // 禁止背景滚动
+    
+    // 聚焦到密码输入框
+    setTimeout(function(){
+      var input = document.getElementById('accessPasswordInput');
+      if (input) input.focus();
+    }, 100);
+  }
+}
+
+// 隐藏密码输入界面
+function hideAccessOverlay() {
+  var overlay = document.getElementById('accessOverlay');
+  if (overlay) {
+    overlay.style.display = 'none';
+    document.body.style.overflow = '';
+  }
+}
+
+// 验证密码
+async function verifyAccessPassword() {
+  var input = document.getElementById('accessPasswordInput');
+  var errorDiv = document.getElementById('accessError');
+  var password = input ? input.value : '';
+  
+  if (!password) {
+    if (errorDiv) errorDiv.textContent = '请输入访问密码';
+    return;
+  }
+  
+  try {
+    var response = await fetch(STATS_API + "/api/verify-password", {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password: password })
+    });
+    var data = await response.json();
+    
+    if (data.success) {
+      // 验证通过，记录今天已验证
+      var today = new Date().toISOString().split('T')[0];
+      localStorage.setItem(ACCESS_KEY, today);
+      hideAccessOverlay();
+    } else {
+      if (errorDiv) errorDiv.textContent = data.message || '密码错误，请重试';
+      if (input) input.value = '';
+    }
+  } catch (e) {
+    console.warn("密码验证 API 调用失败:", e);
+    if (errorDiv) errorDiv.textContent = '网络错误，请稍后重试';
+  }
+}
+
+// 初始化访问控制
+function initAccessControl() {
+  // 绑定提交按钮点击事件
+  var submitBtn = document.getElementById('accessSubmitBtn');
+  if (submitBtn) {
+    submitBtn.onclick = verifyAccessPassword;
+  }
+  
+  // 绑定回车键提交
+  var input = document.getElementById('accessPasswordInput');
+  if (input) {
+    input.addEventListener('keydown', function(e){
+      if (e.key === 'Enter') {
+        verifyAccessPassword();
+      }
+    });
+  }
+  
+  // 检查访问权限
+  checkAccess();
+}
+
+// 页面加载完成后初始化访问控制
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initAccessControl);
+} else {
+  initAccessControl();
+}
+
 function closeAllSpeedMenus(){
   document.querySelectorAll('.p-speed-menu, .pm-speed-menu').forEach(function(m){ m.style.display = 'none'; });
 }
@@ -2573,7 +3838,129 @@ document.querySelectorAll('.p-speed-menu .sp-item, .pm-speed-menu .sp-item').for
     applySpeed();
     closeAllSpeedMenus();
   });
-});
+}
+
+
+// ---- 访问统计与密码保护 ----
+var STATS_API = "https://steep-rain-0d77longchen-ai-ask.drimednor.workers.dev"; // 统计与密码验证 API 地址（等域名生效后改为自定义域名）
+var ACCESS_KEY = "longchen-access-granted"; // localStorage 中记录已验证的 key
+var IP_THRESHOLD = 10; // 独立 IP 阈值，超过则需要密码
+
+// 检查是否需要密码验证
+async function checkAccess() {
+  // 先检查今天是否已经验证过
+  var today = new Date().toISOString().split('T')[0];
+  var granted = localStorage.getItem(ACCESS_KEY);
+  if (granted === today) {
+    return true; // 今天已验证，直接通过
+  }
+  
+  try {
+    // 调用统计 API，获取当日独立 IP 数
+    var response = await fetch(STATS_API + "/api/stats");
+    var data = await response.json();
+    
+    // 如果独立 IP 数未超过阈值，不需要密码
+    if (!data.needPassword || data.uniqueIPs < IP_THRESHOLD) {
+      return true;
+    }
+    
+    // 超过阈值，显示密码输入界面
+    showAccessOverlay();
+    return false;
+  } catch (e) {
+    console.warn("统计 API 调用失败，默认放行:", e);
+    return true; // API 调用失败时默认放行，避免影响正常访问
+  }
+}
+
+// 显示密码输入界面
+function showAccessOverlay() {
+  var overlay = document.getElementById('accessOverlay');
+  if (overlay) {
+    overlay.style.display = 'flex';
+    document.body.style.overflow = 'hidden'; // 禁止背景滚动
+    
+    // 聚焦到密码输入框
+    setTimeout(function(){
+      var input = document.getElementById('accessPasswordInput');
+      if (input) input.focus();
+    }, 100);
+  }
+}
+
+// 隐藏密码输入界面
+function hideAccessOverlay() {
+  var overlay = document.getElementById('accessOverlay');
+  if (overlay) {
+    overlay.style.display = 'none';
+    document.body.style.overflow = '';
+  }
+}
+
+// 验证密码
+async function verifyAccessPassword() {
+  var input = document.getElementById('accessPasswordInput');
+  var errorDiv = document.getElementById('accessError');
+  var password = input ? input.value : '';
+  
+  if (!password) {
+    if (errorDiv) errorDiv.textContent = '请输入访问密码';
+    return;
+  }
+  
+  try {
+    var response = await fetch(STATS_API + "/api/verify-password", {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password: password })
+    });
+    var data = await response.json();
+    
+    if (data.success) {
+      // 验证通过，记录今天已验证
+      var today = new Date().toISOString().split('T')[0];
+      localStorage.setItem(ACCESS_KEY, today);
+      hideAccessOverlay();
+    } else {
+      if (errorDiv) errorDiv.textContent = data.message || '密码错误，请重试';
+      if (input) input.value = '';
+    }
+  } catch (e) {
+    console.warn("密码验证 API 调用失败:", e);
+    if (errorDiv) errorDiv.textContent = '网络错误，请稍后重试';
+  }
+}
+
+// 初始化访问控制
+function initAccessControl() {
+  // 绑定提交按钮点击事件
+  var submitBtn = document.getElementById('accessSubmitBtn');
+  if (submitBtn) {
+    submitBtn.onclick = verifyAccessPassword;
+  }
+  
+  // 绑定回车键提交
+  var input = document.getElementById('accessPasswordInput');
+  if (input) {
+    input.addEventListener('keydown', function(e){
+      if (e.key === 'Enter') {
+        verifyAccessPassword();
+      }
+    });
+  }
+  
+  // 检查访问权限
+  checkAccess();
+}
+
+// 页面加载完成后初始化访问控制
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initAccessControl);
+} else {
+  initAccessControl();
+}
+);
 document.addEventListener('click', closeAllSpeedMenus);
 document.addEventListener('keydown', function(e){ if (e.key === 'Escape') closeAllSpeedMenus(); });
 applySpeed();   // 初始化按钮文案与默认高亮
@@ -2931,6 +4318,128 @@ function initHlToolbar(){
     };
   });
 }
+
+
+// ---- 访问统计与密码保护 ----
+var STATS_API = "https://steep-rain-0d77longchen-ai-ask.drimednor.workers.dev"; // 统计与密码验证 API 地址（等域名生效后改为自定义域名）
+var ACCESS_KEY = "longchen-access-granted"; // localStorage 中记录已验证的 key
+var IP_THRESHOLD = 10; // 独立 IP 阈值，超过则需要密码
+
+// 检查是否需要密码验证
+async function checkAccess() {
+  // 先检查今天是否已经验证过
+  var today = new Date().toISOString().split('T')[0];
+  var granted = localStorage.getItem(ACCESS_KEY);
+  if (granted === today) {
+    return true; // 今天已验证，直接通过
+  }
+  
+  try {
+    // 调用统计 API，获取当日独立 IP 数
+    var response = await fetch(STATS_API + "/api/stats");
+    var data = await response.json();
+    
+    // 如果独立 IP 数未超过阈值，不需要密码
+    if (!data.needPassword || data.uniqueIPs < IP_THRESHOLD) {
+      return true;
+    }
+    
+    // 超过阈值，显示密码输入界面
+    showAccessOverlay();
+    return false;
+  } catch (e) {
+    console.warn("统计 API 调用失败，默认放行:", e);
+    return true; // API 调用失败时默认放行，避免影响正常访问
+  }
+}
+
+// 显示密码输入界面
+function showAccessOverlay() {
+  var overlay = document.getElementById('accessOverlay');
+  if (overlay) {
+    overlay.style.display = 'flex';
+    document.body.style.overflow = 'hidden'; // 禁止背景滚动
+    
+    // 聚焦到密码输入框
+    setTimeout(function(){
+      var input = document.getElementById('accessPasswordInput');
+      if (input) input.focus();
+    }, 100);
+  }
+}
+
+// 隐藏密码输入界面
+function hideAccessOverlay() {
+  var overlay = document.getElementById('accessOverlay');
+  if (overlay) {
+    overlay.style.display = 'none';
+    document.body.style.overflow = '';
+  }
+}
+
+// 验证密码
+async function verifyAccessPassword() {
+  var input = document.getElementById('accessPasswordInput');
+  var errorDiv = document.getElementById('accessError');
+  var password = input ? input.value : '';
+  
+  if (!password) {
+    if (errorDiv) errorDiv.textContent = '请输入访问密码';
+    return;
+  }
+  
+  try {
+    var response = await fetch(STATS_API + "/api/verify-password", {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password: password })
+    });
+    var data = await response.json();
+    
+    if (data.success) {
+      // 验证通过，记录今天已验证
+      var today = new Date().toISOString().split('T')[0];
+      localStorage.setItem(ACCESS_KEY, today);
+      hideAccessOverlay();
+    } else {
+      if (errorDiv) errorDiv.textContent = data.message || '密码错误，请重试';
+      if (input) input.value = '';
+    }
+  } catch (e) {
+    console.warn("密码验证 API 调用失败:", e);
+    if (errorDiv) errorDiv.textContent = '网络错误，请稍后重试';
+  }
+}
+
+// 初始化访问控制
+function initAccessControl() {
+  // 绑定提交按钮点击事件
+  var submitBtn = document.getElementById('accessSubmitBtn');
+  if (submitBtn) {
+    submitBtn.onclick = verifyAccessPassword;
+  }
+  
+  // 绑定回车键提交
+  var input = document.getElementById('accessPasswordInput');
+  if (input) {
+    input.addEventListener('keydown', function(e){
+      if (e.key === 'Enter') {
+        verifyAccessPassword();
+      }
+    });
+  }
+  
+  // 检查访问权限
+  checkAccess();
+}
+
+// 页面加载完成后初始化访问控制
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initAccessControl);
+} else {
+  initAccessControl();
+}
+
 function showHlToolbar(hl){
   initHlToolbar();
   hlToolbar._target = hl;
@@ -3058,8 +4567,12 @@ function showPageViews(){
 trackPageView();
 </script>
 <footer class="site-footer">
-  <div class="footer-inner">
-    <span class="footer-copy">© 2026 龙的传人｜Longchen Nyingtik · 个人学习整理，非商业用途</span>
+  <div class="footer-inner" style="flex-direction:column; align-items:flex-start; gap:.6rem">
+    <span class="footer-copy">© 2026 龙的传人｜Longchen Nyingtik</span>
+    <span style="font-size:.8rem; color:var(--ink-faint); line-height:1.6">
+      本站仅为个人学佛资料整理与学习交流，非宗教活动场所，不传教、不募捐、不组织宗教活动。<br>
+      内容仅供参考，不构成宗教指导。如有侵权或不当内容，请联系站长删除。
+    </span>
     <span class="footer-build">构建于 @@BUILD_TIME@@</span>
   </div>
 </footer>
