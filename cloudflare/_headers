@@ -1,21 +1,23 @@
-# ============================================================================
-# Cloudflare Pages 响应头策略（构建时由 build_site.py 复制到 dist/ 根）
-# 本项目：单文件 SPA（CSS/JS 全内联于 index.html）+ 音频在 /audio/ 下
-# ============================================================================
+# Cloudflare Pages 缓存配置
+# 静态资源（图片、音频、字体等）缓存 1 年，不可变
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable
 
-# 1) HTML 不缓存：每次 push 后访客立即看到最新版（根治"看到旧版"痛点）
-/index.html
-  Cache-Control: no-cache
-
-# 2) 音频长缓存：文件名即内容指纹，更新即改名，可安全长缓存
 /audio/*
-  Cache-Control: public, max-age=86400, immutable
+  Cache-Control: public, max-age=31536000, immutable
 
-# 3) 全局基础安全头
-/*
-  X-Content-Type-Options: nosniff
-  Referrer-Policy: no-referrer
+# HTML 页面缓存 5 分钟，必须重新验证（保证更新及时）
+/index.html
+  Cache-Control: public, max-age=300, must-revalidate
 
-# 4) 仅自己与朋友使用，不对外：阻止默认 pages.dev 子域被搜索引擎索引
-https://:project.pages.dev/*
-  X-Robots-Tag: noindex
+# 根路径也缓存 5 分钟
+/
+  Cache-Control: public, max-age=300, must-revalidate
+
+# robots.txt 缓存 1 小时
+/robots.txt
+  Cache-Control: public, max-age=3600
+
+# Service Worker 不缓存（保证更新及时）
+/sw.js
+  Cache-Control: no-cache, no-store, must-revalidate

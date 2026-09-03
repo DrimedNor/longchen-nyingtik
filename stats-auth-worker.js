@@ -27,7 +27,7 @@ export default {
     const corsHeaders = {
       'Access-Control-Allow-Origin': '*',
       'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type, X-Device-ID',
+      'Access-Control-Allow-Headers': 'Content-Type, X-Device-ID, X-Admin-Password',
     };
     
     // 处理 OPTIONS 预检请求
@@ -64,7 +64,16 @@ export default {
         
         // 国内访问：记录设备
         if (deviceId) {
-          await recordDevice(env.STATS_KV, deviceId, clientIP, country);
+          const geo = {
+            country: country,
+            region: request.cf?.region || '',
+            city: request.cf?.city || '',
+            postalCode: request.cf?.postalCode || '',
+            latitude: request.cf?.latitude || '',
+            longitude: request.cf?.longitude || '',
+            timezone: request.cf?.timezone || '',
+          };
+          await recordDevice(env.STATS_KV, deviceId, clientIP, geo);
         }
         
         const status = await getAccessStatus(env);
@@ -216,6 +225,130 @@ export default {
         }
       }
       
+      // 路由：接收页面浏览统计
+      if (path === '/api/stats/page-view' && request.method === 'POST') {
+        try {
+          const body = await request.json();
+          const { slug, duration } = body;
+          if (slug && duration && duration >= 60) {  // 时长小于1分钟忽略
+            const key = 'page_stats_' + slug;
+            const existing = await env.STATS_KV.get(key, 'json') || { slug, viewCount: 0, totalDuration: 0 };
+            existing.viewCount = (existing.viewCount || 0) + 1;
+            existing.totalDuration = (existing.totalDuration || 0) + duration;
+            existing.lastViewed = new Date().toISOString();
+            await env.STATS_KV.put(key, JSON.stringify(existing));
+            // 维护统计列表
+            const listKey = 'page_stats_list';
+            const list = await env.STATS_KV.get(listKey, 'json') || [];
+            if (!list.includes(slug)) {
+              list.push(slug);
+              await env.STATS_KV.put(listKey, JSON.stringify(list));
+            }
+          }
+          return new Response(JSON.stringify({ success: true }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        } catch (e) {
+          return new Response(JSON.stringify({ success: false, error: e.message }), {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+      }
+      
+      // 路由：接收音频播放统计
+      if (path === '/api/stats/audio-play' && request.method === 'POST') {
+        try {
+          const body = await request.json();
+          const { name, duration } = body;
+          if (name && duration && duration >= 60) {  // 时长小于1分钟忽略
+            const key = 'audio_stats_' + name;
+            const existing = await env.STATS_KV.get(key, 'json') || { name, playCount: 0, totalDuration: 0 };
+            existing.playCount = (existing.playCount || 0) + 1;
+            existing.totalDuration = (existing.totalDuration || 0) + duration;
+            existing.lastPlayed = new Date().toISOString();
+            await env.STATS_KV.put(key, JSON.stringify(existing));
+            // 维护统计列表
+            const listKey = 'audio_stats_list';
+            const list = await env.STATS_KV.get(listKey, 'json') || [];
+            if (!list.includes(name)) {
+              list.push(name);
+              await env.STATS_KV.put(listKey, JSON.stringify(list));
+            }
+          }
+          return new Response(JSON.stringify({ success: true }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        } catch (e) {
+          return new Response(JSON.stringify({ success: false, error: e.message }), {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+      }
+      
+      // 路由：管理员获取详细统计数据
+      if (path === '/api/admin/stats' || path === '/admin/stats') {
+        const adminPass = request.headers.get('X-Admin-Password') || url.searchParams.get('admin');
+        if (adminPass !== env.ADMIN_PASSWORD) {
+          return new Response(JSON.stringify({ success: false, message: '管理员密码错误' }), {
+            status: 401,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+        
+        const status = await getAccessStatus(env);
+        
+        // 获取设备列表（最近 20 个）
+        const deviceList = await env.STATS_KV.get('unique_devices', 'json') || [];
+        const recentDevices = [];
+        for (let i = Math.max(0, deviceList.length - 20); i < deviceList.length; i++) {
+          const dev = await env.STATS_KV.get('device_' + deviceList[i], 'json');
+          if (dev) recentDevices.push(dev);
+        }
+        
+        // 获取 IP 列表（最近 20 个）
+        const ipList = await env.STATS_KV.get('unique_ips', 'json') || [];
+        const recentIps = [];
+        for (let i = Math.max(0, ipList.length - 20); i < ipList.length; i++) {
+          const ipInfo = await env.STATS_KV.get('ip_' + ipList[i], 'json');
+          if (ipInfo) recentIps.push(ipInfo);
+        }
+        
+        // 获取已通过和已拒绝的注册数
+        const pendingList = await env.STATS_KV.get('pending_registrations', 'json') || [];
+        
+        // 获取页面浏览统计
+        const pageStatsList = await env.STATS_KV.get('page_stats_list', 'json') || [];
+        const pageStats = [];
+        for (const slug of pageStatsList) {
+          const stat = await env.STATS_KV.get('page_stats_' + slug, 'json');
+          if (stat) pageStats.push(stat);
+        }
+        pageStats.sort((a, b) => (b.viewCount || 0) - (a.viewCount || 0));
+        
+        // 获取音频播放统计
+        const audioStatsList = await env.STATS_KV.get('audio_stats_list', 'json') || [];
+        const audioStats = [];
+        for (const name of audioStatsList) {
+          const stat = await env.STATS_KV.get('audio_stats_' + name, 'json');
+          if (stat) audioStats.push(stat);
+        }
+        audioStats.sort((a, b) => (b.playCount || 0) - (a.playCount || 0));
+        
+        return new Response(JSON.stringify({ 
+          success: true, 
+          ...status,
+          recentDevices: recentDevices,
+          recentIps: recentIps,
+          pendingCount: pendingList.length,
+          pageStats: pageStats,
+          audioStats: audioStats,
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      
       // 路由：管理员获取待审核列表
       if (path === '/api/admin/pending' || path === '/admin/pending') {
         const adminPass = request.headers.get('X-Admin-Password') || url.searchParams.get('admin');
@@ -293,10 +426,244 @@ export default {
         });
       }
       
+      // 路由：管理员手动设置密码保护状态
+      if (path === '/api/admin/set-password-status' || path === '/admin/set-password-status') {
+        if (request.method !== 'POST') {
+          return new Response(JSON.stringify({ error: 'Method not allowed' }), {
+            status: 405,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+        
+        const adminPass = request.headers.get('X-Admin-Password');
+        if (adminPass !== env.ADMIN_PASSWORD) {
+          return new Response(JSON.stringify({ success: false, message: '管理员密码错误' }), {
+            status: 401,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+        
+        const body = await request.json();
+        const { enabled } = body;
+        
+        if (typeof enabled !== 'boolean') {
+          return new Response(JSON.stringify({ success: false, message: '参数错误，enabled 应为布尔值' }), {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+        
+        await env.STATS_KV.put('password_enabled', enabled ? 'true' : 'false');
+        
+        return new Response(JSON.stringify({ 
+          success: true, 
+          message: enabled ? '密码保护已开启' : '密码保护已关闭',
+          passwordEnabled: enabled
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      
+      // 路由：创建临时访问链接（管理员）
+      if (path === '/api/admin/create-temp-link' || path === '/admin/create-temp-link') {
+        if (request.method !== 'POST') {
+          return new Response(JSON.stringify({ error: 'Method not allowed' }), {
+            status: 405,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+        
+        // 验证管理员密码
+        const adminPassword = request.headers.get('X-Admin-Password') || '';
+        const correctAdminPassword = env.ADMIN_PASSWORD;
+        if (correctAdminPassword && adminPassword !== correctAdminPassword) {
+          return new Response(JSON.stringify({ success: false, message: '管理员密码错误' }), {
+            status: 401,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+        
+        const body = await request.json().catch(() => ({}));
+        const duration = body.duration || 10; // 默认10分钟
+        
+        // 生成随机token
+        const token = 'temp_' + Date.now() + '_' + Math.random().toString(36).substr(2, 16);
+        const expiresAt = Date.now() + duration * 60 * 1000;
+        
+        // 存储到KV
+        await env.STATS_KV.put('temp_token_' + token, JSON.stringify({
+          token: token,
+          createdAt: Date.now(),
+          expiresAt: expiresAt,
+          duration: duration
+        }), { expirationTtl: duration * 60 + 60 }); // 多留60秒余量
+        
+        const tempLink = 'https://longchen-nyingtik.wiki/?temp=' + token;
+        
+        return new Response(JSON.stringify({ 
+          success: true, 
+          message: '临时链接已创建',
+          token: token,
+          link: tempLink,
+          expiresAt: new Date(expiresAt).toISOString(),
+          duration: duration
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      
+      // 路由：验证临时token
+      if (path === '/api/verify-temp' || path === '/verify-temp') {
+        if (request.method !== 'POST') {
+          return new Response(JSON.stringify({ error: 'Method not allowed' }), {
+            status: 405,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+        
+        const body = await request.json().catch(() => ({}));
+        const token = body.token || '';
+        
+        if (!token) {
+          return new Response(JSON.stringify({ success: false, message: '缺少token' }), {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+        
+        // 从KV中获取token信息
+        const tokenData = await env.STATS_KV.get('temp_token_' + token);
+        if (!tokenData) {
+          return new Response(JSON.stringify({ success: false, message: '临时链接无效或已过期' }), {
+            status: 401,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+        
+        try {
+          const data = JSON.parse(tokenData);
+          if (Date.now() > data.expiresAt) {
+            return new Response(JSON.stringify({ success: false, message: '临时链接已过期' }), {
+              status: 401,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            });
+          }
+          
+          return new Response(JSON.stringify({ 
+            success: true, 
+            message: '验证通过',
+            expiresAt: new Date(data.expiresAt).toISOString(),
+            remainingSeconds: Math.floor((data.expiresAt - Date.now()) / 1000)
+          }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        } catch (e) {
+          return new Response(JSON.stringify({ success: false, message: '临时链接数据错误' }), {
+            status: 500,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+      }
+      
+      // 路由：AI问答统计
+      if (path === '/api/stats/ai-ask' || path === '/stats/ai-ask') {
+        try {
+          // 1. 获取汇总统计
+          const summary = await env.STATS_KV.get('ai_ask_summary', 'json').catch(() => null) || {
+            totalCalls: 0, successCalls: 0, failedCalls: 0,
+            totalTokens: 0, totalPromptTokens: 0, totalCompletionTokens: 0,
+            totalResponseTime: 0, withContextCalls: 0, withoutContextCalls: 0,
+            firstCallTime: null, lastCallTime: null
+          };
+          
+          // 2. 获取最近7天的每日统计
+          const dailyStats = [];
+          const today = new Date();
+          for (let i = 6; i >= 0; i--) {
+            const d = new Date(today);
+            d.setDate(d.getDate() - i);
+            const dateStr = d.toISOString().split('T')[0];
+            const daily = await env.STATS_KV.get(`ai_ask_daily_${dateStr}`, 'json').catch(() => null);
+            if (daily) {
+              dailyStats.push({
+                date: dateStr,
+                totalCalls: daily.totalCalls || 0,
+                successCalls: daily.successCalls || 0,
+                failedCalls: daily.failedCalls || 0,
+                totalTokens: daily.totalTokens || 0,
+                uniqueUsers: daily.uniqueUsers || 0,
+                hourlyCalls: daily.hourlyCalls || []
+              });
+            } else {
+              dailyStats.push({
+                date: dateStr,
+                totalCalls: 0, successCalls: 0, failedCalls: 0,
+                totalTokens: 0, uniqueUsers: 0, hourlyCalls: []
+              });
+            }
+          }
+          
+          // 3. 获取用户统计（通过汇总中的uniqueUsers无法直接获取列表，需要从最近日志中提取）
+          const recentLogs = await env.STATS_KV.get('ai_ask_recent_logs', 'json').catch(() => []) || [];
+          
+          // 从最近日志中提取用户统计
+          const userMap = {};
+          for (const log of recentLogs) {
+            if (!userMap[log.userId]) {
+              userMap[log.userId] = {
+                userId: log.userId,
+                totalCalls: 0,
+                successCalls: 0,
+                failedCalls: 0,
+                totalTokens: 0,
+                lastCallTime: 0,
+                recentQuestions: []
+              };
+            }
+            userMap[log.userId].totalCalls++;
+            if (log.success) userMap[log.userId].successCalls++;
+            else userMap[log.userId].failedCalls++;
+            userMap[log.userId].totalTokens += log.tokens || 0;
+            if (log.timestamp > userMap[log.userId].lastCallTime) {
+              userMap[log.userId].lastCallTime = log.timestamp;
+            }
+            if (log.question && userMap[log.userId].recentQuestions.length < 3) {
+              userMap[log.userId].recentQuestions.push(log.question);
+            }
+          }
+          const userStats = Object.values(userMap).sort((a, b) => b.totalCalls - a.totalCalls).slice(0, 20);
+          
+          // 4. 计算统计指标
+          const avgTokens = summary.totalCalls > 0 ? Math.round(summary.totalTokens / summary.totalCalls) : 0;
+          const avgResponseTime = summary.totalCalls > 0 ? Math.round(summary.totalResponseTime / summary.totalCalls) : 0;
+          const successRate = summary.totalCalls > 0 ? ((summary.successCalls / summary.totalCalls) * 100).toFixed(1) : 0;
+          
+          return new Response(JSON.stringify({
+            success: true,
+            summary: {
+              ...summary,
+              avgTokens: avgTokens,
+              avgResponseTime: avgResponseTime,
+              successRate: parseFloat(successRate)
+            },
+            dailyStats: dailyStats,
+            userStats: userStats,
+            recentLogs: recentLogs.slice(0, 20)
+          }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        } catch (e) {
+          return new Response(JSON.stringify({ success: false, error: e.message }), {
+            status: 500,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+      }
+      
       // 默认：404
       return new Response(JSON.stringify({ 
         error: 'Not found', 
-        paths: ['/api/track', '/api/stats', '/api/verify-password', '/api/register', '/api/login', '/api/admin/pending', '/api/admin/review'] 
+        paths: ['/api/track', '/api/stats', '/api/verify-password', '/api/register', '/api/login', '/api/admin/pending', '/api/admin/review', '/api/admin/create-temp-link', '/api/verify-temp', '/api/stats/ai-ask'] 
       }), {
         status: 404,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -314,9 +681,11 @@ export default {
 /**
  * 记录设备（累计，不重置）
  */
-async function recordDevice(kv, deviceId, ip, country) {
+async function recordDevice(kv, deviceId, ip, geo) {
   if (!kv || !deviceId) return;
+  const country = geo?.country || 'UNKNOWN';
   
+  // 记录设备（去重）
   const key = 'unique_devices';
   const existing = await kv.get(key, 'json');
   const deviceSet = new Set(existing || []);
@@ -325,13 +694,62 @@ async function recordDevice(kv, deviceId, ip, country) {
     deviceSet.add(deviceId);
     await kv.put(key, JSON.stringify([...deviceSet]));
     
-    // 记录设备详情
+    // 记录设备详情（含地理位置）
     await kv.put('device_' + deviceId, JSON.stringify({
       deviceId,
       firstIp: ip,
       country: country,
+      region: geo?.region || '',
+      city: geo?.city || '',
+      timezone: geo?.timezone || '',
       firstSeen: new Date().toISOString(),
+      lastSeen: new Date().toISOString(),
+      visitCount: 1,
     }));
+  } else {
+    // 已存在的设备：更新最近访问时间和访问次数
+    const deviceDetail = await kv.get('device_' + deviceId, 'json');
+    if (deviceDetail) {
+      deviceDetail.lastSeen = new Date().toISOString();
+      deviceDetail.visitCount = (deviceDetail.visitCount || 0) + 1;
+      await kv.put('device_' + deviceId, JSON.stringify(deviceDetail));
+    }
+  }
+  
+  // 记录 IP（去重）
+  if (ip && ip !== 'unknown') {
+    const ipKey = 'unique_ips';
+    const existingIps = await kv.get(ipKey, 'json');
+    const ipSet = new Set(existingIps || []);
+    
+    if (!ipSet.has(ip)) {
+      ipSet.add(ip);
+      await kv.put(ipKey, JSON.stringify([...ipSet]));
+      
+      // 记录 IP 详情（含地理位置）
+      await kv.put('ip_' + ip, JSON.stringify({
+        ip,
+        country: country,
+        region: geo?.region || '',
+        city: geo?.city || '',
+        postalCode: geo?.postalCode || '',
+        latitude: geo?.latitude || '',
+        longitude: geo?.longitude || '',
+        timezone: geo?.timezone || '',
+        firstSeen: new Date().toISOString(),
+        lastSeen: new Date().toISOString(),
+        visitCount: 1,
+        deviceId: deviceId,
+      }));
+    } else {
+      // 已存在的 IP：更新最近访问时间和访问次数
+      const ipDetail = await kv.get('ip_' + ip, 'json');
+      if (ipDetail) {
+        ipDetail.lastSeen = new Date().toISOString();
+        ipDetail.visitCount = (ipDetail.visitCount || 0) + 1;
+        await kv.put('ip_' + ip, JSON.stringify(ipDetail));
+      }
+    }
   }
 }
 
@@ -375,8 +793,16 @@ async function getAccessStatus(env) {
     registerEnabled = true;
   }
   
+  // 统计 IP 数
+  let ipCount = 0;
+  if (kv) {
+    const existingIps = await kv.get('unique_ips', 'json');
+    ipCount = existingIps ? existingIps.length : 0;
+  }
+  
   return {
     deviceCount: deviceCount,
+    ipCount: ipCount,
     deviceThreshold: deviceThreshold,
     registerThreshold: registerThreshold,
     passwordEnabled: passwordEnabled,

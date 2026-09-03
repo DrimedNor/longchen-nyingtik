@@ -4,3 +4,8 @@ compatibility_date = "2024-09-02"
 account_id = "36e5618995c36274b4b7b6c7200a2fac"
 
 # API_KEY 通过 wrangler secret put API_KEY 设置，不写在这里
+
+# KV 命名空间绑定（与统计Worker共用，用于存储AI问答统计）
+[[kv_namespaces]]
+binding = "STATS_KV"
+id = "6b045a39f30a41bcbdd8eb210a174467"

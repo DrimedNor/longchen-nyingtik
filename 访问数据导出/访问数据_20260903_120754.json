@@ -1,0 +1,40 @@
+{
+  "success": true,
+  "deviceCount": 2,
+  "ipCount": 2,
+  "deviceThreshold": 10,
+  "registerThreshold": 100,
+  "passwordEnabled": false,
+  "registerEnabled": false,
+  "needPassword": false,
+  "needRegister": false,
+  "recentDevices": [
+    {
+      "deviceId": "dev_1788406478720_6fhwoodmy",
+      "firstIp": "2408:8266:501:303d:e814:79b:7974:ccab",
+      "country": "CN",
+      "firstSeen": "2026-09-03T03:46:37.322Z"
+    },
+    {
+      "deviceId": "dev_1788402850264_bbqjsio7d",
+      "firstIp": "2408:8266:501:303d:c466:a976:582:ff4f",
+      "country": "CN",
+      "firstSeen": "2026-09-03T03:55:41.283Z"
+    }
+  ],
+  "recentIps": [
+    {
+      "ip": "2408:8266:501:303d:e814:79b:7974:ccab",
+      "country": "CN",
+      "firstSeen": "2026-09-03T03:46:37.951Z",
+      "deviceId": "dev_1788406478720_6fhwoodmy"
+    },
+    {
+      "ip": "2408:8266:501:303d:c466:a976:582:ff4f",
+      "country": "CN",
+      "firstSeen": "2026-09-03T03:55:41.869Z",
+      "deviceId": "dev_1788402850264_bbqjsio7d"
+    }
+  ],
+  "pendingCount": 0
+}

@@ -1,0 +1,733 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>龙的传人 · 管理后台</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    background: #f5f5f5;
+    color: #333;
+    line-height: 1.6;
+  }
+  .container { max-width: 1000px; margin: 0 auto; padding: 20px; }
+  .header {
+    background: linear-gradient(135deg, #8a1f1c, #a02825);
+    color: white;
+    padding: 20px 30px;
+    border-radius: 12px;
+    margin-bottom: 20px;
+  }
+  .header h1 { font-size: 1.5rem; margin-bottom: 5px; }
+  .header p { opacity: 0.9; font-size: 0.9rem; }
+  
+  /* 登录界面 */
+  .login-box {
+    background: white;
+    border-radius: 12px;
+    padding: 40px;
+    max-width: 400px;
+    margin: 60px auto;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+    text-align: center;
+  }
+  .login-box h2 { color: #8a1f1c; margin-bottom: 20px; }
+  .login-box input {
+    width: 100%;
+    padding: 12px 16px;
+    border: 2px solid #ddd;
+    border-radius: 8px;
+    font-size: 1rem;
+    margin-bottom: 15px;
+  }
+  .login-box input:focus { border-color: #8a1f1c; outline: none; }
+  .login-box button {
+    width: 100%;
+    padding: 12px;
+    background: #8a1f1c;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 1rem;
+    cursor: pointer;
+  }
+  .login-box button:hover { background: #a02825; }
+  .login-error { color: #e74c3c; margin-top: 10px; font-size: 0.9rem; }
+  
+  /* 统计卡片 */
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 15px;
+    margin-bottom: 20px;
+  }
+  .stat-card {
+    background: white;
+    border-radius: 12px;
+    padding: 20px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+  }
+  .stat-card .label { font-size: 0.85rem; color: #888; margin-bottom: 8px; }
+  .stat-card .value { font-size: 2rem; font-weight: bold; color: #8a1f1c; }
+  .stat-card .sub { font-size: 0.8rem; color: #aaa; margin-top: 5px; }
+  
+  /* 区块 */
+  .section {
+    background: white;
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 20px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+  }
+  .section h3 {
+    color: #8a1f1c;
+    margin-bottom: 15px;
+    padding-bottom: 10px;
+    border-bottom: 2px solid #f0f0f0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .section h3 .refresh-btn {
+    font-size: 0.85rem;
+    color: #8a1f1c;
+    cursor: pointer;
+    background: none;
+    border: 1px solid #8a1f1c;
+    padding: 5px 12px;
+    border-radius: 6px;
+  }
+  .section h3 .refresh-btn:hover { background: #8a1f1c; color: white; }
+  
+  /* 表格 */
+  table { width: 100%; border-collapse: collapse; }
+  th, td { padding: 10px 12px; text-align: left; border-bottom: 1px solid #f0f0f0; font-size: 0.9rem; }
+  th { background: #fafafa; color: #666; font-weight: 600; }
+  tr:hover { background: #fafafa; }
+  
+  /* 审核按钮 */
+  .action-btns { display: flex; gap: 8px; }
+  .btn-approve, .btn-reject {
+    padding: 6px 14px;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.85rem;
+  }
+  .btn-approve { background: #27ae60; color: white; }
+  .btn-approve:hover { background: #219a52; }
+  .btn-reject { background: #e74c3c; color: white; }
+  .btn-reject:hover { background: #c0392b; }
+  
+  /* 状态标签 */
+  .status-tag {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-size: 0.8rem;
+  }
+  .status-on { background: #d4edda; color: #155724; }
+  .status-off { background: #f8d7da; color: #721c24; }
+  
+  .empty { text-align: center; color: #aaa; padding: 30px; }
+  .loading { text-align: center; color: #888; padding: 30px; }
+  
+  .logout-btn {
+    background: rgba(255,255,255,0.2);
+    color: white;
+    border: 1px solid rgba(255,255,255,0.5);
+    padding: 6px 16px;
+    border-radius: 6px;
+    cursor: pointer;
+    float: right;
+  }
+  .logout-btn:hover { background: rgba(255,255,255,0.3); }
+</style>
+</head>
+<body>
+
+<!-- 登录界面 -->
+<div id="loginView" class="login-box" style="display:none;">
+  <h2>🔐 管理后台登录</h2>
+  <input type="password" id="adminPassword" placeholder="请输入管理员密码" />
+  <button onclick="login()">登录</button>
+  <div id="loginError" class="login-error"></div>
+</div>
+
+<!-- 管理后台界面 -->
+<div id="adminView" style="display:none;">
+  <div class="container">
+    <div class="header">
+      <button class="logout-btn" onclick="logout()">退出登录</button>
+      <h1>📊 龙的传人 · 管理后台</h1>
+      <p>访问统计</p>
+    </div>
+    
+    <!-- 统计卡片 -->
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="label">累计设备数</div>
+        <div class="value" id="deviceCount">-</div>
+        <div class="sub">阈值：<span id="deviceThreshold">-</span> 个启用密码</div>
+      </div>
+      <div class="stat-card">
+        <div class="label">累计 IP 数</div>
+        <div class="value" id="ipCount">-</div>
+        <div class="sub">国内访问统计</div>
+      </div>
+      <div class="stat-card">
+        <div class="label">密码保护</div>
+        <div class="value" id="passwordStatus" style="font-size:1.2rem;">-</div>
+        <div class="sub">达到阈值后永久启用</div>
+      </div>
+      <!-- 注册审核统计卡片（暂时隐藏）
+      <div class="stat-card">
+        <div class="label">注册审核</div>
+        <div class="value" id="registerStatus" style="font-size:1.2rem;">-</div>
+        <div class="sub">待审核：<span id="pendingCount">-</span> 个</div>
+      </div>
+      -->
+    </div>
+    
+    <!-- 待审核注册（暂时隐藏）
+    <div class="section">
+      <h3>
+        <span>📝 待审核注册</span>
+        <button class="refresh-btn" onclick="loadPending()">刷新</button>
+      </h3>
+      <div id="pendingList">
+        <div class="loading">加载中...</div>
+      </div>
+    </div>
+    -->
+    
+    <!-- 最近设备 -->
+    <div class="section">
+      <h3>
+        <span>📱 最近访问设备（最近 20 个）</span>
+        <button class="refresh-btn" onclick="loadStats()">刷新</button>
+      </h3>
+      <div id="deviceList">
+        <div class="loading">加载中...</div>
+      </div>
+    </div>
+    
+    <!-- 最近 IP -->
+    <div class="section">
+      <h3>
+        <span>🌐 最近访问 IP（最近 20 个）</span>
+      </h3>
+      <div id="ipList">
+        <div class="loading">加载中...</div>
+      </div>
+    </div>
+    
+    <!-- 文章浏览统计 -->
+    <div class="section">
+      <h3>
+        <span>📄 文章浏览统计（时长≥1分钟）</span>
+      </h3>
+      <div id="pageStatsList">
+        <div class="loading">加载中...</div>
+      </div>
+    </div>
+    
+    <!-- 音频播放统计 -->
+    <div class="section">
+      <h3>
+        <span>🤖 AI问答统计</span>
+        <button class="refresh-btn" onclick="loadAiAskStats()">刷新</button>
+      </h3>
+      
+      <!-- 统计卡片 -->
+      <div id="aiAskSummary" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:1rem;margin-bottom:1.5rem;">
+        <div class="loading">加载中...</div>
+      </div>
+      
+      <!-- 每日统计 -->
+      <div class="section" style="margin-bottom:1.5rem;padding:0;">
+        <h4 style="margin:0 0 .8rem 0;color:var(--ink-soft);font-size:1rem;">📊 最近7天使用趋势</h4>
+        <div id="aiAskDailyStats" style="overflow-x:auto;">
+          <div class="loading">加载中...</div>
+        </div>
+      </div>
+      
+      <!-- 用户统计 -->
+      <div class="section" style="margin-bottom:1.5rem;padding:0;">
+        <h4 style="margin:0 0 .8rem 0;color:var(--ink-soft);font-size:1rem;">👥 用户使用统计（最近记录）</h4>
+        <div id="aiAskUserStats" style="overflow-x:auto;">
+          <div class="loading">加载中...</div>
+        </div>
+      </div>
+      
+      <!-- 最近调用记录 -->
+      <div class="section" style="padding:0;">
+        <h4 style="margin:0 0 .8rem 0;color:var(--ink-soft);font-size:1rem;">📝 最近调用记录（20条）</h4>
+        <div id="aiAskRecentLogs" style="overflow-x:auto;max-height:400px;overflow-y:auto;">
+          <div class="loading">加载中...</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const API_BASE = 'https://stats.longchen-nyingtik.wiki';
+let adminPassword = '';
+
+// 检查是否已登录
+function checkLogin() {
+  const saved = sessionStorage.getItem('adminPassword');
+  if (saved) {
+    adminPassword = saved;
+    showAdmin();
+    loadAll();
+  } else {
+    showLogin();
+  }
+}
+
+function showLogin() {
+  document.getElementById('loginView').style.display = 'block';
+  document.getElementById('adminView').style.display = 'none';
+}
+
+function showAdmin() {
+  document.getElementById('loginView').style.display = 'none';
+  document.getElementById('adminView').style.display = 'block';
+}
+
+function login() {
+  const pwd = document.getElementById('adminPassword').value;
+  if (!pwd) {
+    document.getElementById('loginError').textContent = '请输入密码';
+    return;
+  }
+  
+  // 验证密码（调用待审核 API 测试）
+  fetch(API_BASE + '/api/admin/pending', {
+    headers: { 'X-Admin-Password': pwd }
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (data.success) {
+      adminPassword = pwd;
+      sessionStorage.setItem('adminPassword', pwd);
+      showAdmin();
+      loadAll();
+    } else {
+      document.getElementById('loginError').textContent = data.message || '密码错误';
+    }
+  })
+  .catch(err => {
+    document.getElementById('loginError').textContent = '网络错误：' + err.message;
+  });
+}
+
+function logout() {
+  sessionStorage.removeItem('adminPassword');
+  adminPassword = '';
+  document.getElementById('adminPassword').value = '';
+  showLogin();
+}
+
+function loadAll() {
+  loadStats();
+  loadPending();
+}
+
+// 加载统计数据
+function loadStats() {
+  fetch(API_BASE + '/api/admin/stats', {
+    headers: { 'X-Admin-Password': adminPassword }
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (!data.success) {
+      alert(data.message || '加载失败');
+      return;
+    }
+    
+    document.getElementById('deviceCount').textContent = data.deviceCount;
+    document.getElementById('ipCount').textContent = data.ipCount;
+    document.getElementById('deviceThreshold').textContent = data.deviceThreshold;
+    // 注册审核相关元素已隐藏，跳过更新
+    // document.getElementById('pendingCount').textContent = data.pendingCount;
+    
+    const pwdStatus = document.getElementById('passwordStatus');
+    pwdStatus.innerHTML = data.passwordEnabled 
+      ? '<span class="status-tag status-on">已启用</span>' 
+      : '<span class="status-tag status-off">未启用</span>';
+    
+    // 注册审核相关元素已隐藏，跳过更新
+    // const regStatus = document.getElementById('registerStatus');
+    // regStatus.innerHTML = data.registerEnabled 
+    //   ? '<span class="status-tag status-on">已启用</span>' 
+    //   : '<span class="status-tag status-off">未启用</span>';
+    
+    // 渲染设备列表
+    renderDeviceList(data.recentDevices || []);
+    renderIpList(data.recentIps || []);
+    renderPageStats(data.pageStats || []);
+    renderAudioStats(data.audioStats || []);
+    loadAiAskStats();
+  })
+  .catch(err => {
+    console.error('加载统计失败:', err);
+  });
+}
+
+function renderDeviceList(devices) {
+  const container = document.getElementById('deviceList');
+  if (devices.length === 0) {
+    container.innerHTML = '<div class="empty">暂无设备记录</div>';
+    return;
+  }
+  
+  let html = '<table><tr><th>设备 ID</th><th>首次 IP</th><th>国家/地区</th><th>省份</th><th>城市</th><th>首次访问时间</th><th>最近访问时间</th><th>访问次数</th></tr>';
+  devices.reverse().forEach(d => {
+    html += `<tr>
+      <td style="font-family:monospace;font-size:0.8rem;">${d.deviceId.substring(0, 20)}...</td>
+      <td>${d.firstIp}</td>
+      <td>${d.country}</td>
+      <td>${d.region || '-'}</td>
+      <td>${d.city || '-'}</td>
+      <td>${formatTime(d.firstSeen)}</td>
+      <td>${formatTime(d.lastSeen)}</td>
+      <td>${d.visitCount || '-'}</td>
+    </tr>`;
+  });
+  html += '</table>';
+  container.innerHTML = html;
+}
+
+function renderIpList(ips) {
+  const container = document.getElementById('ipList');
+  if (ips.length === 0) {
+    container.innerHTML = '<div class="empty">暂无 IP 记录</div>';
+    return;
+  }
+  
+  let html = '<table><tr><th>IP 地址</th><th>国家/地区</th><th>省份</th><th>城市</th><th>首次访问时间</th><th>最近访问时间</th><th>访问次数</th></tr>';
+  ips.reverse().forEach(ip => {
+    html += `<tr>
+      <td style="font-family:monospace;">${ip.ip}</td>
+      <td>${ip.country}</td>
+      <td>${ip.region || '-'}</td>
+      <td>${ip.city || '-'}</td>
+      <td>${formatTime(ip.firstSeen)}</td>
+      <td>${formatTime(ip.lastSeen)}</td>
+      <td>${ip.visitCount || '-'}</td>
+    </tr>`;
+  });
+  html += '</table>';
+  container.innerHTML = html;
+}
+
+// 渲染文章浏览统计
+function renderPageStats(stats) {
+  const container = document.getElementById('pageStatsList');
+  if (!stats || stats.length === 0) {
+    container.innerHTML = '<div class="empty">暂无文章浏览统计</div>';
+    return;
+  }
+  let html = '<table><tr><th>文章标题</th><th>浏览次数</th><th>总阅读时长</th><th>最近浏览</th></tr>';
+  stats.forEach(s => {
+    const mins = Math.floor((s.totalDuration || 0) / 60);
+    html += `<tr>
+      <td style="max-width:300px;word-break:break-word;">${esc(s.slug || '')}</td>
+      <td>${s.viewCount || 0}</td>
+      <td>${mins} 分钟</td>
+      <td>${formatTime(s.lastViewed)}</td>
+    </tr>`;
+  });
+  html += '</table>';
+  container.innerHTML = html;
+}
+
+// 渲染音频播放统计
+function renderAudioStats(stats) {
+  const container = document.getElementById('audioStatsList');
+  if (!stats || stats.length === 0) {
+    container.innerHTML = '<div class="empty">暂无音频播放统计</div>';
+    return;
+  }
+  let html = '<table><tr><th>音频名称</th><th>播放次数</th><th>总播放时长</th><th>最近播放</th></tr>';
+  stats.forEach(s => {
+    const mins = Math.floor((s.totalDuration || 0) / 60);
+    html += `<tr>
+      <td style="max-width:300px;word-break:break-word;">${esc(s.name || '')}</td>
+      <td>${s.playCount || 0}</td>
+      <td>${mins} 分钟</td>
+      <td>${formatTime(s.lastPlayed)}</td>
+    </tr>`;
+  });
+  html += '</table>';
+  container.innerHTML = html;
+}
+
+// 加载待审核注册
+function loadPending() {
+  const container = document.getElementById('pendingList');
+  container.innerHTML = '<div class="loading">加载中...</div>';
+  
+  fetch(API_BASE + '/api/admin/pending', {
+    headers: { 'X-Admin-Password': adminPassword }
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (!data.success) {
+      container.innerHTML = '<div class="empty">加载失败：' + (data.message || '') + '</div>';
+      return;
+    }
+    
+    const regs = data.registrations || [];
+    if (regs.length === 0) {
+      container.innerHTML = '<div class="empty">暂无待审核注册</div>';
+      return;
+    }
+    
+    let html = '<table><tr><th>昵称</th><th>申请理由</th><th>联系方式</th><th>IP</th><th>申请时间</th><th>操作</th></tr>';
+    regs.forEach(r => {
+      html += `<tr id="reg-${r.id}">
+        <td><strong>${esc(r.nickname)}</strong></td>
+        <td>${esc(r.reason)}</td>
+        <td>${esc(r.contact || '-')}</td>
+        <td style="font-family:monospace;font-size:0.8rem;">${r.ip}</td>
+        <td>${formatTime(r.createdAt)}</td>
+        <td>
+          <div class="action-btns">
+            <button class="btn-approve" onclick="review('${r.id}', 'approve')">通过</button>
+            <button class="btn-reject" onclick="review('${r.id}', 'reject')">拒绝</button>
+          </div>
+        </td>
+      </tr>`;
+    });
+    html += '</table>';
+    container.innerHTML = html;
+  })
+  .catch(err => {
+    container.innerHTML = '<div class="empty">网络错误：' + err.message + '</div>';
+  });
+}
+
+// 审核
+function review(regId, action) {
+  const actionText = action === 'approve' ? '通过' : '拒绝';
+  if (!confirm(`确定要${actionText}这个注册申请吗？`)) return;
+  
+  fetch(API_BASE + '/api/admin/review', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Admin-Password': adminPassword
+    },
+    body: JSON.stringify({ regId, action })
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (data.success) {
+      alert('操作成功');
+      loadPending();
+      loadStats();
+    } else {
+      alert('操作失败：' + (data.message || ''));
+    }
+  })
+  .catch(err => {
+    alert('网络错误：' + err.message);
+  });
+}
+
+function formatTime(iso) {
+  if (!iso) return '-';
+  try {
+    const d = new Date(iso);
+    return d.getFullYear() + '-' + 
+      String(d.getMonth()+1).padStart(2,'0') + '-' + 
+      String(d.getDate()).padStart(2,'0') + ' ' +
+      String(d.getHours()).padStart(2,'0') + ':' +
+      String(d.getMinutes()).padStart(2,'0');
+  } catch(e) {
+    return iso;
+  }
+}
+
+function esc(str) {
+  if (!str) return '';
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+// 回车登录
+document.getElementById('adminPassword').addEventListener('keydown', function(e) {
+  if (e.key === 'Enter') login();
+});
+
+// 初始化
+checkLogin();
+</script>
+</body>
+</html>
+
+
+// ========== AI问答统计 ==========
+
+// 加载AI问答统计
+async function loadAiAskStats() {
+  try {
+    const response = await fetch(API_BASE + '/api/stats/ai-ask');
+    const data = await response.json();
+    
+    if (data.success) {
+      renderAiAskSummary(data.summary);
+      renderAiAskDailyStats(data.dailyStats);
+      renderAiAskUserStats(data.userStats);
+      renderAiAskRecentLogs(data.recentLogs);
+    }
+  } catch (e) {
+    console.error('加载AI问答统计失败:', e);
+    document.getElementById('aiAskSummary').innerHTML = '<div class="empty">加载失败</div>';
+  }
+}
+
+// 渲染汇总统计
+function renderAiAskSummary(summary) {
+  const container = document.getElementById('aiAskSummary');
+  if (!summary || summary.totalCalls === 0) {
+    container.innerHTML = '<div class="empty" style="grid-column:1/-1;">暂无AI问答使用记录</div>';
+    return;
+  }
+  
+  const cards = [
+    { label: '总调用次数', value: summary.totalCalls, icon: '🔢' },
+    { label: '成功次数', value: summary.successCalls, icon: '✅' },
+    { label: '失败次数', value: summary.failedCalls, icon: '❌' },
+    { label: '成功率', value: (summary.successRate || 0) + '%', icon: '📊' },
+    { label: '总Token用量', value: formatNumber(summary.totalTokens || 0), icon: '🔤' },
+    { label: '平均Token/次', value: formatNumber(summary.avgTokens || 0), icon: '📈' },
+    { label: '平均响应时间', value: (summary.avgResponseTime || 0) + 'ms', icon: '⚡' },
+    { label: '有参考资料', value: summary.withContextCalls || 0, icon: '📚' },
+    { label: '无参考资料', value: summary.withoutContextCalls || 0, icon: '🌐' },
+  ];
+  
+  container.innerHTML = cards.map(card => `
+    <div style="background:var(--surface-soft);border-radius:12px;padding:1rem;text-align:center;border:1px solid var(--line);">
+      <div style="font-size:1.5rem;margin-bottom:.3rem;">${card.icon}</div>
+      <div style="font-size:1.3rem;font-weight:700;color:var(--accent);">${card.value}</div>
+      <div style="font-size:.8rem;color:var(--ink-faint);margin-top:.3rem;">${card.label}</div>
+    </div>
+  `).join('');
+}
+
+// 渲染每日统计
+function renderAiAskDailyStats(dailyStats) {
+  const container = document.getElementById('aiAskDailyStats');
+  if (!dailyStats || dailyStats.length === 0) {
+    container.innerHTML = '<div class="empty">暂无数据</div>';
+    return;
+  }
+  
+  let html = '<table style="width:100%;border-collapse:collapse;font-size:.85rem;">';
+  html += '<thead><tr style="background:var(--surface-soft);">';
+  html += '<th style="padding:.6rem;text-align:left;border-bottom:2px solid var(--line);">日期</th>';
+  html += '<th style="padding:.6rem;text-align:center;border-bottom:2px solid var(--line);">调用次数</th>';
+  html += '<th style="padding:.6rem;text-align:center;border-bottom:2px solid var(--line);">成功</th>';
+  html += '<th style="padding:.6rem;text-align:center;border-bottom:2px solid var(--line);">失败</th>';
+  html += '<th style="padding:.6rem;text-align:center;border-bottom:2px solid var(--line);">Token用量</th>';
+  html += '<th style="padding:.6rem;text-align:center;border-bottom:2px solid var(--line);">独立用户</th>';
+  html += '</tr></thead><tbody>';
+  
+  for (const day of dailyStats) {
+    if (day.totalCalls > 0) {
+      html += '<tr style="border-bottom:1px solid var(--line);">';
+      html += `<td style="padding:.5rem;">${day.date}</td>`;
+      html += `<td style="padding:.5rem;text-align:center;font-weight:600;">${day.totalCalls}</td>`;
+      html += `<td style="padding:.5rem;text-align:center;color:#2e7d32;">${day.successCalls}</td>`;
+      html += `<td style="padding:.5rem;text-align:center;color:#c62828;">${day.failedCalls}</td>`;
+      html += `<td style="padding:.5rem;text-align:center;">${formatNumber(day.totalTokens)}</td>`;
+      html += `<td style="padding:.5rem;text-align:center;">${day.uniqueUsers}</td>`;
+      html += '</tr>';
+    }
+  }
+  
+  html += '</tbody></table>';
+  container.innerHTML = html;
+}
+
+// 渲染用户统计
+function renderAiAskUserStats(userStats) {
+  const container = document.getElementById('aiAskUserStats');
+  if (!userStats || userStats.length === 0) {
+    container.innerHTML = '<div class="empty">暂无用户数据</div>';
+    return;
+  }
+  
+  let html = '<table style="width:100%;border-collapse:collapse;font-size:.85rem;">';
+  html += '<thead><tr style="background:var(--surface-soft);">';
+  html += '<th style="padding:.6rem;text-align:left;border-bottom:2px solid var(--line);">用户ID</th>';
+  html += '<th style="padding:.6rem;text-align:center;border-bottom:2px solid var(--line);">调用次数</th>';
+  html += '<th style="padding:.6rem;text-align:center;border-bottom:2px solid var(--line);">成功</th>';
+  html += '<th style="padding:.6rem;text-align:center;border-bottom:2px solid var(--line);">失败</th>';
+  html += '<th style="padding:.6rem;text-align:center;border-bottom:2px solid var(--line);">Token用量</th>';
+  html += '<th style="padding:.6rem;text-align:left;border-bottom:2px solid var(--line);">最近问题</th>';
+  html += '</tr></thead><tbody>';
+  
+  for (const user of userStats) {
+    html += '<tr style="border-bottom:1px solid var(--line);">';
+    html += `<td style="padding:.5rem;font-family:monospace;font-size:.75rem;max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${user.userId}">${user.userId.substring(0, 20)}...</td>`;
+    html += `<td style="padding:.5rem;text-align:center;font-weight:600;">${user.totalCalls}</td>`;
+    html += `<td style="padding:.5rem;text-align:center;color:#2e7d32;">${user.successCalls}</td>`;
+    html += `<td style="padding:.5rem;text-align:center;color:#c62828;">${user.failedCalls}</td>`;
+    html += `<td style="padding:.5rem;text-align:center;">${formatNumber(user.totalTokens)}</td>`;
+    html += `<td style="padding:.5rem;font-size:.8rem;color:var(--ink-faint);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${(user.recentQuestions && user.recentQuestions[0]) || '-'}</td>`;
+    html += '</tr>';
+  }
+  
+  html += '</tbody></table>';
+  container.innerHTML = html;
+}
+
+// 渲染最近调用记录
+function renderAiAskRecentLogs(logs) {
+  const container = document.getElementById('aiAskRecentLogs');
+  if (!logs || logs.length === 0) {
+    container.innerHTML = '<div class="empty">暂无调用记录</div>';
+    return;
+  }
+  
+  let html = '<table style="width:100%;border-collapse:collapse;font-size:.8rem;">';
+  html += '<thead><tr style="background:var(--surface-soft);position:sticky;top:0;">';
+  html += '<th style="padding:.5rem;text-align:left;border-bottom:2px solid var(--line);">时间</th>';
+  html += '<th style="padding:.5rem;text-align:left;border-bottom:2px solid var(--line);">问题</th>';
+  html += '<th style="padding:.5rem;text-align:center;border-bottom:2px solid var(--line);">状态</th>';
+  html += '<th style="padding:.5rem;text-align:center;border-bottom:2px solid var(--line);">Token</th>';
+  html += '<th style="padding:.5rem;text-align:center;border-bottom:2px solid var(--line);">响应时间</th>';
+  html += '<th style="padding:.5rem;text-align:center;border-bottom:2px solid var(--line);">参考资料</th>';
+  html += '</tr></thead><tbody>';
+  
+  for (const log of logs) {
+    const time = new Date(log.timestamp).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    html += '<tr style="border-bottom:1px solid var(--line);">';
+    html += `<td style="padding:.4rem;white-space:nowrap;font-size:.75rem;">${time}</td>`;
+    html += `<td style="padding:.4rem;max-width:250px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${log.question || ''}">${log.question || '-'}</td>`;
+    html += `<td style="padding:.4rem;text-align:center;">${log.success ? '<span style="color:#2e7d32;">✅</span>' : '<span style="color:#c62828;" title="' + (log.error || '') + '">❌</span>'}</td>`;
+    html += `<td style="padding:.4rem;text-align:center;">${log.tokens || 0}</td>`;
+    html += `<td style="padding:.4rem;text-align:center;">${log.responseTime || 0}ms</td>`;
+    html += `<td style="padding:.4rem;text-align:center;">${log.hasContext ? '📚' : '🌐'}</td>`;
+    html += '</tr>';
+  }
+  
+  html += '</tbody></table>';
+  container.innerHTML = html;
+}
+
+// 格式化数字
+function formatNumber(num) {
+  if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
+  if (num >= 1000) return (num / 1000).toFixed(1) + 'K';
+  return num.toString();
+}

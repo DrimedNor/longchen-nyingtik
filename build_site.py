@@ -16,6 +16,12 @@ build_site.py — 把 content/ 下的 Obsidian 库生成静态站 (dist/)
 import os
 import re
 import json
+import datetime
+
+# 自然排序：按文件名开头的数字大小排序，解决"10."排在"2."前面的问题
+def natural_sort_key(s):
+    parts = re.split(r'(\d+)', s)
+    return [int(p) if p.isdigit() else p.lower() for p in parts]
 import html as html_mod
 import shutil
 import struct
@@ -269,12 +275,9 @@ def discover_pages():
             # draft: true 的文章为草稿，不发布
             if str(meta.get("draft", "")).lower() in ("true", "yes", "1"):
                 continue
-            fallback = re.sub(r"🔊\s*", "", f[:-3]).strip()
+            fallback = f[:-3].strip()
             title = meta.get("title") or fallback or rel
-            title = title.strip('"').strip()
-            # Obsidian 文件名尾缀 "X/x" 仅标识未配置录音语音文件，发布页不显示该标记
-            # （slug 保留原文件名以维持站内 wikilink 一致，仅剥离展示用标题）
-            title = re.sub(r"[Xx]$", "", title).strip()
+            title = title.strip()  # 规则：所有文章标题必须跟Obsidian文件名一模一样，不擅自改动（只去前后空格）
             slug = rel[:-3]
             slug = re.sub(r"🔊\s*", "", slug)
             slug = "/".join(seg.strip() for seg in slug.split("/"))
@@ -715,9 +718,9 @@ a:hover{color:var(--accent-soft)}
 .player .pl-item .pl-dot{width:7px; height:7px; border-radius:50%; background:var(--turq-soft); flex:0 0 7px}
 .player .pl-item.playing .pl-dot{background:var(--turq)}
 /* 悬浮打开播放器按钮 */
-.player-launch{position:fixed; right:1.1rem; bottom:1.1rem; z-index:41;
+.player-launch{position:fixed !important; right:1.1rem; bottom:1.1rem; z-index:41;
   background:var(--accent); color:#fff; border:none; cursor:grab;
-  padding:.7rem 1.1rem; border-radius:999px; font-size:1rem; font-weight:600;
+  padding:.7rem 1.1rem; border-radius:999px; font-size:.9rem; font-weight:600;
   box-shadow:0 4px 14px rgba(59,42,34,.28); display:flex; align-items:center; gap:.4rem;
   user-select:none;-webkit-user-select:none;touch-action:none; opacity:.75; transition:opacity .2s}
 .player-launch:hover{background:var(--accent-soft); opacity:1}
@@ -991,8 +994,8 @@ a:hover{color:var(--accent-soft)}
 .back-top:hover{background:var(--accent-deep)}
 
 /* 悬浮搜索/AI问答按钮（可拖动） */
-.fab-search{position:fixed;top:70px;right:12px;z-index:100;padding:.7rem 1.1rem;border-radius:999px;
-  background:var(--accent);color:#fff;border:none;cursor:grab;font-size:1rem;font-weight:600;
+.fab-search{position:fixed !important;top:70px;right:12px;z-index:100;padding:.7rem 1.1rem;border-radius:999px;
+  background:var(--accent);color:#fff;border:none;cursor:grab;font-size:.9rem;font-weight:600;
   box-shadow:0 4px 14px rgba(59,42,34,.28);display:flex;align-items:center;gap:.4rem;
   transition:box-shadow .2s,opacity .2s;user-select:none;-webkit-user-select:none;touch-action:none;opacity:.75}
 .fab-search:hover{background:var(--accent-soft);opacity:1}
@@ -1036,6 +1039,56 @@ a:hover{color:var(--accent-soft)}
   font-size:.95em;background:var(--surface-soft);color:var(--ink)}
 .ai-ask-input-row button{padding:.6rem 1.2rem;background:var(--accent);color:#fff;border:none;
   border-radius:8px;cursor:pointer;font-size:.95em}
+
+/* ===== 全局响应式：防止页面超宽 ===== */
+html,body{overflow-x:hidden;width:100%;margin:0;padding:0}
+*{max-width:100%;box-sizing:border-box}
+table{display:block;overflow-x:auto;white-space:nowrap}
+pre{white-space:pre-wrap;word-wrap:break-word;overflow-x:auto}
+img{height:auto;max-width:100%}
+
+/* ===== 悬浮按钮靠边贴紧样式 ===== */
+.fab-search.edge-left{right:auto !important;left:0 !important;border-radius:0 999px 999px 0;padding:.7rem .8rem .7rem .5rem}
+.fab-search.edge-left .fab-icon{font-size:1.2em}
+.fab-search.edge-left span:not(.fab-icon){display:none}
+.fab-search.edge-right{left:auto !important;right:0 !important;border-radius:999px 0 0 999px;padding:.7rem .5rem .7rem .8rem}
+.fab-search.edge-right .fab-icon{font-size:1.2em}
+.fab-search.edge-right span:not(.fab-icon){display:none}
+
+/* 播放器按钮靠边隐藏样式 */
+.player-launch.edge-left{right:auto !important;left:0 !important;border-radius:0 999px 999px 0;padding:.7rem .8rem .7rem .5rem;font-size:0;}
+.player-launch.edge-left::before{content:"🎧";font-size:1.1rem;}
+.player-launch.edge-right{left:auto !important;right:0 !important;border-radius:999px 0 0 999px;padding:.7rem .5rem .7rem .8rem;font-size:0;}
+.player-launch.edge-right::before{content:"🎧";font-size:1.1rem;}
+
+/* ===== 文章底部导航样式 ===== */
+.article-bottom-nav{margin-top:2.5rem;padding-top:1.5rem;border-top:1px solid var(--line)}
+.bottom-nav-link{display:block;padding:.6rem .8rem;border-radius:8px;margin-bottom:.4rem;text-decoration:none;transition:background .15s}
+.bottom-nav-link:hover{background:var(--surface-soft)}
+.bottom-nav-link.disabled{opacity:.4;pointer-events:none}
+.bottom-nav-label{display:block;font-size:.8em;color:var(--ink-faint);margin-bottom:.2rem}
+.bottom-nav-title{display:block;font-size:1em;color:var(--ink);font-weight:500}
+.bottom-nav-prev{border-left:3px solid var(--accent-soft)}
+.bottom-nav-next{border-right:3px solid var(--accent-soft);text-align:right}
+.bottom-nav-buttons{display:flex;gap:.8rem;margin-top:1rem;flex-wrap:wrap}
+.bottom-nav-btn{flex:1;min-width:120px;text-align:center;padding:.6rem 1rem;border-radius:8px;
+  background:var(--surface-soft);color:var(--ink-soft);text-decoration:none;font-size:.9em;
+  border:1px solid var(--line);transition:all .15s}
+.bottom-nav-btn:hover{background:var(--accent-soft);color:var(--accent-deep);border-color:var(--accent)}
+
+/* ===== 手机端响应式（768px以下） ===== */
+@media (max-width:768px){
+  body{font-size:18px}
+  .layout{padding:0 16px}
+  .article{padding:1rem 0}
+  .article p,.article li{text-align:justify;text-justify:inter-ideograph}
+  .article h1{font-size:1.5em !important}
+  .hn-sec-title{font-size:1.2em}
+  .fab-search{font-size:.9em;padding:.6rem .9rem}
+  .bottom-nav-btn{font-size:.85em;padding:.5rem .8rem}
+  .bottom-nav-label{font-size:.75em}
+  .bottom-nav-title{font-size:.95em}
+}
 </style>
 <script data-goatcounter="https://drimed.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
 </head>
@@ -1046,15 +1099,10 @@ a:hover{color:var(--accent-soft)}
   <div class="access-box">
     <div class="access-icon">🔒</div>
     <h2>访问验证</h2>
-    <p class="access-desc">本站为个人学佛资料整理，仅对认识的师兄开放。<br>请输入访问密码：</p>
+    <p class="access-desc">本站为个人学习使用，非公开用途。<br>访问请输入密码：</p>
     <input type="password" id="accessPasswordInput" placeholder="请输入访问密码" />
     <button class="access-btn" id="accessSubmitBtn">进入网站</button>
     <div class="access-error" id="accessError"></div>
-    <div class="access-footer">
-      本站仅为个人学习资料整理，兼顾身边朋友交流分享，不传教、不募捐、不组织宗教活动。<br>
-      当访问达到10人后，永久开启密码访问；当超过100人后，开启注册审核访问。<br>
-      如有侵权或不当内容，请联系站长删除。
-    </div>
   </div>
 </div>
 <!-- 注册申请遮罩层（默认隐藏，设备数达到 100 后显示） -->
@@ -1062,15 +1110,12 @@ a:hover{color:var(--accent-soft)}
   <div class="access-box">
     <div class="access-icon">📝</div>
     <h2>注册申请</h2>
-    <p class="access-desc">本站访问人数较多，为保证内容质量，需注册审核后访问。<br>请填写以下信息，管理员审核通过后即可访问。</p>
+    <p class="access-desc">本站仅为个人学习使用，需注册审核后访问。<br>请填写以下信息，管理员审核通过后即可访问。</p>
     <input type="text" id="regNickname" placeholder="您的昵称（必填）" style="margin-bottom:.8rem" />
     <textarea id="regReason" placeholder="申请理由（必填，如：学佛同修、朋友推荐等）" style="width:100%;padding:.8rem 1rem;border:2px solid var(--line);border-radius:10px;font-size:.9rem;font-family:inherit;background:var(--surface-soft);color:var(--ink);box-sizing:border-box;margin-bottom:.8rem;min-height:80px;resize:vertical"></textarea>
     <input type="text" id="regContact" placeholder="联系方式（选填，方便管理员联系）" style="margin-bottom:1rem" />
     <button class="access-btn" id="regSubmitBtn">提交申请</button>
     <div class="access-error" id="regError"></div>
-    <div class="access-footer">
-      本站仅为个人学习资料整理，兼顾身边朋友交流分享，不传教、不募捐、不组织宗教活动。
-    </div>
   </div>
 </div>
 
@@ -1085,10 +1130,12 @@ a:hover{color:var(--accent-soft)}
     <button id="fsInc" title="放大字号">A+</button>
   </div>
   <button id="themeToggle" class="theme-toggle" title="切换暗色/浅色模式">🌙</button>
-  <button class="fab-search" id="fabSearch" title="点击搜索 / AI 问答，可拖动位置">
-    <span class="fab-icon">🔍</span><span>AI 搜索</span>
-  </button>
 </div>
+
+<!-- AI搜索悬浮按钮（移到topbar外面，避免backdrop-filter导致fixed定位失效） -->
+<button class="fab-search" id="fabSearch" title="点击搜索 / AI 问答，可拖动位置">
+  <span class="fab-icon">🔍</span><span>AI 搜索</span>
+</button>
 
 <div class="layout">
   <aside class="sidebar" id="sidebar">
@@ -1112,7 +1159,7 @@ a:hover{color:var(--accent-soft)}
       <input class="search-panel-input" id="searchPanelInput" type="text" placeholder="输入关键词或问题，如：什么是菩提心？" onkeydown="if(event.key==='Enter')doPanelSearch()">
       <div class="ai-ask-messages" id="aiAskMessages"></div>
       <div class="search-panel-results" id="searchPanelResults"></div>
-      <p style="font-size:.85em;color:var(--ink-faint);margin-top:.5rem;opacity:.7;">回答基于本站所收集整理的龙钦宁提相关资料，仅供参考。</p>
+      <p style="font-size:.85em;color:var(--ink-faint);margin-top:.5rem;opacity:.7;line-height:1.6;">回答首先基于本站所收集的龙钦宁提相关材料；<br>如果本站没有相关内容，会基于网络搜索内容回答，仅供参考。</p>
     </div>
   </div>
 </div>
@@ -1217,6 +1264,39 @@ function fetchWithDevice(url, options) {
 
 // 检查是否需要密码或注册
 async function checkAccess() {
+  // 无论是否已验证，都先调用 /api/track 记录设备访问
+  if (STATS_API) {
+    try {
+      await fetchWithDevice(STATS_API + "/api/track");
+    } catch (e) {
+      console.warn("设备统计上报失败:", e);
+    }
+  }
+  
+  // 检查临时访问链接
+  var urlParams = new URLSearchParams(window.location.search);
+  var tempToken = urlParams.get('temp');
+  if (tempToken && STATS_API) {
+    try {
+      var tempResp = await fetch(STATS_API + "/api/verify-temp", {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token: tempToken })
+      });
+      var tempData = await tempResp.json();
+      if (tempData.success) {
+        // 临时链接验证通过，设置访问权限
+        localStorage.setItem(ACCESS_KEY, "true");
+        // 从URL中移除temp参数，避免刷新时重复验证
+        var newUrl = window.location.pathname + window.location.hash;
+        window.history.replaceState({}, document.title, newUrl);
+        return true;
+      }
+    } catch (e) {
+      console.warn("临时链接验证失败:", e);
+    }
+  }
+  
   // 已验证过，直接通过
   if (localStorage.getItem(ACCESS_KEY) === "true") {
     return true;
@@ -1409,8 +1489,6 @@ var AUDIO_TRACKS = @@AUDIO_TRACKS_JSON@@;
 var HOME_UPDATE_HTML = @@HOME_UPDATE_JSON@@;   // 首页「本次更新内容」区块（纯用户资料，不含技术调整）
 var HOME_UPDATE_DATE = "@@HOME_UPDATE_DATE@@"; // 首页公告区标题用的更新日期（取自内容文件 frontmatter date 字段）
 var KNOWLEDGE_BASE = @@KNOWLEDGE_BASE_JSON@@;  // AI问答知识库索引（构建时生成，标题+正文摘要）
-// AI 问答入口：ima 知识库（基于本站资料的外部 AI 问答页面，新窗口打开）
-var AI_ASK_URL = "https://ima.qq.com/wiki/?shareId=588af6f2d87e769588a77ab9deda499bd5d63994b176841528534a103547ca3f";
 
 var bySlug = {};
 PAGES.forEach(function(p){ bySlug[p.slug] = p; });
@@ -1482,6 +1560,12 @@ function renderNav(){
   var TOP_ORDER = ['上师开示', '龙钦宁提传承', '音频资源', '书籍', '关于本站'];
   function topKey(name){ var i = TOP_ORDER.indexOf(name); return i < 0 ? 1000 : i; }
   var html = '';
+  // AI 搜索入口（放在最上面，用分隔线隔开）
+  html += '<div class="nav-sec nav-ai-ask" data-depth="0">'
+    + '<div class="nav-sec-head" onclick="openSearchPanel()">'
+    + '<span class="nav-chev nav-chev-none">🔍</span>'
+    + '<span class="dir-label">AI 搜索</span></div></div>';
+  html += '<hr style="border:none;border-top:1px solid var(--line);margin:.5rem 0;">';
   Object.keys(TREE.dirs).sort(function(a, b){ return topKey(a) - topKey(b); }).forEach(function(name){
     var target = name + '/index';
     if (!bySlug[target]) target = firstPageUnder(name);
@@ -1491,11 +1575,6 @@ function renderNav(){
       + '<span class="nav-chev nav-chev-none">▸</span>'
       + '<span class="dir-label">' + esc(cleanDirName(name)) + '</span></div></div>';
   });
-  // AI 问答入口（打开站内悬浮面板）
-  html += '<div class="nav-sec nav-ai-ask" data-depth="0">'
-    + '<div class="nav-sec-head" onclick="openSearchPanel()">'
-    + '<span class="nav-chev nav-chev-none">💬</span>'
-    + '<span class="dir-label">AI 问答</span></div></div>';
   nav.innerHTML = html;
   // 一级菜单点击：直接进入该目录 Index 页面
   nav.querySelectorAll('.nav-sec-head').forEach(function(h){
@@ -1544,7 +1623,7 @@ function openDirList(path){
   var node = treeNode(path);
   var html = '';
   // 子目录（可继续展开下一级）
-  var dirNames = node && node.dirs ? Object.keys(node.dirs).slice().sort() : [];
+  var dirNames = node && node.dirs ? Object.keys(node.dirs).slice().sort(naturalCompare) : [];
   dirNames.forEach(function(name){
     var subFull = path + '/' + name;
     var subTarget = subFull + '/index';
@@ -1581,9 +1660,56 @@ function closeDirPop(){
   document.getElementById('dirPop').classList.remove('show');
 }
 
+// ---- 内容统计（页面浏览 + 音频播放）----
+var STATS_API = 'https://stats.longchen-nyingtik.wiki';
+var pageViewSlug = null;
+var pageViewStartTime = 0;
+var audioPlayName = null;
+var audioPlayStartTime = 0;
+
+function reportPageView(slug, duration) {
+  if (!slug || duration < 60) return;  // 时长小于1分钟忽略
+  try {
+    fetch(STATS_API + '/api/stats/page-view', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ slug: slug, duration: Math.round(duration) })
+    }).catch(function(){});
+  } catch(e){}
+}
+
+function reportAudioPlay(name, duration) {
+  if (!name || duration < 60) return;  // 时长小于1分钟忽略
+  try {
+    fetch(STATS_API + '/api/stats/audio-play', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: name, duration: Math.round(duration) })
+    }).catch(function(){});
+  } catch(e){}
+}
+
+// 页面卸载时上报最后一次统计
+window.addEventListener('beforeunload', function() {
+  var now = Date.now() / 1000;
+  if (pageViewSlug && pageViewStartTime) {
+    reportPageView(pageViewSlug, now - pageViewStartTime);
+  }
+  if (audioPlayName && audioPlayStartTime && !playerAudio.paused) {
+    reportAudioPlay(audioPlayName, now - audioPlayStartTime);
+  }
+});
+
 // ---- 显示页面 ----
 var currentSlug = null;
 function show(slug){
+  // 页面浏览统计：计算上一个页面的阅读时长并上报
+  var now = Date.now() / 1000;
+  if (pageViewSlug && pageViewStartTime && pageViewSlug !== 'index' && !pageViewSlug.endsWith('/index')) {
+    reportPageView(pageViewSlug, now - pageViewStartTime);
+  }
+  pageViewSlug = slug;
+  pageViewStartTime = now;
   var p = bySlug[slug];
   if (!p){
     // 404 页面
@@ -1623,12 +1749,11 @@ function show(slug){
       tocHtml += '</div></div>';
     }
   }
-  // 文章页（非目录 index）加分享按钮
-  var shareBar = (p.is_index || isHome) ? '' : '<div class="article-actions"><button class="share-btn" id="shareArticleBtn">分享本文</button></div>';
-  var inner = titleHtml + shareBar + metaHtml + tocHtml + p.html;
+  // 文章页（非目录 index）不加分享按钮
+  var inner = titleHtml + metaHtml + tocHtml + p.html;
   if (isHome){
     inner = '<div class="welcome"><div class="big">' + esc(SITE_TITLE) + '</div>'
-          + '<div class="welcome-sub">龙钦宁提资料库 · 学习整理与分享</div></div>'
+          + '<div class="welcome-sub">龙钦宁提资料库</div></div>'
           + '<section class="hn-sec home-update"><h2 class="hn-sec-title">最近更新 · ' + HOME_UPDATE_DATE + '</h2>'
           + HOME_UPDATE_HTML + '</section>'
           + p.html + renderHomeNav();
@@ -1641,7 +1766,7 @@ function show(slug){
       if (p.slug !== '音频资源/index'){
         grp = p.slug.slice('音频资源/'.length).replace(/\/index$/, '');
       }
-      var _curated = grp && p.html.indexOf('class="play-btn"') !== -1;
+      var _curated = grp && p.html && p.html.indexOf('class="play-btn"') !== -1;
       if (!_curated) inner += renderAudioListByFolder(grp);
     } else {
       // 其他目录：展示完整目录树（所有层级子目录+文章，无需逐级点开）
@@ -1649,6 +1774,45 @@ function show(slug){
     }
   }
   var crumb = renderBreadcrumb(p);
+  // 文章底部导航：上一篇/下一篇、回到首页/回到分类（仅非目录页）
+  if (!p.is_index && !isHome) {
+    var navHtml = '<div class="article-bottom-nav">';
+    var slugParts = p.slug.split('/');
+    var rootCat = slugParts[0];
+    var rootCatSlug = rootCat + '/index';
+    // 拉通当前一级目录下的所有文章
+    var allRootArticles = PAGES.filter(function(page){
+      return !page.is_index && page.slug.startsWith(rootCat + '/');
+    }).sort(function(a, b){ return a.slug < b.slug ? -1 : 1; });
+    var curIdx = allRootArticles.findIndex(function(page){ return page.slug === p.slug; });
+    var prevArticle = curIdx > 0 ? allRootArticles[curIdx - 1] : null;
+    var nextArticle = curIdx >= 0 && curIdx < allRootArticles.length - 1 ? allRootArticles[curIdx + 1] : null;
+    // 上一篇
+    if (prevArticle) {
+      navHtml += '<a class="bottom-nav-link bottom-nav-prev" href="#/' + prevArticle.slug.split('/').map(encodeURIComponent).join('/') + '">';
+      navHtml += '<span class="bottom-nav-label">← 上一篇</span>';
+      navHtml += '<span class="bottom-nav-title">' + esc(prevArticle.title) + '</span>';
+      navHtml += '</a>';
+    } else {
+      navHtml += '<div class="bottom-nav-link bottom-nav-prev disabled"><span class="bottom-nav-label">← 上一篇</span><span class="bottom-nav-title">已经是第一篇</span></div>';
+    }
+    // 下一篇
+    if (nextArticle) {
+      navHtml += '<a class="bottom-nav-link bottom-nav-next" href="#/' + nextArticle.slug.split('/').map(encodeURIComponent).join('/') + '">';
+      navHtml += '<span class="bottom-nav-label">下一篇 →</span>';
+      navHtml += '<span class="bottom-nav-title">' + esc(nextArticle.title) + '</span>';
+      navHtml += '</a>';
+    } else {
+      navHtml += '<div class="bottom-nav-link bottom-nav-next disabled"><span class="bottom-nav-label">下一篇 →</span><span class="bottom-nav-title">已经是最后一篇</span></div>';
+    }
+    // 回到首页和分类首页按钮
+    navHtml += '<div class="bottom-nav-buttons">';
+    navHtml += '<a class="bottom-nav-btn" href="#/index">🏠 回到首页</a>';
+    navHtml += '<a class="bottom-nav-btn" href="#/' + rootCatSlug.split('/').map(encodeURIComponent).join('/') + '">📁 回到分类</a>';
+    navHtml += '</div>';
+    navHtml += '</div>';
+    inner += navHtml;
+  }
   document.getElementById('content').innerHTML = '<div class="article">' + crumb + inner + '</div>';
   document.getElementById('pageCrumbs').textContent = p.is_index ? '' : (' / ' + p.title);
   // 目录选中态：仅高亮「层级最深」的匹配项。
@@ -2070,10 +2234,31 @@ function renderBreadcrumb(p){
   return '<div class="breadcrumb">' + crumbs.join('') + '</div>';
 }
 
+// 自然排序：按文件名开头的数字大小排序
+function naturalCompare(a, b) {
+  var aParts = a.split(/(\d+)/);
+  var bParts = b.split(/(\d+)/);
+  for (var i = 0; i < Math.min(aParts.length, bParts.length); i++) {
+    var aPart = aParts[i];
+    var bPart = bParts[i];
+    if (aPart !== bPart) {
+      var aNum = parseInt(aPart, 10);
+      var bNum = parseInt(bPart, 10);
+      if (!isNaN(aNum) && !isNaN(bNum)) {
+        return aNum - bNum;
+      }
+      return aPart < bPart ? -1 : 1;
+    }
+  }
+  return aParts.length - bParts.length;
+}
+
 // ---- 首页导览：递归渲染目录树为可点击板块（同样统一层级序号）----
 function walkBlock(node, prefix, depth, parentNum){
   var arr = [];
-  var names = (node.dirs ? Object.keys(node.dirs) : []).slice().sort();
+  // 最多展示三个层级（depth 0, 1, 2）
+  if (depth > 2) return arr;
+  var names = (node.dirs ? Object.keys(node.dirs) : []).slice().sort(naturalCompare);
   names.forEach(function(name, idx){
     var sub = node.dirs[name];
     var num = parentNum ? (parentNum + '.' + (idx + 1)) : String(idx + 1);
@@ -2083,7 +2268,10 @@ function walkBlock(node, prefix, depth, parentNum){
     var hasSub = sub.dirs && Object.keys(sub.dirs).length;
     var hasPages = sub.children && sub.children.length;
     if (!target && !hasSub && !hasPages) return;   // 空目录 → 跳过
-    var isDefaultOpen = (depth === 0);  // 一级目录默认展开，二级及以下默认收起
+    var subHasPages = sub.children && sub.children.filter(function(c){ return c.type === 'page' && !c.is_index; }).length > 4;
+    var subHasSubDirs = sub.dirs && Object.keys(sub.dirs).length > 0;
+    // 一级目录默认展开；没有子目录但有超过4篇文章的目录默认收起（显示▶）
+    var isDefaultOpen = (depth === 0) || (subHasSubDirs && !subHasPages);
     var groupId = 'dir-' + depth + '-' + full.replace(/[^a-z0-9]/gi, '');
     arr.push('<div class="dir-group" data-depth="' + depth + '" id="' + groupId + '">');
     arr.push('<div class="dir-group-header" onclick="toggleDirGroup(this)" style="cursor:pointer;user-select:none;display:flex;align-items:center;gap:.4rem;">'
@@ -2094,27 +2282,61 @@ function walkBlock(node, prefix, depth, parentNum){
     walkBlock(sub, full, depth + 1, num).forEach(function(x){ arr.push(x); });
     arr.push('</div></div>');
   });
+  // 目录下文章超过4篇时，只显示前4篇，其余通过标题左侧的▶展开
+  var hasSubDirs = node.dirs && Object.keys(node.dirs).length > 0;
+  var pageCount = 0;
+  var totalPages = (node.children || []).filter(function(c){ return c.type === 'page' && !c.is_index; }).length;
+  var shouldCollapse = totalPages > 2;  // 文章超过2篇时折叠（不管有没有子目录）
+  var MAX_VISIBLE = 2;  // 没有子目录只有文章时最多展示2篇
   (node.children || []).forEach(function(c){
     if (c.type === 'page' && !c.is_index){
+      pageCount++;
+      var isHidden = shouldCollapse && pageCount > MAX_VISIBLE;
       var p = bySlug[c.slug];
-      var hasAudio = p && p.html.indexOf('play-btn') >= 0;
-      arr.push('<a class="hn-link" data-page="' + esc(c.slug) + '" style="margin-left:1rem;">'
-        + esc(c.title) + (hasAudio ? ' 🔊' : '') + '</a>');
+      var hasAudio = p && p.html && p.html.indexOf('play-btn') >= 0;
+      arr.push('<a class="hn-link hn-hidden-page" data-page="' + esc(c.slug) + '" style="margin-left:1rem;' + (isHidden ? 'display:none;' : '') + '">'
+        + esc(c.title) + '</a>');
     }
   });
   return arr;
 }
 
-// 目录分组折叠/展开
+// 展开更多文章
+function showMorePages(btn){
+  btn.style.display = 'none';
+  var next = btn.nextElementSibling;
+  while(next){
+    if(next.classList && next.classList.contains('hn-hidden-page')){
+      next.style.display = '';
+    }
+    next = next.nextElementSibling;
+  }
+}
+
+// 目录分组折叠/展开（同时展开/折叠隐藏的文章）
 function toggleDirGroup(header){
   var body = header.nextElementSibling;
   var chev = header.querySelector('.dir-group-chev');
   if (body.style.display === 'none'){
     body.style.display = '';
     chev.textContent = '▼';
+    // 展开时显示所有隐藏的文章
+    var hiddenPages = body.querySelectorAll('.hn-hidden-page');
+    hiddenPages.forEach(function(el){ el.style.display = ''; });
   } else {
     body.style.display = 'none';
     chev.textContent = '▶';
+    // 折叠时重新隐藏超过2篇的文章
+    var hiddenPages = body.querySelectorAll('.hn-hidden-page');
+    var visibleCount = 0;
+    hiddenPages.forEach(function(el){
+      visibleCount++;
+      if (visibleCount > 2){
+        el.style.display = 'none';
+      } else {
+        el.style.display = '';
+      }
+    });
   }
 }
 
@@ -2141,15 +2363,15 @@ function renderHomeNav(){
     if (!hasSub && !hasPages) return;   // 完全无内容的顶层目录不显示在首页
     var meta = META[dirName] || {icon:'📜', title:cleanDirName(dirName), desc:'点击进入查看相关内容。'};
     html.push('<section class="hn-sec">');
-    html.push('<h2 class="hn-sec-title">' + meta.icon + ' ' + esc(meta.title) + '</h2>');
+    var dirIndexSlug = dirName + '/index';
+    html.push('<h2 class="hn-sec-title" style="cursor:pointer;" onclick="show(\'' + esc(dirIndexSlug) + '\')" title="点击进入' + esc(meta.title) + '目录">' + meta.icon + ' ' + esc(meta.title) + ' <span style="font-size:.7em;color:var(--ink-faint);font-weight:normal;">›</span></h2>');
     if (meta.desc) html.push('<p class="hn-desc">' + meta.desc + '</p>');
     if (meta.tips){
       html.push('<ul class="hn-tips">'
-        + '<li>按主题整理的上师开示；</li>'
-        + '<li>点击标题栏左侧的三角符号，可展开或折叠子目录；</li>'
-        + '<li>点击「文章」标题直接阅读；</li>'
+        + '<li>点击标题栏左侧的 ▶，可展开或折叠子目录；</li>'
         + '<li>带有小喇叭 🔊 标志的文章表示有配套音频，可直接点击收听；</li>'
         + '<li>未带小喇叭标志的文章暂无音频，正在陆续添加中，敬请期待。</li>'
+        + '<li>也可以直接点击AI搜索查找相关文章</li>'
         + '</ul>');
     }
     if (meta.audio){
@@ -2188,7 +2410,7 @@ function renderHomeNav(){
               + '<span class="audio-list-arrow">›</span></a>');
           } else {
             // 无海报：保持原列表样式，点击直接播放
-            html.push('<a class="hn-link hn-audio" data-idx="' + o.i + '">🔊 ' + esc(o.t.title) + '</a>');
+            html.push('<a class="hn-link hn-audio" data-idx="' + o.i + '">' + esc(o.t.title) + '</a>');
           }
         });
         html.push('</div></div>');
@@ -2252,7 +2474,7 @@ function renderDirChildren(dirSlug){
     var dirName = slashIdx >= 0 ? rest.substring(0, slashIdx) : null;
     if (dirName) subDirMap[dirName] = true;
   });
-  var subDirs = Object.keys(subDirMap).sort();
+  var subDirs = Object.keys(subDirMap).sort(naturalCompare);
   // 直属文章：slug = dirSlug/文章名（文章名不含 /）
   var items = [];
   PAGES.forEach(function(p){
@@ -2260,9 +2482,9 @@ function renderDirChildren(dirSlug){
     if (p.slug.indexOf(prefix) !== 0) return;
     var rest = p.slug.slice(prefix.length);
     if (rest.indexOf('/') === -1){
-      var hasAudio = p.html.indexOf('play-btn') >= 0;
+      var hasAudio = p && p.html && p.html.indexOf('play-btn') >= 0;
       items.push('<a class="hn-link" data-page="' + esc(p.slug) + '">'
-        + esc(p.title) + (hasAudio ? ' 🔊' : '') + '</a>');
+        + esc(p.title) + '</a>');
     }
   });
   var html = '';
@@ -2330,7 +2552,7 @@ function renderAudioListByFolder(folderKey){
           + '<span class="audio-list-arrow">›</span></a>';
       } else {
         // 无海报：保持原列表样式，点击直接播放
-        html += '<a class="hn-link hn-audio" data-idx="' + o.i + '">🔊 ' + esc(o.t.title) + '</a>';
+        html += '<a class="hn-link hn-audio" data-idx="' + o.i + '">' + esc(o.t.title) + '</a>';
       }
     });
     if (g) html += '</div></div>';
@@ -2438,18 +2660,102 @@ function toggleAiAsk(){
 
 // 本地知识库搜索：关键词匹配，返回最相关的前3篇文章
 function searchKnowledge(question){
-  var keywords = question.split(/[\s，。？！、；：]+/).filter(function(k){ return k.length >= 2; });
+  // 同义词/近义词词典（用于模糊匹配）
+  var synonyms = {
+    "上师": ["上师", "善知识", "师父", "师尊", "喇嘛", "仁波切"],
+    "依止": ["依止", "依止上师", "跟随", "亲近", "依教奉行"],
+    "修行": ["修行", "修持", "实修", "修炼", "用功", "办道"],
+    "信心": ["信心", "信念", "相信", "信赖", "不退转"],
+    "无常": ["无常", "诸行无常", "死亡", "生死", "短暂"],
+    "菩提心": ["菩提心", "发心", "利他", "慈悲", "菩萨心"],
+    "空性": ["空性", "缘起", "性空", "般若", "智慧"],
+    "戒律": ["戒律", "持戒", "戒", "规矩", "规范"],
+    "福报": ["福报", "资粮", "功德", "善根", "福德"],
+    "回向": ["回向", "功德回向", "回向功德"],
+    "皈依": ["皈依", "皈依三宝", "皈依佛门"],
+    "发愿": ["发愿", "愿", "誓愿", "愿力"],
+    "打坐": ["打坐", "静坐", "禅修", "冥想", "坐禅"],
+    "念诵": ["念诵", "念经", "持咒", "念咒", "诵读"],
+    "烦恼": ["烦恼", "妄念", "杂念", "情绪", "痛苦"],
+    "心": ["心", "心念", "内心", "心灵", "心性"],
+    "生活": ["生活", "日常", "平时", "工作", "家庭"],
+    "婚姻": ["婚姻", "爱情", "感情", "家庭", "伴侣"],
+    "死亡": ["死亡", "死", "无常", "生死", "中阴"],
+    "疾病": ["疾病", "病", "病痛", "身体", "健康"],
+    "传承": ["传承", "法脉", "法系", "源流"],
+    "龙钦": ["龙钦", "龙钦宁提", "宁提", "大圆满"],
+    "多智钦": ["多智钦", "多智钦寺", "龙洋", "仁波切"],
+  };
+  
+  // 提取关键词（更细粒度）
+  var keywords = [];
+  // 先按标点分割
+  var parts = question.split(/[\s，。？！、；：""''（）【】]+/).filter(function(k){ return k.length >= 1; });
+  parts.forEach(function(p){
+    if (p.length >= 2) keywords.push(p);
+    // 对长词再进行2-4字的子串提取
+    if (p.length >= 4) {
+      for (var len = 2; len <= Math.min(4, p.length); len++) {
+        for (var i = 0; i <= p.length - len; i++) {
+          keywords.push(p.substring(i, i + len));
+        }
+      }
+    }
+  });
+  // 去重
+  keywords = keywords.filter(function(v, i, a){ return a.indexOf(v) === i; });
+  
+  // 扩展同义词
+  var expandedKeywords = [];
+  keywords.forEach(function(kw){
+    expandedKeywords.push(kw);
+    for (var key in synonyms) {
+      if (kw.indexOf(key) >= 0 || key.indexOf(kw) >= 0) {
+        synonyms[key].forEach(function(syn){
+          if (expandedKeywords.indexOf(syn) < 0) {
+            expandedKeywords.push(syn);
+          }
+        });
+      }
+    }
+  });
+  
   var results = [];
   KNOWLEDGE_BASE.forEach(function(item){
     var score = 0;
-    keywords.forEach(function(kw){
-      if (item.title.indexOf(kw) >= 0) score += 5;
-      if (item.content.indexOf(kw) >= 0) score += 1;
+    var title = item.title || '';
+    var content = item.content || '';
+    var tags = item.tags || [];
+    
+    expandedKeywords.forEach(function(kw){
+      if (kw.length < 2) return;
+      // 标题匹配权重高
+      if (title.indexOf(kw) >= 0) score += 5;
+      // 内容匹配
+      if (content.indexOf(kw) >= 0) score += 1;
+      // tags匹配
+      if (tags && tags.length > 0) {
+        tags.forEach(function(tag){
+          if (tag.indexOf(kw) >= 0 || kw.indexOf(tag) >= 0) score += 3;
+        });
+      }
     });
+    
+    // 模糊匹配：计算问题与标题的字符重叠度
+    var overlap = 0;
+    for (var i = 0; i < question.length; i++) {
+      if (title.indexOf(question[i]) >= 0) overlap++;
+    }
+    if (overlap >= Math.min(3, question.length * 0.5)) {
+      score += overlap * 0.5;
+    }
+    
     if (score > 0) results.push({item: item, score: score});
   });
+  
   results.sort(function(a, b){ return b.score - a.score; });
-  return results.slice(0, 3).map(function(r){ return r.item; });
+  // 返回得分最高的5篇（增加返回数量，提高匹配概率）
+  return results.slice(0, 5).map(function(r){ return r.item; });
 }
 
 // 发送问题（接受可选 question 参数）
@@ -2648,8 +2954,15 @@ function setMediaMeta(t){
 
 function playTrack(idx){
   if (idx < 0 || idx >= AUDIO_TRACKS.length) return;
+  // 音频播放统计：计算上一个音频的播放时长并上报
+  var now = Date.now() / 1000;
+  if (audioPlayName && audioPlayStartTime) {
+    reportAudioPlay(audioPlayName, now - audioPlayStartTime);
+  }
   curIdx = idx;
   var t = AUDIO_TRACKS[idx];
+  audioPlayName = t.title;
+  audioPlayStartTime = now;
   playerAudio.src = t.src;
   playerAudio.playbackRate = SPEEDS[speedIdx];
   // 恢复上次播放进度（如果有保存）
@@ -2753,10 +3066,18 @@ playerAudio.addEventListener('play', function(){
   // iOS：音频真正开始播放时重新设置 Media Session 元信息，确保锁屏显示
   if (curIdx >= 0 && AUDIO_TRACKS[curIdx]) setMediaMeta(AUDIO_TRACKS[curIdx]);
   if ('mediaSession' in navigator){ try{ navigator.mediaSession.playbackState = 'playing'; }catch(e){} }
+  // 音频播放统计：播放时重置开始时间
+  audioPlayStartTime = Date.now() / 1000;
 });
 playerAudio.addEventListener('pause', function(){
   document.getElementById('pPlay').textContent = '▶'; updateMini();
   if ('mediaSession' in navigator){ try{ navigator.mediaSession.playbackState = 'paused'; }catch(e){} }
+  // 音频播放统计：暂停时上报播放时长
+  var now = Date.now() / 1000;
+  if (audioPlayName && audioPlayStartTime) {
+    reportAudioPlay(audioPlayName, now - audioPlayStartTime);
+    audioPlayStartTime = 0;
+  }
 });
 
 // ---- 锁屏播放控制（Media Session API）：手机锁屏/通知栏显示播放/暂停/上一首/下一首/快进快退按钮 ----
@@ -3021,6 +3342,10 @@ doPanelSearch();
     var rect = btn.getBoundingClientRect();
     startLeft = rect.left;
     startTop = rect.top;
+    // 拖动开始时移除贴边状态
+    btn.classList.remove('edge-left', 'edge-right');
+    btn.style.left = startLeft + 'px';
+    btn.style.right = 'auto';
     btn.classList.add('dragging');
   }
 
@@ -3052,11 +3377,26 @@ doPanelSearch();
     isDragging = false;
     btn.classList.remove('dragging');
     if (hasMoved) {
-      // 保存位置
       var rect = btn.getBoundingClientRect();
+      var edgeThreshold = 60;
+      // 靠边自动隐藏
+      if (rect.left < edgeThreshold) {
+        btn.classList.add('edge-left');
+        btn.style.left = '0px';
+        btn.style.right = 'auto';
+      } else if (rect.left + rect.width > window.innerWidth - edgeThreshold) {
+        btn.classList.add('edge-right');
+        btn.style.right = '0px';
+        btn.style.left = 'auto';
+      } else {
+        btn.classList.remove('edge-left', 'edge-right');
+      }
+      // 保存位置
+      var newRect = btn.getBoundingClientRect();
       localStorage.setItem('fabSearchPos', JSON.stringify({
-        left: rect.left,
-        top: rect.top
+        left: newRect.left,
+        top: newRect.top,
+        edge: btn.classList.contains('edge-left') ? 'left' : (btn.classList.contains('edge-right') ? 'right' : null)
       }));
       // 拖动后阻止 click 事件
       setTimeout(function(){ suppressClick = false; }, 100);
@@ -3119,6 +3459,10 @@ doPanelSearch();
     var rect = btn.getBoundingClientRect();
     startLeft = rect.left;
     startTop = rect.top;
+    // 拖动开始时移除贴边状态
+    btn.classList.remove('edge-left', 'edge-right');
+    btn.style.left = startLeft + 'px';
+    btn.style.right = 'auto';
     btn.classList.add('dragging');
   }
 
@@ -3151,9 +3495,25 @@ doPanelSearch();
     btn.classList.remove('dragging');
     if (hasMoved) {
       var rect = btn.getBoundingClientRect();
+      var edgeThreshold = 60;
+      // 靠边自动隐藏
+      if (rect.left < edgeThreshold) {
+        btn.classList.add('edge-left');
+        btn.style.left = '0px';
+        btn.style.right = 'auto';
+      } else if (rect.left + rect.width > window.innerWidth - edgeThreshold) {
+        btn.classList.add('edge-right');
+        btn.style.right = '0px';
+        btn.style.left = 'auto';
+      } else {
+        btn.classList.remove('edge-left', 'edge-right');
+      }
+      // 保存位置
+      var newRect = btn.getBoundingClientRect();
       localStorage.setItem('playerLaunchPos', JSON.stringify({
-        left: rect.left,
-        top: rect.top
+        left: newRect.left,
+        top: newRect.top,
+        edge: btn.classList.contains('edge-left') ? 'left' : (btn.classList.contains('edge-right') ? 'right' : null)
       }));
       setTimeout(function(){ suppressClick = false; }, 100);
     }
@@ -3330,7 +3690,6 @@ setTimeout(function(){
       if (savedPos > 0) playerAudio.currentTime = savedPos;
       document.getElementById('pStatusText').innerHTML = '上次播放：<b>' + esc(t.title) + '</b>' + (savedPos > 0 ? '（点击继续）' : '');
       document.getElementById('pPlay').textContent = '▶';
-      showPlayer();
       renderPlist();
       updatePlayBtns();
     }
@@ -3381,31 +3740,208 @@ trackPageView();
 <footer class="site-footer">
   <div class="footer-inner" style="flex-direction:column; align-items:flex-start; gap:.6rem">
     <span class="footer-copy">© 2026 龙的传人｜Longchen Nyingtik</span>
-    <span style="font-size:.8rem; color:var(--ink-faint); line-height:1.6">
-      本站仅为个人学习资料整理，兼顾身边朋友交流分享，不传教、不募捐、不组织宗教活动。<br>
-      当访问达到10人后，永久开启密码访问；当超过100人后，开启注册审核访问。<br>
-      如有侵权或不当内容，请联系站长删除。
-    </span>
-    <span class="footer-build">构建于 @@BUILD_TIME@@</span>
   </div>
 </footer>
-<a class="ai-ask-fab" id="aiAskFab" target="_blank" rel="noopener" title="AI 问答 · 基于本站资料">💬</a>
-<button id="backToTop" class="back-to-top" title="返回顶部">↑</button>
 <button class="back-top" id="backTop" title="回到顶部">↑</button>
 <script>
-// AI 问答浮动按钮：设置链接并根据当前页面控制显示
-var _aiFab = document.getElementById('aiAskFab');
-if (_aiFab) {
-  _aiFab.href = AI_ASK_URL;
-  var _isHome = !currentSlug || currentSlug === 'index' || currentSlug.endsWith('/index');
-  _aiFab.style.display = _isHome ? 'none' : 'flex';
-}
 document.getElementById('backTop').onclick = function(){ window.scrollTo({top:0, behavior:'smooth'}); };
 window.addEventListener('scroll', function(){
   document.getElementById('backTop').style.opacity = window.scrollY > 300 ? '1' : '0';
 });
 </script>
 @@WATCH_SCRIPT@@
+<script>
+/* ===== 文章内容按需加载模块 =====
+ * 在原始show函数之后加载，重写show函数实现按需加载
+ */
+(function(){
+  // 已加载的文章内容缓存
+  var pageContentCache = {};
+  // 正在加载的文章，避免重复请求
+  var pageLoading = {};
+  // 保存原始的show函数
+  var originalShow = window.show;
+
+  // 生成安全的文件名（与构建器一致）
+  function getSafeFilename(slug) {
+    return slug.replace(/\//g, "__").replace(/ /g, "_").replace(/[?？:："'<>*|]/g, "");
+  }
+
+  // 加载文章内容
+  function loadPageContent(slug) {
+    return new Promise(function(resolve, reject) {
+      // 已缓存，直接返回
+      if (pageContentCache[slug]) {
+        resolve(pageContentCache[slug]);
+        return;
+      }
+      // 正在加载，等待完成
+      if (pageLoading[slug]) {
+        pageLoading[slug].push({resolve: resolve, reject: reject});
+        return;
+      }
+      // 开始加载
+      pageLoading[slug] = [{resolve: resolve, reject: reject}];
+      var url = "pages/" + getSafeFilename(slug) + ".json";
+      fetch(url, {cache: "force-cache"})
+        .then(function(r) {
+          if (!r.ok) throw new Error("HTTP " + r.status);
+          return r.json();
+        })
+        .then(function(data) {
+          pageContentCache[slug] = data;
+          var waiters = pageLoading[slug] || [];
+          delete pageLoading[slug];
+          waiters.forEach(function(w) { w.resolve(data); });
+        })
+        .catch(function(err) {
+          delete pageLoading[slug];
+          var waiters = pageLoading[slug] || [];
+          waiters.forEach(function(w) { w.reject(err); });
+        });
+    });
+  }
+
+  // 重写show函数
+  window.show = function(slug) {
+    var p = window.bySlug ? window.bySlug[slug] : null;
+    if (!p) {
+      // 没有找到页面，调用原始show函数处理404
+      if (originalShow) originalShow(slug);
+      return;
+    }
+
+    // 如果不需要按需加载，或者是目录页，直接调用原始show函数
+    if (!p._need_load || p.is_index || slug === "index") {
+      if (originalShow) originalShow(slug);
+      return;
+    }
+
+    // 需要按需加载
+    // 先显示加载状态（简化版，直接设置内容）
+    var contentEl = document.getElementById('content');
+    if (contentEl) {
+      contentEl.innerHTML = '<div class="article"><div style="text-align:center;padding:3rem 0;color:var(--ink-faint);"><div style="font-size:2rem;margin-bottom:1rem;">📖</div><div>正在加载文章内容...</div></div></div>';
+    }
+
+    // 加载文章内容
+    loadPageContent(slug).then(function(data) {
+      // 加载成功，把内容赋值给p对象，然后调用原始show函数
+      p.html = data.html;
+      p.meta = data.meta || p.meta;
+      p.tags = data.tags || p.tags;
+      p._need_load = false; // 标记已加载，避免重复加载
+      // 调用原始show函数渲染
+      if (originalShow) originalShow(slug);
+    }).catch(function(err) {
+      // 加载失败
+      if (contentEl) {
+        contentEl.innerHTML = '<div class="article"><div style="text-align:center;padding:3rem 0;color:var(--ink-faint);"><div style="font-size:2rem;margin-bottom:1rem;">⚠️</div><div>文章内容加载失败</div><div style="font-size:.85rem;margin-top:.5rem;">' + (err.message || '') + '</div><button onclick="location.reload()" style="margin-top:1rem;padding:.5rem 1rem;border-radius:8px;border:1px solid var(--accent);background:var(--accent-soft);color:var(--accent-deep);cursor:pointer;">重新加载</button></div></div>';
+      }
+    });
+  };
+
+  // 暴露loadPageContent函数供外部使用
+  window.loadPageContent = loadPageContent;
+})();
+
+</script>
+<script>
+/* ===== 文章内容按需加载模块 =====
+ * 在原始show函数之后加载，重写show函数实现按需加载
+ */
+(function(){
+  // 已加载的文章内容缓存
+  var pageContentCache = {};
+  // 正在加载的文章，避免重复请求
+  var pageLoading = {};
+  // 保存原始的show函数
+  var originalShow = window.show;
+
+  // 生成安全的文件名（与构建器一致）
+  function getSafeFilename(slug) {
+    return slug.replace(/\//g, "__").replace(/ /g, "_").replace(/[?？:："'<>*|]/g, "");
+  }
+
+  // 加载文章内容
+  function loadPageContent(slug) {
+    return new Promise(function(resolve, reject) {
+      // 已缓存，直接返回
+      if (pageContentCache[slug]) {
+        resolve(pageContentCache[slug]);
+        return;
+      }
+      // 正在加载，等待完成
+      if (pageLoading[slug]) {
+        pageLoading[slug].push({resolve: resolve, reject: reject});
+        return;
+      }
+      // 开始加载
+      pageLoading[slug] = [{resolve: resolve, reject: reject}];
+      var url = "pages/" + getSafeFilename(slug) + ".json";
+      fetch(url, {cache: "force-cache"})
+        .then(function(r) {
+          if (!r.ok) throw new Error("HTTP " + r.status);
+          return r.json();
+        })
+        .then(function(data) {
+          pageContentCache[slug] = data;
+          var waiters = pageLoading[slug] || [];
+          delete pageLoading[slug];
+          waiters.forEach(function(w) { w.resolve(data); });
+        })
+        .catch(function(err) {
+          delete pageLoading[slug];
+          var waiters = pageLoading[slug] || [];
+          waiters.forEach(function(w) { w.reject(err); });
+        });
+    });
+  }
+
+  // 重写show函数
+  window.show = function(slug) {
+    var p = window.bySlug ? window.bySlug[slug] : null;
+    if (!p) {
+      // 没有找到页面，调用原始show函数处理404
+      if (originalShow) originalShow(slug);
+      return;
+    }
+
+    // 如果不需要按需加载，或者是目录页，直接调用原始show函数
+    if (!p._need_load || p.is_index || slug === "index") {
+      if (originalShow) originalShow(slug);
+      return;
+    }
+
+    // 需要按需加载
+    // 先显示加载状态（简化版，直接设置内容）
+    var contentEl = document.getElementById('content');
+    if (contentEl) {
+      contentEl.innerHTML = '<div class="article"><div style="text-align:center;padding:3rem 0;color:var(--ink-faint);"><div style="font-size:2rem;margin-bottom:1rem;">📖</div><div>正在加载文章内容...</div></div></div>';
+    }
+
+    // 加载文章内容
+    loadPageContent(slug).then(function(data) {
+      // 加载成功，把内容赋值给p对象，然后调用原始show函数
+      p.html = data.html;
+      p.meta = data.meta || p.meta;
+      p.tags = data.tags || p.tags;
+      p._need_load = false; // 标记已加载，避免重复加载
+      // 调用原始show函数渲染
+      if (originalShow) originalShow(slug);
+    }).catch(function(err) {
+      // 加载失败
+      if (contentEl) {
+        contentEl.innerHTML = '<div class="article"><div style="text-align:center;padding:3rem 0;color:var(--ink-faint);"><div style="font-size:2rem;margin-bottom:1rem;">⚠️</div><div>文章内容加载失败</div><div style="font-size:.85rem;margin-top:.5rem;">' + (err.message || '') + '</div><button onclick="location.reload()" style="margin-top:1rem;padding:.5rem 1rem;border-radius:8px;border:1px solid var(--accent);background:var(--accent-soft);color:var(--accent-deep);cursor:pointer;">重新加载</button></div></div>';
+      }
+    });
+  };
+
+  // 暴露loadPageContent函数供外部使用
+  window.loadPageContent = loadPageContent;
+})();
+
+</script>
 </body>
 </html>
 """
@@ -3456,16 +3992,54 @@ def main():
 
     tree = build_tree(pages)
 
-    # 首页「本次更新内容」区块：读取独立内容源文件并渲染（仅用户资料，不含技术调整）
+    # 首页「最近更新」区块：自动扫描 content/ 下的文章和音频文件，按修改时间排序生成
     home_update_html = ""
     home_update_date = ""
-    upd_path = os.path.join(CONTENT_DIR, "本次更新内容.md")
-    if os.path.exists(upd_path):
-        upd_txt = open(upd_path, encoding="utf-8").read()
-        upd_meta, upd_body = parse_frontmatter(upd_txt)
-        home_update_html = md_to_html(upd_body)
-        # 公告区标题日期：优先取 frontmatter 的 date 字段（如 2026-08-18），无则回退空串
-        home_update_date = (upd_meta.get("date") or "").strip()
+    recent_items = []
+    for root, dirs, files in os.walk(CONTENT_DIR):
+        for fname in files:
+            fpath = os.path.join(root, fname)
+            rel_path = os.path.relpath(fpath, CONTENT_DIR).replace('\\', '/')
+            # 跳过 index.md、本次更新内容.md、更新日志.md
+            if fname in ('index.md', '本次更新内容.md', '更新日志.md'):
+                continue
+            # 只处理 .md 文章和音频文件
+            if fname.endswith('.md'):
+                mtime = os.path.getmtime(fpath)
+                title = fname[:-3]
+                slug = rel_path[:-3]
+                slug = re.sub(r"🔊\s*", "", slug)  # 与文章页面slug保持一致，去掉🔊
+                # 尝试从 frontmatter 读取标题
+                try:
+                    with open(fpath, 'r', encoding='utf-8') as f:
+                        raw = f.read()
+                    meta, body = parse_frontmatter(raw)
+                    if meta.get('title'):
+                        title = meta['title']
+                except:
+                    pass
+                recent_items.append({'mtime': mtime, 'title': title, 'slug': slug, 'type': 'article'})
+            elif fname.endswith(('.mp3', '.m4a', '.wav', '.ogg')):
+                mtime = os.path.getmtime(fpath)
+                title = os.path.splitext(fname)[0]
+                recent_items.append({'mtime': mtime, 'title': title, 'slug': '', 'type': 'audio'})
+    # 按修改时间倒序排列，取最近10条
+    recent_items.sort(key=lambda x: x['mtime'], reverse=True)
+    recent_items = recent_items[:10]
+    if recent_items:
+        html_parts = ['<ul>']
+        display_items = recent_items[:3]  # 最多显示3项
+        for item in display_items:
+            icon = '📄' if item['type'] == 'article' else '🎧'
+            if item['slug']:
+                html_parts.append(f'<li>{icon} <a href="#/{item["slug"]}" style="color:var(--accent);">{item["title"]}</a></li>')
+            else:
+                html_parts.append(f'<li>{icon} {item["title"]}</li>')
+        if len(recent_items) > 3:
+            html_parts.append(f'<li style="color:var(--ink-faint);font-size:.9em;">等 {len(recent_items)} 项内容更新</li>')
+        html_parts.append('</ul>')
+        home_update_html = ''.join(html_parts)
+        home_update_date = datetime.datetime.fromtimestamp(recent_items[0]['mtime']).strftime('%Y-%m-%d')
 
     site_title = "龙的传人｜Longchen Nyingtik"
     for p in pages:
@@ -3535,10 +4109,10 @@ def main():
     if os.path.isdir(_article_dir):
         _idx = 0
         for _dp, _dn, _fn in os.walk(_article_dir):
-            _dn.sort()  # 子目录按名称排序
-            for _f in sorted(_fn):
+            _dn.sort(key=natural_sort_key)  # 子目录按自然排序
+            for _f in sorted(_fn, key=natural_sort_key):
                 if _f.endswith(".md") and _f != "index.md":
-                    _title = re.sub(r"[🔊\"'“”\s]", "", _f[:-3]).strip()
+                    _title = re.sub(r"[\"'“”\s]", "", _f[:-3]).strip()
                     article_order[_title] = _idx
                     _idx += 1
     def audio_sort_key(fname):
@@ -3633,30 +4207,64 @@ def main():
     # 重新生成 tree（包含详情页，但渲染时过滤 is_audio_detail / hide_from_nav）
     tree = build_tree(pages)
 
-    # 生成 AI 问答知识库索引：提取所有文章的标题+正文（去HTML标签，截取前3000字）
+    # 生成 AI 问答知识库索引：直接遍历 Obsidian 中所有非 index 的 .md 文件
     knowledge_base = []
-    for p in pages:
-        if p.get("is_audio_detail") or p.get("hide_from_nav") or p.get("is_index"):
-            continue
-        if p["slug"] in ("index", "更新日志", "本次更新内容"):
-            continue
-        # 去掉 HTML 标签，提取纯文本
-        text = re.sub(r'<[^>]+>', ' ', p.get("html", ""))
-        text = re.sub(r'\s+', ' ', text).strip()
-        if len(text) < 50:  # 内容太短的跳过
-            continue
-        knowledge_base.append({
-            "slug": p["slug"],
-            "title": p["title"],
-            "content": text[:3000]  # 每篇截取前3000字，控制索引体积
-        })
+    for root, dirs, files in os.walk(CONTENT_DIR):
+        for fname in files:
+            if not fname.endswith('.md') or fname == 'index.md':
+                continue
+            fpath = os.path.join(root, fname)
+            try:
+                with open(fpath, 'r', encoding='utf-8') as f:
+                    raw = f.read()
+                # 去掉 frontmatter
+                if raw.startswith('---'):
+                    end = raw.find('---', 3)
+                    if end > 0:
+                        raw = raw[end+3:]
+                # 去掉 Obsidian 语法，提取纯文本
+                text = re.sub(r'\[\[[^\]]+\]\]', '', raw)  # 去掉 [[链接]]
+                text = re.sub(r'!\[\[[^\]]+\]\]', '', text)  # 去掉 ![[图片]]
+                text = re.sub(r'^#+\s*', '', text, flags=re.MULTILINE)  # 去掉标题标记
+                text = re.sub(r'[*_>`~-]', '', text)  # 去掉markdown格式标记
+                text = re.sub(r'\s+', ' ', text).strip()
+                # 计算相对路径作为slug
+                rel_path = os.path.relpath(fpath, CONTENT_DIR).replace('\\', '/')
+                slug = rel_path[:-3] if rel_path.endswith('.md') else rel_path
+                title = fname[:-3] if fname.endswith('.md') else fname
+                if text or title:
+                    knowledge_base.append({
+                        "slug": slug,
+                        "title": title,
+                        "content": text[:3000] if text else title  # 每篇截取前3000字
+                    })
+            except Exception as e:
+                print(f"  跳过文件 {fname}: {e}")
     print(f"AI知识库索引: {len(knowledge_base)} 篇文章")
 
     html_out = PAGE_TEMPLATE
     html_out = html_out.replace("@@SITE_TITLE_JSON@@", json.dumps(site_title, ensure_ascii=False))
     html_out = html_out.replace("@@AUDIO_ALBUM_JSON@@", json.dumps(CHANGLESI_ALBUM, ensure_ascii=False))
     html_out = html_out.replace("@@AUDIO_TRACKS_JSON@@", json.dumps(audio_tracks, ensure_ascii=False))
-    html_out = html_out.replace("@@PAGES_JSON@@", json.dumps(pages, ensure_ascii=False))
+    # 按需加载：把非目录页的文章内容拆分成单独JSON文件
+    pages_dir = os.path.join(DIST_DIR, "pages")
+    os.makedirs(pages_dir, exist_ok=True)
+    pages_meta = []
+    for p in pages:
+        if p.get("is_index") or p["slug"] == "index":
+            # 目录页和首页保留html内容
+            pages_meta.append(p)
+        else:
+            # 非目录页：把html内容保存到单独JSON文件，PAGES只保留元数据
+            safe_name = p["slug"].replace("/", "__").replace(" ", "_").replace("?？:：\"'<>*|", "")
+            json_path = os.path.join(pages_dir, safe_name + ".json")
+            with open(json_path, 'w', encoding='utf-8') as jf:
+                json.dump({"html": p.get("html", ""), "meta": p.get("meta", {}), "tags": p.get("tags", [])}, jf, ensure_ascii=False)
+            meta_page = {k: v for k, v in p.items() if k != "html"}
+            meta_page["_need_load"] = True
+            pages_meta.append(meta_page)
+    print(f"文章内容拆分: {len(pages) - len([p for p in pages if p.get('is_index') or p['slug'] == 'index'])} 篇文章已拆分为单独JSON文件")
+    html_out = html_out.replace("@@PAGES_JSON@@", json.dumps(pages_meta, ensure_ascii=False))
     html_out = html_out.replace("@@TREE_JSON@@", json.dumps(tree, ensure_ascii=False))
     html_out = html_out.replace("@@KNOWLEDGE_BASE_JSON@@", json.dumps(knowledge_base, ensure_ascii=False))
     html_out = html_out.replace("@@HOME_UPDATE_JSON@@", json.dumps(home_update_html, ensure_ascii=False))
@@ -3666,21 +4274,7 @@ def main():
     # 热更新脚本：仅 watch 模式注入，定期检查构建时间变化并自动刷新
     watch_script = ""
     if WATCH_MODE:
-        watch_script = """<script>
-(function(){
-  var lastBuild = "@@BUILD_TIME@@";
-  setInterval(function(){
-    fetch(location.pathname + '?t=' + Date.now(), {cache:'no-store'})
-      .then(function(r){ return r.text(); })
-      .then(function(t){
-        var m = t.match(/构建于 ([0-9\-: ]+)/);
-        if (m && m[1] !== lastBuild){
-          location.reload();
-        }
-      }).catch(function(){});
-  }, 2000);
-})();
-</script>"""
+        watch_script = """"""
     html_out = html_out.replace("@@WATCH_SCRIPT@@", watch_script)
     # 内联二维码生成库（qrcode.min.js，用于分享卡片生成文章链接二维码）
     qrcode_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "qrcode.min.js")
@@ -3764,6 +4358,14 @@ def main():
     _headers_src = os.path.join(os.path.dirname(os.path.abspath(__file__)), "cloudflare", "_headers")
     if os.path.exists(_headers_src):
         shutil.copy2(_headers_src, os.path.join(DIST_DIR, "_headers"))
+
+    # 复制管理后台 admin.html 到 dist/admin/index.html
+    admin_src = os.path.join(os.path.dirname(os.path.abspath(__file__)), "admin.html")
+    if os.path.exists(admin_src):
+        admin_dir = os.path.join(DIST_DIR, "admin")
+        os.makedirs(admin_dir, exist_ok=True)
+        shutil.copy2(admin_src, os.path.join(admin_dir, "index.html"))
+        print("管理后台已复制: dist/admin/index.html")
 
     print("已生成: %s" % out_path)
     print("文章数: %d" % len(pages))
