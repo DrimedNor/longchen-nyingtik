@@ -1051,11 +1051,29 @@ a:hover{color:var(--accent-soft)}
     <button class="access-btn" id="accessSubmitBtn">进入网站</button>
     <div class="access-error" id="accessError"></div>
     <div class="access-footer">
-      本站仅为个人学佛资料整理与学习交流，非宗教活动场所，不传教、不募捐、不组织宗教活动。<br>
-      如有问题请联系站长。
+      本站仅为个人学习资料整理，兼顾身边朋友交流分享，不传教、不募捐、不组织宗教活动。<br>
+      当访问达到10人后，永久开启密码访问；当超过100人后，开启注册审核访问。<br>
+      如有侵权或不当内容，请联系站长删除。
     </div>
   </div>
 </div>
+<!-- 注册申请遮罩层（默认隐藏，设备数达到 100 后显示） -->
+<div class="register-overlay access-overlay" id="registerOverlay" style="display:none">
+  <div class="access-box">
+    <div class="access-icon">📝</div>
+    <h2>注册申请</h2>
+    <p class="access-desc">本站访问人数较多，为保证内容质量，需注册审核后访问。<br>请填写以下信息，管理员审核通过后即可访问。</p>
+    <input type="text" id="regNickname" placeholder="您的昵称（必填）" style="margin-bottom:.8rem" />
+    <textarea id="regReason" placeholder="申请理由（必填，如：学佛同修、朋友推荐等）" style="width:100%;padding:.8rem 1rem;border:2px solid var(--line);border-radius:10px;font-size:.9rem;font-family:inherit;background:var(--surface-soft);color:var(--ink);box-sizing:border-box;margin-bottom:.8rem;min-height:80px;resize:vertical"></textarea>
+    <input type="text" id="regContact" placeholder="联系方式（选填，方便管理员联系）" style="margin-bottom:1rem" />
+    <button class="access-btn" id="regSubmitBtn">提交申请</button>
+    <div class="access-error" id="regError"></div>
+    <div class="access-footer">
+      本站仅为个人学习资料整理，兼顾身边朋友交流分享，不传教、不募捐、不组织宗教活动。
+    </div>
+  </div>
+</div>
+
 
 <div class="topbar">
   <button class="menu-btn" id="menuBtn">☰</button>
@@ -1172,39 +1190,88 @@ if ('serviceWorker' in navigator){
 
 
 
-// ---- 访问统计与密码保护 ----
-var STATS_API = "https://longchen-stats-auth.drimednor.workers.dev"; // 统计与密码验证 API 地址（等自定义域名绑定后改为 https://api.longchen-nyingtik.wiki）
-var ACCESS_KEY = "longchen-access-granted"; // localStorage 中记录已验证的 key
 
-// 检查是否需要密码验证
-async function checkAccess() {
-  // 先检查是否已经验证过（永久有效，不每天重置）
-  var granted = localStorage.getItem(ACCESS_KEY);
-  if (granted === "true") {
-    return true; // 已验证过，直接通过
+// ---- 访问统计与密码保护 ----
+var STATS_API = "https://longchen-stats-auth.drimednor.workers.dev";
+var ACCESS_KEY = "longchen-access-granted";
+var DEVICE_KEY = "longchen-device-id";
+var REG_KEY = "longchen-reg-id";
+
+// 生成或获取设备 ID
+function getDeviceId() {
+  var deviceId = localStorage.getItem(DEVICE_KEY);
+  if (!deviceId) {
+    deviceId = 'dev_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+    localStorage.setItem(DEVICE_KEY, deviceId);
   }
-  
-  // 如果没有配置 API 地址，默认放行
-  if (!STATS_API) {
+  return deviceId;
+}
+
+// 带设备 ID 的 fetch
+function fetchWithDevice(url, options) {
+  options = options || {};
+  options.headers = options.headers || {};
+  options.headers['X-Device-ID'] = getDeviceId();
+  return fetch(url, options);
+}
+
+// 检查是否需要密码或注册
+async function checkAccess() {
+  // 已验证过，直接通过
+  if (localStorage.getItem(ACCESS_KEY) === "true") {
     return true;
   }
   
+  // 已注册并审核通过，直接通过
+  var regId = localStorage.getItem(REG_KEY);
+  if (regId) {
+    try {
+      var resp = await fetchWithDevice(STATS_API + "/api/login", {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ regId: regId })
+      });
+      var data = await resp.json();
+      if (data.success) {
+        return true;
+      }
+    } catch (e) {
+      console.warn("登录验证失败:", e);
+    }
+  }
+  
+  if (!STATS_API) return true;
+  
   try {
-    // 调用 track 接口，记录 IP 并获取状态
-    var response = await fetch(STATS_API + "/api/track");
+    var response = await fetchWithDevice(STATS_API + "/api/track");
     var data = await response.json();
     
-    // 如果未启用密码保护，直接通过
-    if (!data.passwordEnabled || !data.needPassword) {
+    // 国外访问不限制
+    if (!data.isChina) {
       return true;
     }
     
-    // 已启用密码保护，显示密码输入界面
-    showAccessOverlay();
-    return false;
+    // 不需要密码和注册，直接通过
+    if (!data.needPassword && !data.needRegister) {
+      return true;
+    }
+    
+    // 需要注册审核
+    if (data.needRegister) {
+      showRegisterOverlay();
+      return false;
+    }
+    
+    // 需要密码
+    if (data.needPassword) {
+      showAccessOverlay();
+      return false;
+    }
+    
+    return true;
   } catch (e) {
     console.warn("统计 API 调用失败，默认放行:", e);
-    return true; // API 调用失败时默认放行，避免影响正常访问
+    return true;
   }
 }
 
@@ -1214,7 +1281,6 @@ function showAccessOverlay() {
   if (overlay) {
     overlay.style.display = 'flex';
     document.body.style.overflow = 'hidden';
-    
     setTimeout(function(){
       var input = document.getElementById('accessPasswordInput');
       if (input) input.focus();
@@ -1222,13 +1288,20 @@ function showAccessOverlay() {
   }
 }
 
-// 隐藏密码输入界面
-function hideAccessOverlay() {
-  var overlay = document.getElementById('accessOverlay');
+// 显示注册界面
+function showRegisterOverlay() {
+  var overlay = document.getElementById('registerOverlay');
   if (overlay) {
-    overlay.style.display = 'none';
-    document.body.style.overflow = '';
+    overlay.style.display = 'flex';
+    document.body.style.overflow = 'hidden';
   }
+}
+
+// 隐藏所有遮罩
+function hideOverlays() {
+  var overlays = document.querySelectorAll('.access-overlay, .register-overlay');
+  overlays.forEach(function(o) { o.style.display = 'none'; });
+  document.body.style.overflow = '';
 }
 
 // 验证密码
@@ -1242,16 +1315,8 @@ async function verifyAccessPassword() {
     return;
   }
   
-  if (!STATS_API) {
-    // 没有配置 API，本地验证（不推荐，密码会暴露在前端）
-    // 这里直接放行，实际使用应该配置 Worker
-    localStorage.setItem(ACCESS_KEY, "true");
-    hideAccessOverlay();
-    return;
-  }
-  
   try {
-    var response = await fetch(STATS_API + "/api/verify-password", {
+    var response = await fetchWithDevice(STATS_API + "/api/verify-password", {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ password: password })
@@ -1259,35 +1324,72 @@ async function verifyAccessPassword() {
     var data = await response.json();
     
     if (data.success) {
-      // 验证通过，永久记录（不每天重置）
       localStorage.setItem(ACCESS_KEY, "true");
-      hideAccessOverlay();
+      hideOverlays();
     } else {
       if (errorDiv) errorDiv.textContent = data.message || '密码错误，请重试';
       if (input) input.value = '';
     }
   } catch (e) {
-    console.warn("密码验证 API 调用失败:", e);
+    console.warn("密码验证失败:", e);
+    if (errorDiv) errorDiv.textContent = '网络错误，请稍后重试';
+  }
+}
+
+// 提交注册申请
+async function submitRegistration() {
+  var nickname = document.getElementById('regNickname').value;
+  var reason = document.getElementById('regReason').value;
+  var contact = document.getElementById('regContact').value;
+  var errorDiv = document.getElementById('regError');
+  
+  if (!nickname || !reason) {
+    if (errorDiv) errorDiv.textContent = '请填写昵称和申请理由';
+    return;
+  }
+  
+  try {
+    var response = await fetchWithDevice(STATS_API + "/api/register", {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ nickname: nickname, reason: reason, contact: contact })
+    });
+    var data = await response.json();
+    
+    if (data.success) {
+      localStorage.setItem(REG_KEY, data.regId);
+      if (errorDiv) {
+        errorDiv.style.color = '#27ae60';
+        errorDiv.textContent = '注册申请已提交，请等待管理员审核。审核通过后刷新页面即可访问。';
+      }
+    } else {
+      if (errorDiv) errorDiv.textContent = data.message || '提交失败，请重试';
+    }
+  } catch (e) {
+    console.warn("注册失败:", e);
     if (errorDiv) errorDiv.textContent = '网络错误，请稍后重试';
   }
 }
 
 // 初始化访问控制
 function initAccessControl() {
+  // 密码提交按钮
   var submitBtn = document.getElementById('accessSubmitBtn');
-  if (submitBtn) {
-    submitBtn.onclick = verifyAccessPassword;
-  }
+  if (submitBtn) submitBtn.onclick = verifyAccessPassword;
   
+  // 密码回车提交
   var input = document.getElementById('accessPasswordInput');
   if (input) {
     input.addEventListener('keydown', function(e){
-      if (e.key === 'Enter') {
-        verifyAccessPassword();
-      }
+      if (e.key === 'Enter') verifyAccessPassword();
     });
   }
   
+  // 注册提交按钮
+  var regBtn = document.getElementById('regSubmitBtn');
+  if (regBtn) regBtn.onclick = submitRegistration;
+  
+  // 检查访问权限
   checkAccess();
 }
 
@@ -1296,6 +1398,7 @@ if (document.readyState === 'loading') {
 } else {
   initAccessControl();
 }
+
 
 
 var SITE_TITLE = @@SITE_TITLE_JSON@@;
@@ -3279,8 +3382,9 @@ trackPageView();
   <div class="footer-inner" style="flex-direction:column; align-items:flex-start; gap:.6rem">
     <span class="footer-copy">© 2026 龙的传人｜Longchen Nyingtik</span>
     <span style="font-size:.8rem; color:var(--ink-faint); line-height:1.6">
-      本站仅为个人学佛资料整理与学习交流，非宗教活动场所，不传教、不募捐、不组织宗教活动。<br>
-      内容仅供参考，不构成宗教指导。如有侵权或不当内容，请联系站长删除。
+      本站仅为个人学习资料整理，兼顾身边朋友交流分享，不传教、不募捐、不组织宗教活动。<br>
+      当访问达到10人后，永久开启密码访问；当超过100人后，开启注册审核访问。<br>
+      如有侵权或不当内容，请联系站长删除。
     </span>
     <span class="footer-build">构建于 @@BUILD_TIME@@</span>
   </div>
