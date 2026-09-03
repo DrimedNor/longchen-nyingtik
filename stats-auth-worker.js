@@ -1,13 +1,16 @@
 /**
  * 访问统计与密码验证 Worker
+ * 
  * 功能：
- * 1. 记录每日独立 IP 数（存储在 KV 中）
- * 2. 提供 /api/stats 接口返回当日独立 IP 数
- * 3. 提供 /api/verify-password 接口验证访问密码
+ * 1. 记录累计独立 IP 数（存储在 KV 中，不重置）
+ * 2. 一旦累计独立 IP 达到阈值，永久启用密码保护
+ * 3. 提供 /api/stats 接口返回统计状态和是否需要密码
+ * 4. 提供 /api/verify-password 接口验证访问密码
+ * 5. 提供 /api/track 接口记录访问 IP
  * 
  * 环境变量：
- * - ACCESS_PASSWORD：访问密码（当独立 IP > 阈值时需要）
- * - IP_THRESHOLD：独立 IP 阈值，默认 10
+ * - ACCESS_PASSWORD：访问密码（启用密码保护后需要）
+ * - IP_THRESHOLD：累计独立 IP 阈值，默认 10，达到后永久启用密码保护
  * 
  * KV 命名空间绑定：
  * - STATS_KV：存储统计数据
@@ -35,22 +38,20 @@ export default {
                      request.headers.get('X-Forwarded-For')?.split(',')[0] ||
                      'unknown';
     
-    // 获取今天的日期字符串
-    const today = new Date().toISOString().split('T')[0];
-    
     try {
-      // 路由：获取统计数据
+      // 路由：记录访问（每个页面加载时调用）
+      if (path === '/api/track' || path === '/track') {
+        await recordIP(env.STATS_KV, clientIP);
+        const status = await getAccessStatus(env);
+        return new Response(JSON.stringify({ success: true, ...status }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      
+      // 路由：获取统计状态
       if (path === '/api/stats' || path === '/stats') {
-        const ipCount = await getUniqueIPCount(env.STATS_KV, today);
-        const threshold = parseInt(env.IP_THRESHOLD || '10');
-        const needPassword = ipCount >= threshold;
-        
-        return new Response(JSON.stringify({
-          date: today,
-          uniqueIPs: ipCount,
-          threshold: threshold,
-          needPassword: needPassword,
-        }), {
+        const status = await getAccessStatus(env);
+        return new Response(JSON.stringify(status), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
@@ -80,23 +81,18 @@ export default {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           });
         } else {
-          return new Response(JSON.stringify({ success: false, message: '密码错误' }), {
+          return new Response(JSON.stringify({ success: false, message: '密码错误，请重试' }), {
             status: 401,
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           });
         }
       }
       
-      // 路由：记录访问（每个页面加载时调用）
-      if (path === '/api/track' || path === '/track') {
-        await recordIP(env.STATS_KV, today, clientIP);
-        return new Response(JSON.stringify({ success: true }), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
-      }
-      
       // 默认：404
-      return new Response(JSON.stringify({ error: 'Not found', paths: ['/api/stats', '/api/verify-password', '/api/track'] }), {
+      return new Response(JSON.stringify({ 
+        error: 'Not found', 
+        paths: ['/api/stats', '/api/verify-password', '/api/track'] 
+      }), {
         status: 404,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
@@ -111,29 +107,51 @@ export default {
 };
 
 /**
- * 记录 IP 到 KV（使用 Set 去重）
+ * 记录 IP 到 KV（累计，不重置）
  */
-async function recordIP(kv, date, ip) {
+async function recordIP(kv, ip) {
   if (!kv) return;
   
-  const key = `ips:${date}`;
+  const key = 'unique_ips';
   const existing = await kv.get(key, 'json');
   const ipSet = new Set(existing || []);
   
   if (!ipSet.has(ip)) {
     ipSet.add(ip);
-    // 设置过期时间为 7 天，自动清理旧数据
-    await kv.put(key, JSON.stringify([...ipSet]), { expirationTtl: 7 * 24 * 60 * 60 });
+    await kv.put(key, JSON.stringify([...ipSet]));
   }
 }
 
 /**
- * 获取当日独立 IP 数
+ * 获取访问状态
  */
-async function getUniqueIPCount(kv, date) {
-  if (!kv) return 0;
+async function getAccessStatus(env) {
+  const kv = env.STATS_KV;
+  const threshold = parseInt(env.IP_THRESHOLD || '10');
   
-  const key = `ips:${date}`;
-  const existing = await kv.get(key, 'json');
-  return existing ? existing.length : 0;
+  let uniqueIPCount = 0;
+  if (kv) {
+    const existing = await kv.get('unique_ips', 'json');
+    uniqueIPCount = existing ? existing.length : 0;
+  }
+  
+  // 检查是否已永久启用密码保护
+  let passwordEnabled = false;
+  if (kv) {
+    const flag = await kv.get('password_enabled');
+    passwordEnabled = flag === 'true';
+  }
+  
+  // 如果累计 IP 达到阈值且尚未启用，永久启用密码保护
+  if (uniqueIPCount >= threshold && !passwordEnabled && kv) {
+    await kv.put('password_enabled', 'true');
+    passwordEnabled = true;
+  }
+  
+  return {
+    uniqueIPs: uniqueIPCount,
+    threshold: threshold,
+    passwordEnabled: passwordEnabled,
+    needPassword: passwordEnabled, // 一旦启用，永久需要密码
+  };
 }

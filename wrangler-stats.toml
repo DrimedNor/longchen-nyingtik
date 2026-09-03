@@ -1,0 +1,16 @@
+name = "longchen-stats-auth"
+main = "stats-auth-worker.js"
+compatibility_date = "2024-09-02"
+account_id = "36e5618995c36274b4b7b6c7200a2fac"
+
+# 自定义域名绑定
+custom_domains = ["api.longchen-nyingtik.wiki"]
+
+# KV 命名空间绑定
+[[kv_namespaces]]
+binding = "STATS_KV"
+id = "6b045a39f30a41bcbdd8eb210a174467"
+
+# 环境变量（敏感信息用 wrangler secret put 设置）
+# ACCESS_PASSWORD = "610"  # 用 wrangler secret put ACCESS_PASSWORD --config wrangler-stats.toml 设置
+# IP_THRESHOLD = "10"      # 用 wrangler secret put IP_THRESHOLD --config wrangler-stats.toml 设置
