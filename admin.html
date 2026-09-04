@@ -12,7 +12,9 @@
     color: #333;
     line-height: 1.6;
   }
-  .container { max-width: 1000px; margin: 0 auto; padding: 20px; }
+  .container { max-width: 100%; margin: 0 auto; padding: 15px; width: 100%; box-sizing: border-box; }
+  @media (min-width: 768px) { .container { max-width: 900px; padding: 20px; } }
+  @media (min-width: 1200px) { .container { max-width: 1100px; } }
   .header {
     background: linear-gradient(135deg, #8a1f1c, #a02825);
     color: white;
@@ -77,8 +79,11 @@
   .section {
     background: white;
     border-radius: 12px;
-    padding: 20px;
-    margin-bottom: 20px;
+    padding: 15px;
+    margin-bottom: 15px;
+    width: 100%;
+    box-sizing: border-box;
+    overflow-x: auto;
     box-shadow: 0 2px 10px rgba(0,0,0,0.05);
   }
   .section h3 {
@@ -182,26 +187,12 @@
         <div class="value" id="passwordStatus" style="font-size:1.2rem;">-</div>
         <div class="sub">达到阈值后永久启用</div>
       </div>
-      <!-- 注册审核统计卡片（暂时隐藏）
       <div class="stat-card">
         <div class="label">注册审核</div>
         <div class="value" id="registerStatus" style="font-size:1.2rem;">-</div>
         <div class="sub">待审核：<span id="pendingCount">-</span> 个</div>
       </div>
-      -->
     </div>
-    
-    <!-- 待审核注册（暂时隐藏）
-    <div class="section">
-      <h3>
-        <span>📝 待审核注册</span>
-        <button class="refresh-btn" onclick="loadPending()">刷新</button>
-      </h3>
-      <div id="pendingList">
-        <div class="loading">加载中...</div>
-      </div>
-    </div>
-    -->
     
     <!-- 最近设备 -->
     <div class="section">
@@ -270,6 +261,36 @@
         </div>
       </div>
     </div>
+    
+    <!-- 待审核注册 -->
+    <div class="section">
+      <h3>
+        <span>📝 待审核注册</span>
+        <button class="refresh-btn" onclick="loadPending()">刷新</button>
+      </h3>
+      <div id="pendingList">
+        <div class="loading">加载中...</div>
+      </div>
+    </div>
+    
+    <!-- 邀请码管理 -->
+    <div class="section">
+      <h3>
+        <span>🎟️ 邀请码管理</span>
+        <button class="refresh-btn" onclick="loadInvites()">刷新</button>
+      </h3>
+      <div style="margin-bottom:1rem;padding:1rem;background:var(--surface-soft);border-radius:8px;">
+        <h4 style="margin:0 0 .8rem 0;font-size:1rem;">创建新邀请码</h4>
+        <div style="display:flex;gap:.5rem;flex-wrap:wrap;align-items:center;">
+          <input type="text" id="newInviteCode" placeholder="自定义邀请码（留空自动生成）" style="flex:1;min-width:150px;padding:.5rem;border:1px solid var(--line);border-radius:6px;">
+          <input type="text" id="newInviteNote" placeholder="备注（如：张三）" style="flex:1;min-width:150px;padding:.5rem;border:1px solid var(--line);border-radius:6px;">
+          <button onclick="createInvite()" style="padding:.5rem 1rem;background:var(--accent);color:white;border:none;border-radius:6px;cursor:pointer;">创建邀请码</button>
+        </div>
+      </div>
+      <div id="inviteList">
+        <div class="loading">加载中...</div>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -336,6 +357,7 @@ function logout() {
 function loadAll() {
   loadStats();
   loadPending();
+  loadInvites();
 }
 
 // 加载统计数据
@@ -353,8 +375,11 @@ function loadStats() {
     document.getElementById('deviceCount').textContent = data.deviceCount;
     document.getElementById('ipCount').textContent = data.ipCount;
     document.getElementById('deviceThreshold').textContent = data.deviceThreshold;
-    // 注册审核相关元素已隐藏，跳过更新
-    // document.getElementById('pendingCount').textContent = data.pendingCount;
+    // 更新注册审核统计
+    const pendingCountEl = document.getElementById('pendingCount');
+    if (pendingCountEl) pendingCountEl.textContent = data.pendingCount || 0;
+    const regStatus = document.getElementById('registerStatus');
+    if (regStatus) regStatus.innerHTML = data.registerEnabled ? '<span style="color:#2e7d32;">已启用</span>' : '<span style="color:#c62828;">未启用</span>';
     
     const pwdStatus = document.getElementById('passwordStatus');
     pwdStatus.innerHTML = data.passwordEnabled 
@@ -569,9 +594,6 @@ document.getElementById('adminPassword').addEventListener('keydown', function(e)
 
 // 初始化
 checkLogin();
-</script>
-</body>
-</html>
 
 
 // ========== AI问答统计 ==========
@@ -731,3 +753,99 @@ function formatNumber(num) {
   if (num >= 1000) return (num / 1000).toFixed(1) + 'K';
   return num.toString();
 }
+
+// ========== 邀请码管理 ==========
+
+// 加载邀请码列表
+async function loadInvites() {
+  const container = document.getElementById('inviteList');
+  try {
+    const response = await fetch(API_BASE + '/api/admin/invite/list', {
+      headers: { 'X-Admin-Password': adminPassword }
+    });
+    const data = await response.json();
+    
+    if (data.success && data.invites) {
+      if (data.invites.length === 0) {
+        container.innerHTML = '<div class="empty">暂无邀请码</div>';
+        return;
+      }
+      
+      let html = '<table style="width:100%;border-collapse:collapse;font-size:.85rem;">';
+      html += '<thead><tr style="background:var(--surface-soft);">';
+      html += '<th style="padding:.6rem;text-align:left;border-bottom:2px solid var(--line);">邀请码</th>';
+      html += '<th style="padding:.6rem;text-align:center;border-bottom:2px solid var(--line);">使用次数</th>';
+      html += '<th style="padding:.6rem;text-align:left;border-bottom:2px solid var(--line);">备注</th>';
+      html += '<th style="padding:.6rem;text-align:left;border-bottom:2px solid var(--line);">创建时间</th>';
+      html += '<th style="padding:.6rem;text-align:center;border-bottom:2px solid var(--line);">状态</th>';
+      html += '<th style="padding:.6rem;text-align:center;border-bottom:2px solid var(--line);">操作</th>';
+      html += '</tr></thead><tbody>';
+      
+      for (const invite of data.invites) {
+        const statusText = invite.status === 'active' ? '<span style="color:#2e7d32;">有效</span>' : '<span style="color:#c62828;">已失效</span>';
+        const registerLink = `https://longchen-nyingtik.wiki/#/register?code=${invite.code}`;
+        html += '<tr style="border-bottom:1px solid var(--line);">';
+        html += `<td style="padding:.5rem;font-family:monospace;font-weight:600;">${invite.code}</td>`;
+        html += `<td style="padding:.5rem;text-align:center;">${invite.usedCount || 0}</td>`;
+        html += `<td style="padding:.5rem;">${invite.note || '-'}</td>`;
+        html += `<td style="padding:.5rem;font-size:.8rem;">${new Date(invite.createdTime).toLocaleString('zh-CN')}</td>`;
+        html += `<td style="padding:.5rem;text-align:center;">${statusText}</td>`;
+        html += `<td style="padding:.5rem;text-align:center;">`;
+        html += `<button onclick="copyInviteLink('${invite.code}')" style="padding:.3rem .6rem;font-size:.8rem;background:var(--surface-soft);border:1px solid var(--line);border-radius:4px;cursor:pointer;margin-right:.3rem;">复制链接</button>`;
+        html += `</td>`;
+        html += '</tr>';
+      }
+      
+      html += '</tbody></table>';
+      container.innerHTML = html;
+    } else {
+      container.innerHTML = '<div class="empty">加载失败</div>';
+    }
+  } catch (e) {
+    console.error('加载邀请码失败:', e);
+    container.innerHTML = '<div class="empty">加载失败</div>';
+  }
+}
+
+// 创建邀请码
+async function createInvite() {
+  const code = document.getElementById('newInviteCode').value.trim();
+  const note = document.getElementById('newInviteNote').value.trim();
+  
+  try {
+    const response = await fetch(API_BASE + '/api/admin/invite/create', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Admin-Password': adminPassword
+      },
+      body: JSON.stringify({ code: code || null, note: note })
+    });
+    const data = await response.json();
+    
+    if (data.success) {
+      alert('邀请码创建成功：' + data.inviteCode);
+      document.getElementById('newInviteCode').value = '';
+      document.getElementById('newInviteNote').value = '';
+      loadInvites();
+    } else {
+      alert('创建失败：' + data.message);
+    }
+  } catch (e) {
+    alert('创建失败：' + e.message);
+  }
+}
+
+// 复制邀请链接
+function copyInviteLink(code) {
+  const link = `https://longchen-nyingtik.wiki/#/register?code=${code}`;
+  navigator.clipboard.writeText(link).then(() => {
+    alert('邀请链接已复制：\n' + link);
+  }).catch(() => {
+    prompt('请手动复制邀请链接：', link);
+  });
+}
+
+</script>
+</body>
+</html>

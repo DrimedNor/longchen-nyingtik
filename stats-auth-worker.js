@@ -126,7 +126,7 @@ export default {
         }
       }
       
-      // 路由：用户注册申请
+      // 路由：用户注册（需要邀请码）
       if (path === '/api/register' || path === '/register') {
         if (request.method !== 'POST') {
           return new Response(JSON.stringify({ error: 'Method not allowed' }), {
@@ -136,47 +136,93 @@ export default {
         }
         
         const body = await request.json();
-        const { nickname, reason, contact } = body;
+        const { username, password, nickname, inviteCode, reason } = body;
         
-        if (!nickname || !reason) {
-          return new Response(JSON.stringify({ success: false, message: '请填写昵称和申请理由' }), {
+        if (!username || !password || !nickname || !inviteCode) {
+          return new Response(JSON.stringify({ success: false, message: '请填写用户名、密码、昵称和邀请码' }), {
             status: 400,
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           });
         }
         
-        // 生成注册申请 ID
-        const regId = 'reg_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
-        const registration = {
-          id: regId,
-          nickname,
-          reason,
-          contact: contact || '',
+        // 验证邀请码
+        const invite = await env.STATS_KV.get('invite_' + inviteCode, 'json');
+        if (!invite) {
+          return new Response(JSON.stringify({ success: false, message: '邀请码无效' }), {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+        if (invite.status !== 'active') {
+          return new Response(JSON.stringify({ success: false, message: '邀请码已失效' }), {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+        if (invite.expiresAt && new Date(invite.expiresAt) < new Date()) {
+          return new Response(JSON.stringify({ success: false, message: '邀请码已过期' }), {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+        
+        // 检查用户名是否已存在
+        const existingUser = await env.STATS_KV.get('user_' + username, 'json');
+        if (existingUser) {
+          return new Response(JSON.stringify({ success: false, message: '用户名已被使用' }), {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+        
+        // 简单密码哈希（实际生产应使用bcrypt，这里用简单哈希）
+        const passwordHash = simpleHash(password);
+        
+        // 生成用户ID
+        const userId = 'user_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+        
+        // 创建用户（状态为待审核）
+        const user = {
+          id: userId,
+          username: username,
+          passwordHash: passwordHash,
+          nickname: nickname,
+          inviteCode: inviteCode,
+          reason: reason || '',
           deviceId: deviceId,
           ip: clientIP,
           country: country,
           status: 'pending', // pending / approved / rejected
           createdAt: new Date().toISOString(),
+          lastLoginTime: null,
+          loginCount: 0,
         };
         
-        // 保存注册申请
-        await env.STATS_KV.put('reg_' + regId, JSON.stringify(registration));
+        // 保存用户
+        await env.STATS_KV.put('user_' + username, JSON.stringify(user));
+        await env.STATS_KV.put('userid_' + userId, JSON.stringify(user));
+        
+        // 更新邀请码使用次数
+        invite.usedCount = (invite.usedCount || 0) + 1;
+        invite.usedBy = invite.usedBy || [];
+        invite.usedBy.push({ username: username, time: new Date().toISOString() });
+        await env.STATS_KV.put('invite_' + inviteCode, JSON.stringify(invite));
         
         // 添加到待审核列表
         const pendingList = await env.STATS_KV.get('pending_registrations', 'json') || [];
-        pendingList.push(regId);
+        pendingList.push(username);
         await env.STATS_KV.put('pending_registrations', JSON.stringify(pendingList));
         
         return new Response(JSON.stringify({ 
           success: true, 
-          message: '注册申请已提交，请等待管理员审核',
-          regId: regId
+          message: '注册申请已提交，请等待管理员审核通过后登录',
+          username: username
         }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
       
-      // 路由：用户登录（审核通过后）
+      // 路由：用户登录（用户名+密码）
       if (path === '/api/login' || path === '/login') {
         if (request.method !== 'POST') {
           return new Response(JSON.stringify({ error: 'Method not allowed' }), {
@@ -186,44 +232,271 @@ export default {
         }
         
         const body = await request.json();
-        const { regId } = body;
+        const { username, password } = body;
         
-        if (!regId) {
-          return new Response(JSON.stringify({ success: false, message: '请提供注册 ID' }), {
+        if (!username || !password) {
+          return new Response(JSON.stringify({ success: false, message: '请输入用户名和密码' }), {
             status: 400,
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           });
         }
         
-        const reg = await env.STATS_KV.get('reg_' + regId, 'json');
+        const user = await env.STATS_KV.get('user_' + username, 'json');
         
-        if (!reg) {
-          return new Response(JSON.stringify({ success: false, message: '注册申请不存在' }), {
+        if (!user) {
+          return new Response(JSON.stringify({ success: false, message: '用户不存在' }), {
             status: 404,
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           });
         }
         
-        if (reg.status === 'approved') {
-          return new Response(JSON.stringify({ 
-            success: true, 
-            message: '登录成功',
-            nickname: reg.nickname
-          }), {
+        // 验证密码
+        const passwordHash = simpleHash(password);
+        if (user.passwordHash !== passwordHash) {
+          return new Response(JSON.stringify({ success: false, message: '密码错误' }), {
+            status: 401,
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           });
-        } else if (reg.status === 'pending') {
+        }
+        
+        if (user.status === 'pending') {
           return new Response(JSON.stringify({ success: false, message: '注册申请正在审核中，请耐心等待' }), {
             status: 403,
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           });
-        } else {
+        }
+        
+        if (user.status === 'rejected') {
           return new Response(JSON.stringify({ success: false, message: '注册申请已被拒绝，请联系管理员' }), {
             status: 403,
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           });
         }
+        
+        // 更新登录信息
+        user.lastLoginTime = new Date().toISOString();
+        user.loginCount = (user.loginCount || 0) + 1;
+        await env.STATS_KV.put('user_' + username, JSON.stringify(user));
+        
+        // 生成登录token（简单实现，实际应使用JWT）
+        const token = simpleHash(username + Date.now() + Math.random());
+        
+        return new Response(JSON.stringify({ 
+          success: true, 
+          message: '登录成功',
+          token: token,
+          user: {
+            id: user.id,
+            username: user.username,
+            nickname: user.nickname,
+          }
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
       }
+      
+      // 路由：获取用户信息
+      if (path === '/api/user/info' || path === '/user/info') {
+        if (request.method !== 'POST') {
+          return new Response(JSON.stringify({ error: 'Method not allowed' }), {
+            status: 405,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+        
+        const body = await request.json();
+        const { username } = body;
+        
+        if (!username) {
+          return new Response(JSON.stringify({ success: false, message: '未登录' }), {
+            status: 401,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+        
+        const user = await env.STATS_KV.get('user_' + username, 'json');
+        if (!user) {
+          return new Response(JSON.stringify({ success: false, message: '用户不存在' }), {
+            status: 404,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+        
+        return new Response(JSON.stringify({
+          success: true,
+          user: {
+            id: user.id,
+            username: user.username,
+            nickname: user.nickname,
+            status: user.status,
+            createdAt: user.createdAt,
+            lastLoginTime: user.lastLoginTime,
+            loginCount: user.loginCount,
+          }
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      
+      // 路由：用户发现记录（划线、收藏、阅读历史）
+      if (path === '/api/user/discoveries' || path === '/user/discoveries') {
+        const body = request.method === 'POST' ? await request.json() : {};
+        const { username, action, data } = body;
+        
+        if (!username) {
+          return new Response(JSON.stringify({ success: false, message: '未登录' }), {
+            status: 401,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+        
+        const discoveriesKey = 'discoveries_' + username;
+        let discoveries = await env.STATS_KV.get(discoveriesKey, 'json') || {
+          highlights: [],
+          bookmarks: [],
+          readingHistory: [],
+        };
+        
+        if (request.method === 'GET' || !action || action === 'get') {
+          // 获取发现记录
+          return new Response(JSON.stringify({
+            success: true,
+            discoveries: discoveries
+          }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+        
+        if (action === 'add_highlight') {
+          // 添加划线
+          const highlight = {
+            id: 'hl_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6),
+            ...data,
+            createdTime: new Date().toISOString(),
+          };
+          discoveries.highlights.push(highlight);
+        } else if (action === 'delete_highlight') {
+          // 删除划线
+          discoveries.highlights = discoveries.highlights.filter(h => h.id !== data.id);
+        } else if (action === 'add_bookmark') {
+          // 添加收藏
+          const exists = discoveries.bookmarks.find(b => b.articleSlug === data.articleSlug);
+          if (!exists) {
+            discoveries.bookmarks.push({
+              ...data,
+              createdTime: new Date().toISOString(),
+            });
+          }
+        } else if (action === 'delete_bookmark') {
+          // 删除收藏
+          discoveries.bookmarks = discoveries.bookmarks.filter(b => b.articleSlug !== data.articleSlug);
+        } else if (action === 'add_reading_history') {
+          // 添加阅读历史
+          const exists = discoveries.readingHistory.find(r => r.articleSlug === data.articleSlug);
+          if (exists) {
+            exists.readTime = new Date().toISOString();
+            exists.duration = (exists.duration || 0) + (data.duration || 0);
+          } else {
+            discoveries.readingHistory.unshift({
+              ...data,
+              readTime: new Date().toISOString(),
+            });
+          }
+          // 只保留最近100条
+          if (discoveries.readingHistory.length > 100) {
+            discoveries.readingHistory = discoveries.readingHistory.slice(0, 100);
+          }
+        }
+        
+        // 保存
+        await env.STATS_KV.put(discoveriesKey, JSON.stringify(discoveries));
+        
+        return new Response(JSON.stringify({
+          success: true,
+          discoveries: discoveries
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      
+      // 路由：管理员创建邀请码
+      if (path === '/api/admin/invite/create' || path === '/admin/invite/create') {
+        if (request.method !== 'POST') {
+          return new Response(JSON.stringify({ error: 'Method not allowed' }), {
+            status: 405,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+        
+        const adminPassword = request.headers.get('X-Admin-Password');
+        if (adminPassword !== (env.ADMIN_PASSWORD || 'admin610')) {
+          return new Response(JSON.stringify({ success: false, message: '管理员密码错误' }), {
+            status: 403,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+        
+        const body = await request.json();
+        const { code, maxUses, expiresAt, note } = body;
+        
+        const inviteCode = code || generateInviteCode();
+        
+        const invite = {
+          code: inviteCode,
+          maxUses: maxUses || 0, // 0表示不限次数
+          usedCount: 0,
+          usedBy: [],
+          expiresAt: expiresAt || null,
+          note: note || '',
+          status: 'active',
+          createdTime: new Date().toISOString(),
+        };
+        
+        await env.STATS_KV.put('invite_' + inviteCode, JSON.stringify(invite));
+        
+        // 添加到邀请码列表
+        const inviteList = await env.STATS_KV.get('invite_codes', 'json') || [];
+        inviteList.push(inviteCode);
+        await env.STATS_KV.put('invite_codes', JSON.stringify(inviteList));
+        
+        return new Response(JSON.stringify({
+          success: true,
+          inviteCode: inviteCode,
+          message: '邀请码创建成功'
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      
+      // 路由：管理员获取邀请码列表
+      if (path === '/api/admin/invite/list' || path === '/admin/invite/list') {
+        const adminPassword = request.headers.get('X-Admin-Password');
+        if (adminPassword !== (env.ADMIN_PASSWORD || 'admin610')) {
+          return new Response(JSON.stringify({ success: false, message: '管理员密码错误' }), {
+            status: 403,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+        
+        const inviteList = await env.STATS_KV.get('invite_codes', 'json') || [];
+        const invites = [];
+        
+        for (const code of inviteList) {
+          const invite = await env.STATS_KV.get('invite_' + code, 'json');
+          if (invite) {
+            invites.push(invite);
+          }
+        }
+        
+        return new Response(JSON.stringify({
+          success: true,
+          invites: invites
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      
+
       
       // 路由：接收页面浏览统计
       if (path === '/api/stats/page-view' && request.method === 'POST') {
@@ -663,7 +936,7 @@ export default {
       // 默认：404
       return new Response(JSON.stringify({ 
         error: 'Not found', 
-        paths: ['/api/track', '/api/stats', '/api/verify-password', '/api/register', '/api/login', '/api/admin/pending', '/api/admin/review', '/api/admin/create-temp-link', '/api/verify-temp', '/api/stats/ai-ask'] 
+        paths: ['/api/track', '/api/stats', '/api/verify-password', '/api/register', '/api/login', '/api/user/info', '/api/user/discoveries', '/api/admin/pending', '/api/admin/review', '/api/admin/invite/create', '/api/admin/invite/list', '/api/admin/create-temp-link', '/api/verify-temp', '/api/stats/ai-ask'] 
       }), {
         status: 404,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -677,6 +950,27 @@ export default {
     }
   },
 };
+
+// 简单哈希函数（用于密码，实际生产应使用bcrypt）
+function simpleHash(str) {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    const char = str.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash; // Convert to 32bit integer
+  }
+  return 'h_' + Math.abs(hash).toString(36) + '_' + str.length;
+}
+
+// 生成邀请码
+function generateInviteCode() {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let code = '';
+  for (let i = 0; i < 8; i++) {
+    code += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return code;
+}
 
 /**
  * 记录设备（累计，不重置）
