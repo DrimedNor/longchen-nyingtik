@@ -4115,12 +4115,26 @@ def main():
                     _title = re.sub(r"[\"'“”\s]", "", _f[:-3]).strip()
                     article_order[_title] = _idx
                     _idx += 1
+    # 音频文件名到文章标题的别名映射（音频文件名与文章标题不一致时使用）
+    audio_title_alias = {
+        "什么样的老师适合你": "找一位什么样的上师最好🔊",
+        "如何反观与自省": "修行人如何自我反观🔊",
+        "成就的必由之路": "成就的必由之路——一师一法一本尊🔊",
+        "选好你的救命稻草": "唯一的救命稻草：选好上师🔊",
+    }
     def audio_sort_key(fname):
         _title = re.sub(r"[\"'“”\s]", "", fname[:-4] if fname.lower().endswith(".mp3") else fname).strip()
         _folder = audio_folder_rel(fname)
         # 上师开示（AI朗读）的音频按文章顺序排序
-        if "上师开示" in _folder and _title in article_order:
-            return (0, article_order[_title], _title)
+        if "上师开示" in _folder:
+            # 先查直接匹配，再查别名映射
+            _match_title = _title
+            if _match_title not in article_order and _title in audio_title_alias:
+                _match_title = audio_title_alias[_title]
+            if _match_title in article_order:
+                return (0, article_order[_match_title], _title)
+            # 没有对应文章的音频放到最后
+            return (2, _title)
         return (1, _title)
     audio_tracks = []
     for fname in sorted(LOCAL_AUDIO.keys(), key=audio_sort_key):
