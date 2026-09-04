@@ -118,6 +118,7 @@ def inline(text):
         # 在 content/ 下查找图片文件
         img_src = None
         for _dp, _dn, _fn in os.walk(CONTENT_DIR):
+            _dn[:] = [d for d in _dn if not is_excluded_dir(d)]
             if fname in _fn:
                 rel = os.path.relpath(os.path.join(_dp, fname), CONTENT_DIR).replace("\\", "/")
                 img_src = "assets/" + rel
@@ -248,20 +249,24 @@ def md_to_html(body):
 
 
 # ---------------------------------------------------------------- 文件发现
+def is_excluded_dir(d):
+    """判断目录是否应该被排除（隐藏目录、不推送目录、备份目录）"""
+    return d.startswith(".") or "不推送" in d or "_backup" in d or d.endswith("_backup")
+
 def discover_pages():
     global LOCAL_AUDIO
     LOCAL_AUDIO = {}
     # 第一遍：先扫描收集所有本地音频（必须在解析 md 之前完成）
-    # 排除规则：隐藏目录（.开头）和「不推送」目录（用户不想公开的音频/资料，仅本地保留）
+    # 排除规则：隐藏目录（.开头）、「不推送」目录、备份目录
     for dirpath, dirs, files in os.walk(CONTENT_DIR):
-        dirs[:] = [d for d in dirs if not d.startswith(".") and "不推送" not in d]
+        dirs[:] = [d for d in dirs if not is_excluded_dir(d)]
         for f in files:
             if f.lower().endswith((".mp3", ".m4a", ".wav")):
                 LOCAL_AUDIO[f] = os.path.join(dirpath, f)
     # 第二遍：解析 md
     pages = []
     for dirpath, dirs, files in os.walk(CONTENT_DIR):
-        dirs[:] = [d for d in dirs if not d.startswith(".") and "不推送" not in d]
+        dirs[:] = [d for d in dirs if not is_excluded_dir(d)]
         for f in sorted(files):
             if not f.endswith(".md"):
                 continue
@@ -3997,6 +4002,7 @@ def main():
     home_update_date = ""
     recent_items = []
     for root, dirs, files in os.walk(CONTENT_DIR):
+        dirs[:] = [d for d in dirs if not is_excluded_dir(d)]
         for fname in files:
             fpath = os.path.join(root, fname)
             rel_path = os.path.relpath(fpath, CONTENT_DIR).replace('\\', '/')
@@ -4224,6 +4230,7 @@ def main():
     # 生成 AI 问答知识库索引：直接遍历 Obsidian 中所有非 index 的 .md 文件
     knowledge_base = []
     for root, dirs, files in os.walk(CONTENT_DIR):
+        dirs[:] = [d for d in dirs if not is_excluded_dir(d)]
         for fname in files:
             if not fname.endswith('.md') or fname == 'index.md':
                 continue
@@ -4349,6 +4356,7 @@ def main():
     assets_dir = os.path.join(DIST_DIR, "assets")
     img_copied = 0
     for _dp, _dn, _fn in os.walk(CONTENT_DIR):
+        _dn[:] = [d for d in _dn if not is_excluded_dir(d)]
         for f in _fn:
             if f.lower().endswith(IMG_EXT):
                 src = os.path.join(_dp, f)
@@ -4444,6 +4452,7 @@ def watch_and_serve():
     def get_mtimes():
         mtimes = {}
         for dp, dn, fn in os.walk(CONTENT_DIR):
+            dn[:] = [d for d in dn if not is_excluded_dir(d)]
             for f in fn:
                 fp = os.path.join(dp, f)
                 try:
