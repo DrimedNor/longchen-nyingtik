@@ -48,21 +48,7 @@ export default {
     try {
       // 路由：记录访问（每个页面加载时调用）
       if (path === '/api/track' || path === '/track') {
-        // 国外访问不统计，直接返回不需要限制
-        if (!isChina) {
-          return new Response(JSON.stringify({ 
-            success: true, 
-            country: country,
-            isChina: false,
-            needPassword: false,
-            needRegister: false,
-            message: '国外访问，不设限制'
-          }), {
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          });
-        }
-        
-        // 国内访问：记录设备
+        // 记录设备访问（所有IP都记录，用于统计）
         if (deviceId) {
           const geo = {
             country: country,
@@ -76,11 +62,12 @@ export default {
           await recordDevice(env.STATS_KV, deviceId, clientIP, geo);
         }
         
+        // 所有IP都需要密码验证（不区分国内国外）
         const status = await getAccessStatus(env);
         return new Response(JSON.stringify({ 
           success: true, 
           country: country,
-          isChina: true,
+          isChina: isChina,
           ...status 
         }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -503,6 +490,13 @@ export default {
         try {
           const body = await request.json();
           const { slug, duration } = body;
+          const deviceId = request.headers.get('X-Device-ID') || '';
+          // 管理员设备的访问不统计
+          if (isAdminDevice(deviceId, env)) {
+            return new Response(JSON.stringify({ success: true, message: '管理员设备，不统计' }), {
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            });
+          }
           if (slug && duration && duration >= 60) {  // 时长小于1分钟忽略
             const key = 'page_stats_' + slug;
             const existing = await env.STATS_KV.get(key, 'json') || { slug, viewCount: 0, totalDuration: 0 };
@@ -534,6 +528,13 @@ export default {
         try {
           const body = await request.json();
           const { name, duration } = body;
+          const deviceId = request.headers.get('X-Device-ID') || '';
+          // 管理员设备的访问不统计
+          if (isAdminDevice(deviceId, env)) {
+            return new Response(JSON.stringify({ success: true, message: '管理员设备，不统计' }), {
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            });
+          }
           if (name && duration && duration >= 60) {  // 时长小于1分钟忽略
             const key = 'audio_stats_' + name;
             const existing = await env.STATS_KV.get(key, 'json') || { name, playCount: 0, totalDuration: 0 };
@@ -547,6 +548,204 @@ export default {
             if (!list.includes(name)) {
               list.push(name);
               await env.STATS_KV.put(listKey, JSON.stringify(list));
+            }
+          }
+          return new Response(JSON.stringify({ success: true }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        } catch (e) {
+          return new Response(JSON.stringify({ success: false, error: e.message }), {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+      }
+      
+      // 路由：接收用户点击统计（批量上报）
+      if (path === '/api/stats/click' && request.method === 'POST') {
+        try {
+          const body = await request.json();
+          const { clicks, deviceId } = body;
+          // 管理员设备的点击不统计
+          if (isAdminDevice(deviceId, env)) {
+            return new Response(JSON.stringify({ success: true, message: '管理员设备，不统计' }), {
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            });
+          }
+          if (clicks && Array.isArray(clicks) && clicks.length > 0) {
+            const clickSummary = {};
+            clicks.forEach(function(c) {
+              const key = (c.type || 'unknown') + '|' + (c.target || 'unknown') + '|' + (c.page || 'unknown');
+              if (!clickSummary[key]) {
+                clickSummary[key] = { type: c.type, target: c.target, page: c.page, count: 0 };
+              }
+              clickSummary[key].count++;
+            });
+            // 保存每个点击项的统计
+            for (const key in clickSummary) {
+              const item = clickSummary[key];
+              const statKey = 'click_stats_' + key.replace(/[^a-z0-9]/gi, '_');
+              const existing = await env.STATS_KV.get(statKey, 'json') || { type: item.type, target: item.target, page: item.page, count: 0, devices: {} };
+              existing.count = (existing.count || 0) + item.count;
+              existing.lastClicked = new Date().toISOString();
+              if (deviceId) {
+                existing.devices[deviceId] = (existing.devices[deviceId] || 0) + item.count;
+              }
+              await env.STATS_KV.put(statKey, JSON.stringify(existing));
+              // 维护点击统计列表
+              const listKey = 'click_stats_list';
+              const list = await env.STATS_KV.get(listKey, 'json') || [];
+              if (!list.includes(statKey)) {
+                list.push(statKey);
+                await env.STATS_KV.put(listKey, JSON.stringify(list));
+              }
+            }
+          }
+          return new Response(JSON.stringify({ success: true }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        } catch (e) {
+          return new Response(JSON.stringify({ success: false, error: e.message }), {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+      }
+      
+      // 路由：管理员重命名设备
+      if (path === '/api/admin/device/rename' && request.method === 'POST') {
+        const adminPass = request.headers.get('X-Admin-Password') || url.searchParams.get('admin');
+        if (adminPass !== (env.ADMIN_PASSWORD || 'admin610')) {
+          return new Response(JSON.stringify({ success: false, message: '管理员密码错误' }), {
+            status: 401,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+        try {
+          const body = await request.json();
+          const { deviceId, name } = body;
+          if (!deviceId) {
+            return new Response(JSON.stringify({ success: false, message: '缺少设备ID' }), {
+              status: 400,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            });
+          }
+          const deviceKey = 'device_' + deviceId;
+          const deviceDetail = await env.STATS_KV.get(deviceKey, 'json');
+          if (!deviceDetail) {
+            return new Response(JSON.stringify({ success: false, message: '设备不存在' }), {
+              status: 404,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            });
+          }
+          deviceDetail.name = name || '';
+          await env.STATS_KV.put(deviceKey, JSON.stringify(deviceDetail));
+          return new Response(JSON.stringify({ success: true, device: deviceDetail }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        } catch (e) {
+          return new Response(JSON.stringify({ success: false, error: e.message }), {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+      }
+      
+      // 路由：接收使用时长统计
+      if (path === '/api/stats/duration' && request.method === 'POST') {
+        try {
+          const body = await request.json();
+          const { deviceId, duration, page } = body;
+          // 管理员设备的使用时长不统计
+          if (isAdminDevice(deviceId, env)) {
+            return new Response(JSON.stringify({ success: true, message: '管理员设备，不统计' }), {
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            });
+          }
+          if (deviceId && duration && duration > 0) {
+            const today = new Date().toISOString().split('T')[0];
+            
+            // 记录设备累计使用时长
+            const deviceKey = 'device_' + deviceId;
+            const deviceDetail = await env.STATS_KV.get(deviceKey, 'json');
+            if (deviceDetail) {
+              deviceDetail.totalDuration = (deviceDetail.totalDuration || 0) + duration;
+              deviceDetail.todayDuration = deviceDetail.todayDuration || {};
+              deviceDetail.todayDuration[today] = (deviceDetail.todayDuration[today] || 0) + duration;
+              // 只保留最近30天的每日数据
+              const days = Object.keys(deviceDetail.todayDuration).sort();
+              if (days.length > 30) {
+                for (let i = 0; i < days.length - 30; i++) {
+                  delete deviceDetail.todayDuration[days[i]];
+                }
+              }
+              // 记录单次使用时长（最近50条）
+              deviceDetail.sessionDurations = deviceDetail.sessionDurations || [];
+              deviceDetail.sessionDurations.push({
+                duration: duration,
+                page: page || '',
+                date: new Date().toISOString()
+              });
+              if (deviceDetail.sessionDurations.length > 50) {
+                deviceDetail.sessionDurations = deviceDetail.sessionDurations.slice(-50);
+              }
+              await env.STATS_KV.put(deviceKey, JSON.stringify(deviceDetail));
+            }
+          }
+          return new Response(JSON.stringify({ success: true }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        } catch (e) {
+          return new Response(JSON.stringify({ success: false, error: e.message }), {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+      }
+      
+      // 路由：接收设备信息
+      if (path === '/api/stats/device-info' && request.method === 'POST') {
+        try {
+          const body = await request.json();
+          const { deviceId, deviceType, os, browser, screenWidth, screenHeight, language, isTouch, isWechat } = body;
+          if (deviceId) {
+            const deviceKey = 'device_' + deviceId;
+            const deviceDetail = await env.STATS_KV.get(deviceKey, 'json');
+            if (deviceDetail) {
+              deviceDetail.deviceType = deviceType || deviceDetail.deviceType;
+              deviceDetail.os = os || deviceDetail.os;
+              deviceDetail.browser = browser || deviceDetail.browser;
+              deviceDetail.screenWidth = screenWidth || deviceDetail.screenWidth;
+              deviceDetail.screenHeight = screenHeight || deviceDetail.screenHeight;
+              deviceDetail.language = language || deviceDetail.language;
+              deviceDetail.isTouch = isTouch !== undefined ? isTouch : deviceDetail.isTouch;
+              deviceDetail.isWechat = isWechat !== undefined ? isWechat : deviceDetail.isWechat;
+              await env.STATS_KV.put(deviceKey, JSON.stringify(deviceDetail));
+            }
+          }
+          return new Response(JSON.stringify({ success: true }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        } catch (e) {
+          return new Response(JSON.stringify({ success: false, error: e.message }), {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+      }
+      
+      // 路由：记录设备标识（手机/电脑识别）
+      if (path === '/api/stats/identify-device' && request.method === 'POST') {
+        try {
+          const body = await request.json();
+          const { deviceId, identify } = body;
+          if (deviceId && identify) {
+            const deviceKey = 'device_' + deviceId;
+            const deviceDetail = await env.STATS_KV.get(deviceKey, 'json');
+            if (deviceDetail) {
+              deviceDetail.identify = identify; // 'phone' 或 'pc'
+              deviceDetail.identifyTime = new Date().toISOString();
+              await env.STATS_KV.put(deviceKey, JSON.stringify(deviceDetail));
             }
           }
           return new Response(JSON.stringify({ success: true }), {
@@ -609,6 +808,15 @@ export default {
         }
         audioStats.sort((a, b) => (b.playCount || 0) - (a.playCount || 0));
         
+        // 获取点击统计
+        const clickStatsList = await env.STATS_KV.get('click_stats_list', 'json') || [];
+        const clickStats = [];
+        for (const key of clickStatsList) {
+          const stat = await env.STATS_KV.get(key, 'json');
+          if (stat) clickStats.push(stat);
+        }
+        clickStats.sort((a, b) => (b.count || 0) - (a.count || 0));
+        
         return new Response(JSON.stringify({ 
           success: true, 
           ...status,
@@ -617,6 +825,7 @@ export default {
           pendingCount: pendingList.length,
           pageStats: pageStats,
           audioStats: audioStats,
+          clickStats: clickStats,
         }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
@@ -697,6 +906,63 @@ export default {
         }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
+      }
+      
+      // 路由：管理员清理历史统计数据
+      if (path === '/api/admin/clear-stats' && request.method === 'POST') {
+        const adminPass = request.headers.get('X-Admin-Password') || url.searchParams.get('admin');
+        if (adminPass !== (env.ADMIN_PASSWORD || 'admin610')) {
+          return new Response(JSON.stringify({ success: false, message: '管理员密码错误' }), {
+            status: 401,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+        
+        try {
+          const body = await request.json().catch(() => ({}));
+          const { type } = body; // 'all' | 'page' | 'audio' | 'click' | 'ai'
+          
+          let deletedCount = 0;
+          const prefixes = [];
+          
+          if (type === 'all' || !type) {
+            prefixes.push('page_stats_', 'audio_stats_', 'click_stats_', 'ai_ask_');
+          } else if (type === 'page') {
+            prefixes.push('page_stats_');
+          } else if (type === 'audio') {
+            prefixes.push('audio_stats_');
+          } else if (type === 'click') {
+            prefixes.push('click_stats_');
+          } else if (type === 'ai') {
+            prefixes.push('ai_ask_');
+          }
+          
+          // 分页列出并删除所有匹配的键
+          for (const prefix of prefixes) {
+            let cursor = '';
+            do {
+              const listResult = await env.STATS_KV.list({ prefix, cursor, limit: 1000 });
+              for (const key of listResult.keys) {
+                await env.STATS_KV.delete(key.name);
+                deletedCount++;
+              }
+              cursor = listResult.list_complete ? '' : listResult.cursor;
+            } while (cursor);
+          }
+          
+          return new Response(JSON.stringify({ 
+            success: true, 
+            message: `已清理 ${deletedCount} 条历史统计数据`,
+            deletedCount 
+          }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        } catch (e) {
+          return new Response(JSON.stringify({ success: false, error: e.message }), {
+            status: 500,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
       }
       
       // 路由：管理员手动设置密码保护状态
@@ -936,7 +1202,7 @@ export default {
       // 默认：404
       return new Response(JSON.stringify({ 
         error: 'Not found', 
-        paths: ['/api/track', '/api/stats', '/api/verify-password', '/api/register', '/api/login', '/api/user/info', '/api/user/discoveries', '/api/admin/pending', '/api/admin/review', '/api/admin/invite/create', '/api/admin/invite/list', '/api/admin/create-temp-link', '/api/verify-temp', '/api/stats/ai-ask'] 
+        paths: ['/api/track', '/api/stats', '/api/verify-password', '/api/register', '/api/login', '/api/user/info', '/api/user/discoveries', '/api/admin/pending', '/api/admin/review', '/api/admin/invite/create', '/api/admin/invite/list', '/api/admin/create-temp-link', '/api/verify-temp', '/api/stats/ai-ask', '/api/stats/click', '/api/stats/page-view', '/api/stats/audio-play', '/api/admin/device/rename', '/api/stats/duration', '/api/stats/device-info', '/api/stats/identify-device'] 
       }), {
         status: 404,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -960,6 +1226,13 @@ function simpleHash(str) {
     hash = hash & hash; // Convert to 32bit integer
   }
   return 'h_' + Math.abs(hash).toString(36) + '_' + str.length;
+}
+
+// 判断是否为管理员设备（用于统计剔除）
+function isAdminDevice(deviceId, env) {
+  if (!deviceId) return false;
+  const adminDeviceIds = (env.ADMIN_DEVICE_IDS || '').split(',').map(s => s.trim()).filter(s => s);
+  return adminDeviceIds.includes(deviceId);
 }
 
 // 生成邀请码

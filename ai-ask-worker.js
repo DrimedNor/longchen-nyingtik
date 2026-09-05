@@ -133,7 +133,7 @@ ${context}
           completionTokens: 0,
           totalTokens: 0,
           model: 'deepseek-v4-flash-0731',
-        });
+        }, env);
 
         return new Response(JSON.stringify({ 
           error: `API 调用失败: ${apiResponse.status}`,
@@ -178,7 +178,7 @@ ${context}
         completionTokens: completionTokens,
         totalTokens: totalTokens,
         model: 'deepseek-v4-flash-0731',
-      });
+      }, env);
 
       // 相关文章链接由前端处理，显示为可点击链接
 
@@ -206,7 +206,7 @@ ${context}
         completionTokens: 0,
         totalTokens: 0,
         model: 'deepseek-v4-flash-0731',
-      }).catch(() => {});
+      }, env).catch(() => {});
 
       return new Response(JSON.stringify({ error: '服务器内部错误: ' + error.message }), {
         status: 500,
@@ -224,8 +224,14 @@ ${context}
  * - ai_ask_user_{userId}: 用户统计
  * - ai_ask_log_{timestamp}_{random}: 单次记录（最近100条）
  */
-async function recordAiAsk(kv, record) {
+async function recordAiAsk(kv, record, env) {
   if (!kv) return;
+
+  // 管理员设备的AI问答不统计
+  const adminDeviceIds = (env && env.ADMIN_DEVICE_IDS || '').split(',').map(s => s.trim()).filter(s => s);
+  if (record.deviceId && adminDeviceIds.includes(record.deviceId)) {
+    return;
+  }
 
   const date = new Date(record.timestamp);
   const dateStr = date.toISOString().split('T')[0];

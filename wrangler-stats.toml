@@ -14,3 +14,7 @@ id = "6b045a39f30a41bcbdd8eb210a174467"
 # 环境变量（敏感信息用 wrangler secret put 设置）
 # ACCESS_PASSWORD = "610"  # 用 wrangler secret put ACCESS_PASSWORD --config wrangler-stats.toml 设置
 # IP_THRESHOLD = "10"      # 用 wrangler secret put IP_THRESHOLD --config wrangler-stats.toml 设置
+
+# 管理员设备 ID（这些设备的文章浏览和点击数据不计入全站统计）
+[vars]
+ADMIN_DEVICE_IDS = "dev_1788402850264_bbqjsio7d,dev_1788406478720_6fhwoodmy"
