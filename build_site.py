@@ -594,6 +594,21 @@ button:focus-visible, a:focus-visible{outline:2px solid var(--accent); outline-o
 .hn-link:hover{background:var(--surface-soft); color:var(--ink)}
 .hn-link:active{background:var(--surface-hover)}
 
+/* 首页退出确认框 */
+.exit-confirm-overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:99999;display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity .2s ease}
+.exit-confirm-overlay.show{opacity:1}
+.exit-confirm-box{background:var(--bg);border:1px solid var(--line);border-radius:16px;padding:24px;max-width:320px;width:85%;text-align:center;transform:scale(.9);transition:transform .2s ease}
+.exit-confirm-overlay.show .exit-confirm-box{transform:scale(1)}
+.exit-confirm-title{font-size:1.15em;font-weight:700;color:var(--ink);margin-bottom:8px}
+.exit-confirm-desc{font-size:.9em;color:var(--ink-soft);margin-bottom:20px}
+.exit-confirm-buttons{display:flex;gap:12px}
+.exit-confirm-btn{flex:1;padding:10px 0;border-radius:10px;border:none;font-size:.95em;cursor:pointer;font-family:inherit;transition:all .15s}
+.exit-confirm-btn.exit-cancel{background:var(--surface);color:var(--ink);border:1px solid var(--line)}
+.exit-confirm-btn.exit-cancel:hover{background:var(--surface-hover)}
+.exit-confirm-btn.exit-ok{background:var(--accent);color:#fff}
+.exit-confirm-btn.exit-ok:hover{opacity:.9}
+.exit-confirm-btn:active{transform:scale(.97)}
+
 /* 页面切换动画 */
 .content{animation:pageFadeIn .25s ease-out}
 @keyframes pageFadeIn{
@@ -2255,6 +2270,9 @@ function show(slug){
   if (p.meta.source_url) meta += '<span class="src"><a href="' + esc(p.meta.source_url) + '" target="_blank" rel="noopener">查看原文 ↗</a></span>';
   if (p.meta.tags && p.meta.tags.length) meta += p.meta.tags.map(function(t){return '<span class="tag">' + esc(t) + '</span>';}).join('');
   var isHome = (p.slug === 'index');
+  // 首页返回守卫：进入首页时激活，离开时移除
+  if (isHome) { if (typeof pushExitGuard === 'function') pushExitGuard(); }
+  else { if (typeof removeExitGuard === 'function') removeExitGuard(); }
   var titleHtml = p.is_index ? '' : '<h1>' + esc(p.title) + '</h1>';
   var metaHtml = meta ? '<div class="meta">' + meta + '</div>' : '';
   // 文章目录（TOC）：仅非目录页且有 h2/h3 标题时显示
@@ -4825,6 +4843,57 @@ window.addEventListener('hashchange', function(){
 var initSlug = slugFromHash();
 if (initSlug){ show(initSlug); }
 else { var home = TREE.children && TREE.children.find(function(c){ return c.is_index; }); show(home ? home.slug : PAGES[0].slug); }
+
+// ── 首页返回确认：防止误触返回直接退出网站 ──
+var exitGuardActive = false;
+function pushExitGuard(){
+  if (exitGuardActive) return;
+  exitGuardActive = true;
+  history.pushState({ exitGuard: true }, '');
+}
+function removeExitGuard(){
+  if (!exitGuardActive) return;
+  exitGuardActive = false;
+  history.back();
+}
+window.addEventListener('popstate', function(e){
+  if (e.state && e.state.exitGuard && currentSlug === 'index'){
+    // 用户在首页触发了返回，弹出确认框
+    e.preventDefault();
+    showExitConfirm();
+    // 重新压入守卫，这样取消后还能继续拦截
+    setTimeout(function(){ pushExitGuard(); }, 100);
+  }
+});
+function showExitConfirm(){
+  var overlay = document.createElement('div');
+  overlay.className = 'exit-confirm-overlay';
+  overlay.innerHTML = '<div class="exit-confirm-box">'
+    + '<div class="exit-confirm-title">确认退出？</div>'
+    + '<div class="exit-confirm-desc">即将离开龙钦宁提资料库</div>'
+    + '<div class="exit-confirm-buttons">'
+    + '<button class="exit-confirm-btn exit-cancel">继续浏览</button>'
+    + '<button class="exit-confirm-btn exit-ok">退出网站</button>'
+    + '</div></div>';
+  document.body.appendChild(overlay);
+  setTimeout(function(){ overlay.classList.add('show'); }, 10);
+  overlay.querySelector('.exit-cancel').onclick = function(){
+    overlay.classList.remove('show');
+    setTimeout(function(){ overlay.remove(); }, 200);
+  };
+  overlay.querySelector('.exit-ok').onclick = function(){
+    overlay.classList.remove('show');
+    setTimeout(function(){
+      overlay.remove();
+      // 移除守卫，让下一次返回真正退出
+      exitGuardActive = false;
+      history.back();
+    }, 200);
+  };
+  overlay.onclick = function(e){
+    if (e.target === overlay) overlay.querySelector('.exit-cancel').click();
+  };
+}
 // 恢复上次播放的音频（仅加载，不自动播放）
 setTimeout(function(){
   try {
