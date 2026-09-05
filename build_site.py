@@ -4846,23 +4846,24 @@ else { var home = TREE.children && TREE.children.find(function(c){ return c.is_i
 
 // ── 首页返回确认：防止误触返回直接退出网站 ──
 var exitGuardActive = false;
+var isExiting = false;
 function pushExitGuard(){
-  if (exitGuardActive) return;
+  if (exitGuardActive || isExiting) return;
   exitGuardActive = true;
   history.pushState({ exitGuard: true }, '');
 }
 function removeExitGuard(){
-  if (!exitGuardActive) return;
   exitGuardActive = false;
-  history.back();
 }
 window.addEventListener('popstate', function(e){
+  if (isExiting) return;  // 正在退出，不拦截
   if (e.state && e.state.exitGuard && currentSlug === 'index'){
-    // 用户在首页触发了返回，弹出确认框
-    e.preventDefault();
+    // 立即同步重新压入守卫，阻止浏览器继续退出
+    exitGuardActive = false;
+    history.pushState({ exitGuard: true }, '');
+    exitGuardActive = true;
+    // 弹出确认框
     showExitConfirm();
-    // 重新压入守卫，这样取消后还能继续拦截
-    setTimeout(function(){ pushExitGuard(); }, 100);
   }
 });
 function showExitConfirm(){
@@ -4885,7 +4886,8 @@ function showExitConfirm(){
     overlay.classList.remove('show');
     setTimeout(function(){
       overlay.remove();
-      // 移除守卫，让下一次返回真正退出
+      // 设置正在退出标志，然后真正退出
+      isExiting = true;
       exitGuardActive = false;
       history.back();
     }, 200);
