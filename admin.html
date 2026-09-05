@@ -208,9 +208,26 @@
     <!-- 最近设备 -->
     <div class="section">
       <h3>
-        <span>📱 最近访问设备（最近 20 个）</span>
+        <span>📱 访问设备分类统计</span>
         <button class="refresh-btn" onclick="loadStats()">刷新</button>
       </h3>
+      
+      <!-- 分类标签 -->
+      <div style="display:flex;gap:.5rem;margin-bottom:1rem;flex-wrap:wrap;">
+        <button class="tab-btn active" onclick="switchDeviceTab('all', this)" style="padding:.5rem 1rem;border:1px solid var(--line);background:var(--surface);border-radius:6px;cursor:pointer;">
+          📊 全部 <span id="allCount" style="font-weight:bold;">0</span>
+        </button>
+        <button class="tab-btn" onclick="switchDeviceTab('real', this)" style="padding:.5rem 1rem;border:1px solid var(--line);background:var(--surface);border-radius:6px;cursor:pointer;">
+          👤 真实用户 <span id="realCount" style="color:var(--accent);font-weight:bold;">0</span>
+        </button>
+        <button class="tab-btn" onclick="switchDeviceTab('bot', this)" style="padding:.5rem 1rem;border:1px solid var(--line);background:var(--surface);border-radius:6px;cursor:pointer;">
+          🤖 爬虫 <span id="botCount" style="color:var(--ink-faint);font-weight:bold;">0</span>
+        </button>
+        <button class="tab-btn" onclick="switchDeviceTab('admin', this)" style="padding:.5rem 1rem;border:1px solid var(--line);background:var(--surface);border-radius:6px;cursor:pointer;">
+          🔧 管理员 <span id="adminCount" style="color:var(--gold-deep);font-weight:bold;">0</span>
+        </button>
+      </div>
+      
       <div id="deviceList">
         <div class="loading">加载中...</div>
       </div>
@@ -427,7 +444,22 @@ function loadStats() {
     
     // 渲染设备列表
     renderAdminDeviceStats(data.recentDevices || []);
-    renderDeviceList(data.recentDevices || []);
+    
+    // 统计各类设备数量
+    const allDevices = data.recentDevices || [];
+    const realDevices = allDevices.filter(d => d.visitorType === 'real');
+    const botDevices = allDevices.filter(d => d.visitorType === 'bot');
+    const adminDevices = allDevices.filter(d => ADMIN_DEVICE_IDS.includes(d.deviceId) || d.visitorType === 'admin');
+    
+    document.getElementById('realCount').textContent = realDevices.length;
+    document.getElementById('botCount').textContent = botDevices.length;
+    document.getElementById('adminCount').textContent = adminDevices.length;
+    document.getElementById('allCount').textContent = allDevices.length;
+    
+    // 默认显示全部设备
+    window._allDevices = allDevices;
+    renderDeviceList(allDevices);
+    
     renderIpList(data.recentIps || []);
     renderPageStats(data.pageStats || []);
     renderAudioStats(data.audioStats || []);
@@ -505,6 +537,36 @@ function renderAdminDeviceStats(devices) {
   container.innerHTML = html;
 }
 
+// 切换设备分类标签
+function switchDeviceTab(type, btn) {
+  // 更新标签按钮样式
+  document.querySelectorAll('.tab-btn').forEach(b => {
+    b.style.background = 'var(--surface)';
+    b.style.borderColor = 'var(--line)';
+    b.style.fontWeight = 'normal';
+  });
+  btn.style.background = 'var(--accent)';
+  btn.style.color = '#fff';
+  btn.style.borderColor = 'var(--accent)';
+  btn.style.fontWeight = 'bold';
+  
+  // 筛选设备
+  const allDevices = window._allDevices || [];
+  let filtered = [];
+  
+  if (type === 'all') {
+    filtered = allDevices;
+  } else if (type === 'admin') {
+    filtered = allDevices.filter(d => ADMIN_DEVICE_IDS.includes(d.deviceId) || d.visitorType === 'admin');
+  } else if (type === 'bot') {
+    filtered = allDevices.filter(d => d.visitorType === 'bot' || (!d.visitorType && (!d.totalDuration || d.totalDuration < 60)));
+  } else { // real
+    filtered = allDevices.filter(d => d.visitorType === 'real' || (d.totalDuration && d.totalDuration >= 60 && !ADMIN_DEVICE_IDS.includes(d.deviceId)));
+  }
+  
+  renderDeviceList(filtered);
+}
+
 function renderDeviceList(devices) {
   const container = document.getElementById('deviceList');
   if (devices.length === 0) {
@@ -514,27 +576,47 @@ function renderDeviceList(devices) {
   
   const today = new Date().toISOString().split('T')[0];
   
-  // 剔除管理员设备，只显示普通用户设备
-  const nonAdminDevices = devices.filter(d => !ADMIN_DEVICE_IDS.includes(d.deviceId));
-  
   // 按最近访问时间从近到远排序
-  const sortedDevices = nonAdminDevices.slice().sort((a, b) => {
+  const sortedDevices = devices.slice().sort((a, b) => {
     const timeA = a.lastSeen ? new Date(a.lastSeen).getTime() : 0;
     const timeB = b.lastSeen ? new Date(b.lastSeen).getTime() : 0;
     return timeB - timeA;
   });
   
-  let html = '<div style="overflow-x:auto;"><table><tr><th>设备名称</th><th>设备类型</th><th>操作系统</th><th>浏览器</th><th>分辨率</th><th>地区</th><th>累计时长</th><th>今日时长</th><th>访问次数</th><th>最近访问</th><th>操作</th></tr>';
+  let html = '<div style="overflow-x:auto;"><table><tr><th>设备名称</th><th>类型</th><th>设备类型</th><th>操作系统</th><th>浏览器</th><th>地区</th><th>最后一次时长</th><th>累计时长</th><th>今日时长</th><th>访问次数</th><th>最近访问</th><th>操作</th></tr>';
   sortedDevices.forEach(d => {
     const totalMins = Math.floor((d.totalDuration || 0) / 60);
     const todayMins = Math.floor(((d.todayDuration && d.todayDuration[today]) || 0) / 60);
+    // 最后一次访问时长：从sessionDurations中获取最后一条
+    const lastSessionMins = d.sessionDurations && d.sessionDurations.length > 0
+      ? Math.floor(d.sessionDurations[d.sessionDurations.length - 1].duration / 60)
+      : 0;
     const deviceName = d.name || '';
     // 设备信息为空时显示"待更新"
     const deviceType = d.deviceType || '<span style="color:var(--ink-faint);font-style:italic;">待更新</span>';
     const os = d.os || '<span style="color:var(--ink-faint);font-style:italic;">待更新</span>';
     const browser = d.browser || '<span style="color:var(--ink-faint);font-style:italic;">待更新</span>';
-    const resolution = d.screenWidth && d.screenHeight ? `${d.screenWidth}×${d.screenHeight}` : '<span style="color:var(--ink-faint);font-style:italic;">待更新</span>';
     const region = `${d.country || ''} ${d.region || ''} ${d.city || ''}`.trim() || '-';
+    
+    // 判断访问者类型
+    const isAdmin = ADMIN_DEVICE_IDS.includes(d.deviceId) || d.visitorType === 'admin';
+    const isBot = d.visitorType === 'bot' || (!d.visitorType && (!d.totalDuration || d.totalDuration < 60));
+    const isReal = d.visitorType === 'real' || (d.totalDuration && d.totalDuration >= 60 && !isAdmin);
+    
+    let typeBadge = '';
+    let rowStyle = '';
+    if (isAdmin) {
+      typeBadge = '<span style="display:inline-block;background:#FFD700;color:#333;font-size:0.7rem;padding:1px 4px;border-radius:3px;">管理员</span>';
+      rowStyle = 'background:rgba(255,215,0,0.05);';
+    } else if (isBot) {
+      typeBadge = '<span style="display:inline-block;background:#9e9e9e;color:#fff;font-size:0.7rem;padding:1px 4px;border-radius:3px;">爬虫</span>';
+      rowStyle = 'background:rgba(158,158,158,0.05);';
+    } else if (isReal) {
+      typeBadge = '<span style="display:inline-block;background:#4caf50;color:#fff;font-size:0.7rem;padding:1px 4px;border-radius:3px;">真实用户</span>';
+      rowStyle = 'background:rgba(76,175,80,0.05);';
+    } else {
+      typeBadge = '<span style="display:inline-block;background:#ff9800;color:#fff;font-size:0.7rem;padding:1px 4px;border-radius:3px;">未知</span>';
+    }
     
     // 设备类型图标
     let typeIcon = '';
@@ -542,31 +624,38 @@ function renderDeviceList(devices) {
     else if (d.deviceType === '手机') typeIcon = '📱';
     else if (d.deviceType === '平板') typeIcon = '📱';
     
-    // 判断是否为管理员设备
-    const isAdmin = d.identify === 'pc' || d.identify === 'phone' || d.name === '我的电脑' || d.name === '我的手机';
-    const adminBadge = isAdmin ? '<span style="display:inline-block;background:#FFD700;color:#333;font-size:0.7rem;padding:1px 4px;border-radius:3px;margin-left:4px;">管理员</span>' : '';
-    
-    html += `<tr${isAdmin ? ' style="background:rgba(255,215,0,0.05);"' : ''}>
+    html += `<tr style="${rowStyle}">
       <td style="max-width:120px;">
         <span class="device-name-display" data-device-id="${d.deviceId}" style="cursor:pointer;color:var(--accent);" onclick="editDeviceName('${d.deviceId}', this)">
           ${deviceName ? esc(deviceName) : '<span style="color:var(--ink-faint);font-style:italic;">点击命名</span>'}
         </span>
-        ${adminBadge}
       </td>
+      <td>${typeBadge}</td>
       <td>${typeIcon} ${deviceType}</td>
       <td>${os}</td>
       <td>${browser}</td>
-      <td style="font-size:0.8rem;">${resolution}</td>
       <td style="font-size:0.8rem;">${region}</td>
-      <td style="font-weight:600;">${totalMins} 分钟</td>
-      <td style="color:var(--accent);">${todayMins} 分钟</td>
+      <td style="color:var(--accent);">${lastSessionMins > 0 ? lastSessionMins + ' 分钟' : '-'}</td>
+      <td style="font-weight:600;">${totalMins > 0 ? totalMins + ' 分钟' : '-'}</td>
+      <td style="color:var(--accent);">${todayMins > 0 ? todayMins + ' 分钟' : '-'}</td>
       <td>${d.visitCount || '-'}</td>
       <td style="font-size:0.8rem;">${d.lastSeen ? formatTime(d.lastSeen) : '-'}</td>
       <td><button onclick="editDeviceName('${d.deviceId}', this)" style="padding:.2rem .5rem;font-size:.8rem;cursor:pointer;">命名</button></td>
     </tr>`;
+    
+    // 真实用户显示最近浏览记录
+    if (isReal && d.sessionDurations && d.sessionDurations.length > 0) {
+      const recentSessions = d.sessionDurations.slice(-3).reverse();
+      html += `<tr style="${rowStyle}">
+        <td colspan="11" style="padding-left:2rem;font-size:0.8rem;color:var(--ink-soft);background:rgba(76,175,80,0.02);">
+          <strong>最近浏览：</strong>
+          ${recentSessions.map(s => `${s.page || '未知页面'} (${Math.floor(s.duration)}秒)`).join(' | ')}
+        </td>
+      </tr>`;
+    }
   });
   html += '</table></div>';
-  html += '<p style="font-size:0.8rem;color:var(--ink-faint);margin-top:0.5rem;">💡 提示：设备信息显示"待更新"时，用该设备重新访问网站即可自动更新。</p>';
+  html += '<p style="font-size:0.8rem;color:var(--ink-faint);margin-top:0.5rem;">💡 提示：绿色=真实用户，灰色=爬虫（停留<1分钟），金色=管理员。真实用户下方显示最近浏览记录。</p>';
   container.innerHTML = html;
 }
 

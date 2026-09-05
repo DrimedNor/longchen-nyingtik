@@ -689,6 +689,12 @@ export default {
               if (deviceDetail.sessionDurations.length > 50) {
                 deviceDetail.sessionDurations = deviceDetail.sessionDurations.slice(-50);
               }
+              // 更新访问者类型：总停留时间<60秒为爬虫，否则为真实用户
+              if (deviceDetail.totalDuration >= 60) {
+                deviceDetail.visitorType = 'real';
+              } else {
+                deviceDetail.visitorType = 'bot';
+              }
               await env.STATS_KV.put(deviceKey, JSON.stringify(deviceDetail));
             }
           }
@@ -1272,6 +1278,7 @@ async function recordDevice(kv, deviceId, ip, geo) {
       firstSeen: new Date().toISOString(),
       lastSeen: new Date().toISOString(),
       visitCount: 1,
+      visitorType: 'unknown', // admin / bot / real
     }));
   } else {
     // 已存在的设备：更新最近访问时间和访问次数

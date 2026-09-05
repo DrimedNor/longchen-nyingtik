@@ -106,7 +106,7 @@ ${context}
             { role: 'user', content: question },
           ],
           temperature: 0.3,  // 低温度，回答更稳定准确
-          max_tokens: 4000,  // 最大回答长度（增加以避免回复被截断）
+          max_tokens: 6000,  // 最大回答长度（增加以避免回复被截断）
           stream: false,
         }),
       });

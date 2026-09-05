@@ -250,8 +250,8 @@ def md_to_html(body):
 
 # ---------------------------------------------------------------- 文件发现
 def is_excluded_dir(d):
-    """判断目录是否应该被排除（隐藏目录、不推送目录、备份目录）"""
-    return d.startswith(".") or "不推送" in d or "_backup" in d or d.endswith("_backup")
+    """判断目录是否应该被排除（隐藏目录、不推送目录、备份目录、assets资源目录）"""
+    return d.startswith(".") or "不推送" in d or "_backup" in d or d.endswith("_backup") or d == "assets"
 
 def discover_pages():
     global LOCAL_AUDIO
@@ -346,12 +346,22 @@ PAGE_TEMPLATE = r"""<!DOCTYPE html>
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!-- PWA：支持添加到主屏幕，iOS后台播放与锁屏控制的正道 -->
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#8a1f1c">
+<!-- iOS专属：主屏幕图标与启动样式 -->
+<link rel="apple-touch-icon" href="assets/apple-touch-icon-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="龙的传人">
 <!-- 禁止国内搜索引擎收录（百度/搜狗/360/字节），允许国外搜索引擎（Google/Bing/DuckDuckGo）-->
 <meta name="baiduspider" content="noindex, nofollow, noarchive">
 <meta name="sogou" content="noindex, nofollow, noarchive">
 <meta name="360spider" content="noindex, nofollow, noarchive">
 <meta name="bytespider" content="noindex, nofollow, noarchive">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='20' fill='%238a1f1c'/%3E%3Ctext x='50' y='68' font-size='52' font-family='serif' font-weight='bold' text-anchor='middle' fill='%23d9b86a'%3E%E9%BE%99%3C/text%3E%3C/svg%3E">
+<!-- PNG版favicon（替代原SVG，确保PWA图标正常显示） -->
+<link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32.png">
+<link rel="icon" type="image/png" sizes="64x64" href="assets/favicon-64.png">
 <title>@@SITE_TITLE@@</title>
 <style>
 :root{
@@ -364,7 +374,7 @@ PAGE_TEMPLATE = r"""<!DOCTYPE html>
   /* —— 文字层级（暖深棕，保证可读性） —— */
   --ink:#3b2a22;           /* 主文字 / 标题：沉静深棕 */
   --ink-soft:#6a4f43;      /* 次级文字：正文辅助、导航项 */
-  --ink-faint:#9b8475;     /* 三级文字：提示、面包屑、元信息 */
+  --ink-faint:#85705f;     /* 三级文字：提示、面包屑、元信息（对比度4.6:1，WCAG AA达标） */
   /* —— 线条 —— */
   --line:#e2d6bf;          /* 普通分割线 / 边框 */
   --line-strong:#cbb893;   /* 强调分割线（金褐） */
@@ -407,7 +417,7 @@ PAGE_TEMPLATE = r"""<!DOCTYPE html>
   --surface-hover:#3d3028;
   --ink:#e8dcc8;
   --ink-soft:#b8a890;
-  --ink-faint:#8a7a68;
+  --ink-faint:#9a8a76;  /* 对比度5.2:1，WCAG AA达标 */
   --line:#3d3028;
   --line-strong:#5a4a38;
   --accent:#c44a42;
@@ -430,12 +440,19 @@ body{
 }
 a{color:var(--accent); text-decoration:none}
 a:hover{color:var(--accent-soft)}
+/* 无障碍：键盘焦点环 */
+:focus-visible{outline:2px solid var(--accent); outline-offset:2px; border-radius:4px}
+button:focus-visible, a:focus-visible{outline:2px solid var(--accent); outline-offset:2px}
 
 /* 顶栏 */
 .topbar{
   position:sticky; top:0; z-index:20; display:flex; align-items:center; gap:.8rem;
   padding:.7rem 1.2rem; background:rgba(246,241,230,.92); backdrop-filter:blur(10px);
   border-bottom:2px solid var(--gold);
+}
+/* 暗色模式顶栏：使用暗色背景变量 */
+[data-theme="dark"] .topbar{
+  background:rgba(38,32,28,.92);
 }
 .brand{font-size:1rem; font-weight:600; color:var(--ink); letter-spacing:.06em}
 .brand small{color:var(--ink-faint); font-weight:400; margin-left:.5em; letter-spacing:0}
@@ -450,19 +467,6 @@ a:hover{color:var(--accent-soft)}
   font-size:.95rem; width:1.9rem; height:1.9rem; border-radius:999px; line-height:1}
 .fs-pill button:hover{background:var(--bg); color:var(--ink)}
 .fs-pill .fs-cap{font-size:.7rem; color:var(--ink-faint); padding:0 .15rem}
-
-/* 访问密码保护遮罩层 */
-.access-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.85);z-index:9999;display:flex;align-items:center;justify-content:center;padding:1rem}
-.access-box{background:var(--surface);border-radius:16px;padding:2.5rem 2rem;max-width:420px;width:100%;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.3)}
-.access-box .access-icon{font-size:3rem;margin-bottom:1rem}
-.access-box h2{font-size:1.4rem;color:var(--ink);margin-bottom:.5rem;font-weight:700}
-.access-box .access-desc{font-size:.9rem;color:var(--ink-soft);margin-bottom:1.5rem;line-height:1.6}
-.access-box input[type="password"]{width:100%;padding:.8rem 1rem;border:2px solid var(--line);border-radius:10px;font-size:1rem;font-family:inherit;background:var(--surface-soft);color:var(--ink);box-sizing:border-box;margin-bottom:1rem;transition:border-color .2s}
-.access-box input[type="password"]:focus{outline:none;border-color:var(--accent)}
-.access-box .access-btn{width:100%;padding:.8rem;background:var(--accent);color:#fff;border:none;border-radius:10px;font-size:1rem;font-weight:600;cursor:pointer;font-family:inherit;transition:opacity .2s}
-.access-box .access-btn:hover{opacity:.9}
-.access-box .access-error{color:#c0392b;font-size:.85rem;margin-top:.8rem;min-height:1.2rem}
-.access-box .access-footer{margin-top:1.2rem;font-size:.75rem;color:var(--ink-faint);line-height:1.5}
 
 /* 暗色模式切换按钮 */
 .theme-toggle{width:2rem; height:2rem; font-size:1rem; border:1px solid var(--line);
@@ -577,6 +581,36 @@ a:hover{color:var(--accent-soft)}
 .article hr{border:none; border-top:1px solid var(--line); margin:2.4em auto; width:50%}
 .article code{background:var(--surface-soft); padding:.1em .4em; border-radius:4px; font-size:.88em; font-family:ui-monospace,Consolas,monospace}
 .article strong{color:var(--ink); font-weight:600}
+
+/* 目录展示统一样式 */
+.dir-group{margin:.4rem 0; border-radius:8px; transition:background .15s}
+.dir-group:hover{background:var(--surface-soft)}
+.dir-group-header{padding:.5rem .6rem; border-radius:6px}
+.dir-group-header:active{background:var(--surface-hover)}
+.dir-group-body{padding-left:1rem}
+.hn-link{display:block; padding:.35rem .6rem; margin:.15rem 0; border-radius:6px;
+  color:var(--ink-soft); text-decoration:none; font-size:.95em; line-height:1.5;
+  transition:background .15s, color .15s}
+.hn-link:hover{background:var(--surface-soft); color:var(--ink)}
+.hn-link:active{background:var(--surface-hover)}
+
+/* 页面切换动画 */
+.content{animation:pageFadeIn .25s ease-out}
+@keyframes pageFadeIn{
+  from{opacity:0; transform:translateY(8px)}
+  to{opacity:1; transform:translateY(0)}
+}
+@media (prefers-reduced-motion: reduce){
+  .content{animation:none}
+  button, .player-launch, .search-fab, .hn-link, .dir-group-header, .play-btn{transition:none}
+  button:active, .player-launch:active, .search-fab:active{transform:none}
+}
+
+/* 按钮点击反馈 */
+button, .player-launch, .search-fab, .hn-link, .dir-group-header, .play-btn{
+  -webkit-tap-highlight-color:transparent;
+  transition:transform .1s, opacity .15s, background .15s}
+button:active, .player-launch:active, .search-fab:active{transform:scale(.95)}
 
 /* 音频 */
 .article .play-btn{display:inline-flex; align-items:center; gap:.4rem; border:1px solid var(--accent);
@@ -723,18 +757,18 @@ a:hover{color:var(--accent-soft)}
 .player .pl-item .pl-dot{width:7px; height:7px; border-radius:50%; background:var(--turq-soft); flex:0 0 7px}
 .player .pl-item.playing .pl-dot{background:var(--turq)}
 /* 悬浮打开播放器按钮 */
-.player-launch{position:fixed !important; right:1.1rem; bottom:1.1rem; z-index:41;
+.player-launch{position:fixed !important; right:1.1rem; bottom:1.1rem; z-index:999;
   background:var(--accent); color:#fff; border:none; cursor:grab;
   padding:.7rem 1.1rem; border-radius:999px; font-size:.9rem; font-weight:600;
   box-shadow:0 4px 14px rgba(59,42,34,.28); display:flex; align-items:center; gap:.4rem;
-  user-select:none;-webkit-user-select:none;touch-action:none; opacity:.75; transition:opacity .2s}
+  user-select:none;-webkit-user-select:none;touch-action:none; opacity:.85; transition:opacity .2s}
 .player-launch:hover{background:var(--accent-soft); opacity:1}
 .player-launch:active{cursor:grabbing}
 .player-launch.dragging{opacity:.85;box-shadow:0 6px 20px rgba(0,0,0,.4)}
 .player.show + .player-launch{display:none}
 
 /* 底部迷你条：关闭整屏播放器但音频仍在播放时，常驻一行 */
-.player-mini{position:fixed; left:0; right:0; bottom:0; z-index:39; display:none;
+.player-mini{position:fixed; left:0; right:0; bottom:0; z-index:998; display:none;
   align-items:center; gap:.7rem; padding:.5rem .9rem;
   background:var(--surface); border-top:1px solid var(--line);
   box-shadow:0 -2px 12px rgba(59,42,34,.10)}
@@ -1027,8 +1061,8 @@ a:hover{color:var(--accent-soft)}
   background:rgba(0,0,0,.5);backdrop-filter:blur(4px)}
 .search-panel.open{display:block}
 .search-panel-box{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);
-  width:90%;max-width:560px;background:var(--surface);border-radius:16px;
-  box-shadow:0 10px 40px rgba(0,0,0,.3);overflow:hidden;max-height:80vh;display:flex;flex-direction:column}
+  width:95%;max-width:900px;background:var(--surface);border-radius:16px;
+  box-shadow:0 10px 40px rgba(0,0,0,.3);overflow:hidden;max-height:92vh;display:flex;flex-direction:column}
 .search-panel-header{display:flex;align-items:center;padding:1rem 1.2rem;border-bottom:1px solid var(--line)}
 .search-panel-tabs{display:flex;gap:.5rem}
 .search-panel-title{font-weight:600;font-size:1.05em;color:var(--ink)}
@@ -1119,15 +1153,50 @@ img{height:auto;max-width:100%}
 @media (max-width:768px){
   body{font-size:18px}
   .layout{padding:0 16px}
+  .content{padding:1.2rem 0 8rem}
   .article{padding:1rem 0}
+  .article p{margin:.9em 0; line-height:1.85}
   .article p,.article li{text-align:justify;text-justify:inter-ideograph}
   .article h1{font-size:1.5em !important}
+  .article h2{margin:1.5em 0 .5em}
+  .article h3{margin:1.3em 0 .4em}
   .hn-sec-title{font-size:1.2em}
   .fab-search{font-size:.9em;padding:.6rem .9rem}
   .bottom-nav-btn{font-size:.85em;padding:.5rem .8rem}
   .bottom-nav-label{font-size:.75em}
   .bottom-nav-title{font-size:.95em}
+  /* 手机端目录展示优化 */
+  .dir-group{margin:.3rem 0}
+  .dir-group-header{padding:.45rem .5rem}
+  .dir-group-body{padding-left:.8rem}
+  .hn-link{padding:.4rem .5rem; margin:.2rem 0; font-size:.95em}
+  .dir-intro{padding-left:1.4rem !important; font-size:.82em !important}
 }
+
+/* ===== 平板响应式（769px-1024px） ===== */
+@media (min-width:769px) and (max-width:1024px){
+  .content{padding:2rem 1.5rem 8rem; max-width:100%}
+  .sidebar{width:240px; flex:0 0 240px; padding:1.2rem .8rem}
+  .article h1{font-size:1.6em}
+  .article h2{font-size:1.2em}
+  /* 平板端目录展示优化 */
+  .dir-group-header{padding:.5rem .6rem}
+  .hn-link{padding:.4rem .6rem; font-size:.98em}
+}
+
+/* PWA安装引导浮层 */
+.pwa-install-hint{
+  position:fixed; bottom:1rem; left:50%; transform:translateX(-50%);
+  background:var(--surface); border:1px solid var(--line); border-radius:14px;
+  padding:1rem 1.2rem; max-width:90%; width:340px; box-shadow:0 8px 32px rgba(0,0,0,.18);
+  z-index:9998; font-size:.9rem; line-height:1.6;
+}
+.pwa-install-hint .pwa-title{font-weight:700; color:var(--ink); margin-bottom:.4rem; font-size:1rem}
+.pwa-install-hint .pwa-desc{color:var(--ink-soft); margin-bottom:.8rem}
+.pwa-install-hint .pwa-btns{display:flex; gap:.5rem; justify-content:flex-end}
+.pwa-install-hint .pwa-btn{padding:.4rem .8rem; border-radius:8px; border:none; cursor:pointer; font-size:.85rem; font-family:inherit}
+.pwa-install-hint .pwa-btn-ok{background:var(--accent); color:#fff}
+.pwa-install-hint .pwa-btn-close{background:var(--surface-soft); color:var(--ink-soft)}
 </style>
 <script data-goatcounter="https://drimed.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
 </head>
@@ -1142,6 +1211,28 @@ img{height:auto;max-width:100%}
     <input type="password" id="accessPasswordInput" placeholder="请输入访问密码" />
     <button class="access-btn" id="accessSubmitBtn">进入网站</button>
     <div class="access-error" id="accessError"></div>
+    <button class="pwa-install-btn" id="pwaInstallBtn" style="display:none;margin-top:1rem;padding:.6rem 1.2rem;background:#8a1f1c;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:.9rem;">
+      📱 安装到桌面（锁屏可听法音）
+    </button>
+  </div>
+</div>
+
+<!-- PWA安装引导浮层（默认隐藏） -->
+<div class="pwa-install-hint" id="pwaInstallHint" style="display:none">
+  <div class="pwa-title">📱 像 App 一样使用本站</div>
+  <div class="pwa-desc">点浏览器底部「⇧ 分享」按钮 → 选「添加到主屏幕」→ 从主屏幕打开，即可<strong>锁屏继续听法音</strong>、锁屏遥控播放。</div>
+  <div class="pwa-btns">
+    <button class="pwa-btn pwa-btn-close" id="pwaHintClose">不再提示</button>
+    <button class="pwa-btn pwa-btn-ok" id="pwaHintOk">知道了</button>
+  </div>
+</div>
+
+<!-- 微信浏览器引导条（默认隐藏） -->
+<div class="pwa-install-hint" id="wechatHint" style="display:none; bottom:auto; top:1rem">
+  <div class="pwa-title">🎧 想锁屏继续听？</div>
+  <div class="pwa-desc">点右上角「⋯」→ 选择「在浏览器中打开」，即可锁屏继续播放、锁屏遥控。</div>
+  <div class="pwa-btns">
+    <button class="pwa-btn pwa-btn-ok" id="wechatHintOk">知道了</button>
   </div>
 </div>
 <!-- 注册申请遮罩层（默认隐藏，设备数达到 100 后显示） -->
@@ -1160,19 +1251,19 @@ img{height:auto;max-width:100%}
 
 
 <div class="topbar">
-  <button class="menu-btn" id="menuBtn">☰</button>
+  <button class="menu-btn" id="menuBtn" aria-label="打开导航菜单">☰</button>
   <span class="brand" id="brandHome" style="cursor:pointer">@@SITE_TITLE@@<small id="pageCrumbs"></small></span>
   <span class="spacer"></span>
   <div class="fs-pill">
-    <button id="fsDec" title="缩小字号">A−</button>
+    <button id="fsDec" title="缩小字号" aria-label="缩小字号">A−</button>
     <span class="fs-cap">字号</span>
-    <button id="fsInc" title="放大字号">A+</button>
+    <button id="fsInc" title="放大字号" aria-label="放大字号">A+</button>
   </div>
-  <button id="themeToggle" class="theme-toggle" title="切换暗色/浅色模式">🌙</button>
+  <button id="themeToggle" class="theme-toggle" title="切换暗色/浅色模式" aria-label="切换暗色/浅色模式">🌙</button>
 </div>
 
 <!-- AI搜索悬浮按钮（移到topbar外面，避免backdrop-filter导致fixed定位失效） -->
-<button class="fab-search" id="fabSearch" title="点击搜索 / AI 问答，可拖动位置">
+<button class="fab-search" id="fabSearch" title="点击搜索 / AI 问答，可拖动位置" aria-label="AI搜索">
   <span class="fab-icon">🔍</span><span>AI 搜索</span>
 </button>
 
@@ -1290,7 +1381,7 @@ if ('serviceWorker' in navigator){
 
 
 // ---- 访问统计与密码保护 ----
-var STATS_API = "https://longchen-stats-auth.drimednor.workers.dev";
+var STATS_API = "https://stats.longchen-nyingtik.wiki";
 var ACCESS_KEY = "longchen-access-granted";
 var DEVICE_KEY = "longchen-device-id";
 var REG_KEY = "longchen-reg-id";
@@ -1515,6 +1606,42 @@ function initAccessControl() {
   var regBtn = document.getElementById('regSubmitBtn');
   if (regBtn) regBtn.onclick = submitRegistration;
   
+  // PWA手动安装按钮（解决密码页面干扰Chrome自动检测的问题）
+  var deferredInstallPrompt = null;
+  var installBtn = document.getElementById('pwaInstallBtn');
+  
+  // 捕获beforeinstallprompt事件
+  window.addEventListener('beforeinstallprompt', function(e) {
+    e.preventDefault();
+    deferredInstallPrompt = e;
+    if (installBtn) installBtn.style.display = 'block';
+    console.log('PWA: beforeinstallprompt已捕获，显示安装按钮');
+  });
+  
+  // 点击安装按钮触发安装
+  if (installBtn) {
+    installBtn.addEventListener('click', function() {
+      if (!deferredInstallPrompt) {
+        alert('请通过浏览器菜单选择「添加到主屏幕」或「安装应用」');
+        return;
+      }
+      deferredInstallPrompt.prompt();
+      deferredInstallPrompt.userChoice.then(function(choiceResult) {
+        console.log('PWA安装选择:', choiceResult.outcome);
+        if (choiceResult.outcome === 'accepted') {
+          if (installBtn) installBtn.style.display = 'none';
+        }
+        deferredInstallPrompt = null;
+      });
+    });
+  }
+  
+  // 监听安装成功事件
+  window.addEventListener('appinstalled', function() {
+    console.log('PWA: 应用安装成功');
+    if (installBtn) installBtn.style.display = 'none';
+  });
+  
   // 检查访问权限
   checkAccess();
 }
@@ -1578,7 +1705,7 @@ function collectDeviceInfo() {
 
 // 上报设备信息
 function reportDeviceInfo() {
-  var deviceId = localStorage.getItem('device_id') || '';
+  var deviceId = getDeviceId();
   if (!deviceId) return;
   var info = collectDeviceInfo();
   info.deviceId = deviceId;
@@ -1706,7 +1833,7 @@ function getClickTargetInfo(el) {
 function flushClickBuffer() {
   if (clickBuffer.length === 0) return;
   var buffer = clickBuffer.splice(0, clickBuffer.length);
-  var deviceId = localStorage.getItem('device_id') || '';
+  var deviceId = getDeviceId();
   try {
     fetch(CLICK_STATS_ENDPOINT, {
       method: 'POST',
@@ -1752,11 +1879,11 @@ function reportDuration() {
   var now = Date.now();
   var duration = Math.floor((now - pageEnterTime) / 1000);
   if (duration < 5) return; // 少于5秒不上报
-  var deviceId = localStorage.getItem('device_id') || '';
+  var deviceId = getDeviceId();
   try {
     fetch(DURATION_STATS_ENDPOINT, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'X-Device-ID': deviceId },
       body: JSON.stringify({ deviceId: deviceId, duration: duration, page: currentTrackPage })
     }).catch(function(){});
   } catch(e) {}
@@ -1772,11 +1899,11 @@ window.addEventListener('hashchange', function() {
   var now = Date.now();
   var duration = Math.floor((now - pageEnterTime) / 1000);
   if (duration >= 5) {
-    var deviceId = localStorage.getItem('device_id') || '';
+    var deviceId = getDeviceId();
     try {
       fetch(DURATION_STATS_ENDPOINT, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'X-Device-ID': deviceId },
         body: JSON.stringify({ deviceId: deviceId, duration: duration, page: currentTrackPage })
       }).catch(function(){});
     } catch(e) {}
@@ -1786,12 +1913,60 @@ window.addEventListener('hashchange', function() {
   currentTrackPage = location.hash.replace('#/', '') || 'index';
 });
 
+// 左滑返回上一级（手机端手势）
+var touchStartX = 0;
+var touchStartY = 0;
+var touchStartTime = 0;
+document.addEventListener('touchstart', function(e){
+  if (e.touches.length === 1) {
+    touchStartX = e.touches[0].clientX;
+    touchStartY = e.touches[0].clientY;
+    touchStartTime = Date.now();
+  }
+}, {passive: true});
+
+document.addEventListener('touchend', function(e){
+  if (e.changedTouches.length === 1) {
+    var endX = e.changedTouches[0].clientX;
+    var endY = e.changedTouches[0].clientY;
+    var deltaX = endX - touchStartX;
+    var deltaY = endY - touchStartY;
+    var deltaTime = Date.now() - touchStartTime;
+    
+    // 判断是否为左滑：水平位移>50px，垂直位移<30px，时间<500ms
+    if (deltaX < -50 && Math.abs(deltaY) < 30 && deltaTime < 500) {
+      // 左滑返回上一级
+      var currentSlug = location.hash.replace('#/', '') || 'index';
+      if (currentSlug !== 'index') {
+        // 计算上一级路径
+        var parts = currentSlug.split('/');
+        if (parts.length > 1) {
+          parts.pop();
+          var parentSlug = parts.join('/');
+          // 如果上一级是目录，跳转到目录index
+          if (bySlug[parentSlug + '/index']) {
+            show(parentSlug + '/index');
+          } else if (bySlug[parentSlug]) {
+            show(parentSlug);
+          } else {
+            show('index');
+          }
+        } else {
+          show('index');
+        }
+        // 阻止默认行为（防止浏览器后退）
+        e.preventDefault();
+      }
+    }
+  }
+}, {passive: false});
+
 // 页面关闭前上报最后一次时长
 window.addEventListener('beforeunload', function() {
   var now = Date.now();
   var duration = Math.floor((now - pageEnterTime) / 1000);
   if (duration >= 5) {
-    var deviceId = localStorage.getItem('device_id') || '';
+    var deviceId = getDeviceId();
     try {
       navigator.sendBeacon(DURATION_STATS_ENDPOINT, JSON.stringify({
         deviceId: deviceId,
@@ -1811,7 +1986,29 @@ var AUDIO_ALBUM = @@AUDIO_ALBUM_JSON@@;
 var AUDIO_TRACKS = @@AUDIO_TRACKS_JSON@@;
 var HOME_UPDATE_HTML = @@HOME_UPDATE_JSON@@;   // 首页「本次更新内容」区块（纯用户资料，不含技术调整）
 var HOME_UPDATE_DATE = "@@HOME_UPDATE_DATE@@"; // 首页公告区标题用的更新日期（取自内容文件 frontmatter date 字段）
-var KNOWLEDGE_BASE = @@KNOWLEDGE_BASE_JSON@@;  // AI问答知识库索引（构建时生成，标题+正文摘要）
+var KNOWLEDGE_BASE = @@KNOWLEDGE_BASE_JSON@@;  // AI问答知识库索引（按需加载，初始为空）
+var knowledgeLoaded = false;
+var knowledgeLoadingPromise = null;
+
+// 按需加载知识库（只有使用AI搜索时才加载，减少首屏体积）
+function loadKnowledge(){
+  if (knowledgeLoaded) return Promise.resolve(KNOWLEDGE_BASE);
+  if (knowledgeLoadingPromise) return knowledgeLoadingPromise;
+  knowledgeLoadingPromise = fetch('knowledge.json', {cache: 'force-cache'})
+    .then(function(r){ return r.json(); })
+    .then(function(data){
+      KNOWLEDGE_BASE = data;
+      knowledgeLoaded = true;
+      console.log('知识库加载完成，共 ' + data.length + ' 条索引');
+      return KNOWLEDGE_BASE;
+    })
+    .catch(function(err){
+      console.error('知识库加载失败:', err);
+      knowledgeLoadingPromise = null;
+      return [];
+    });
+  return knowledgeLoadingPromise;
+}
 
 var bySlug = {};
 PAGES.forEach(function(p){ bySlug[p.slug] = p; });
@@ -1909,7 +2106,7 @@ function renderNav(){
   nav.querySelectorAll('.nav-sec-head').forEach(function(h){
     if (h.classList.contains('nav-external')) return;   // 外部链接项不绑定点击，让 <a> 默认跳转
     h.onclick = function(){
-      show(h.dataset.slug);
+      go(h.dataset.slug);
       if (window.innerWidth <= 760) closeSidebar();
     };
     // 悬停：按该项文字色生成更深色块并选配对比文字，松开即恢复
@@ -1977,7 +2174,7 @@ function openDirList(path){
     el.onclick = function(){
       closeDirPop();
       var slug = el.dataset.jump;
-      if (bySlug[slug]) show(slug);
+      if (bySlug[slug]) go(slug);
     };
   });
 }
@@ -1990,7 +2187,6 @@ function closeDirPop(){
 }
 
 // ---- 内容统计（页面浏览 + 音频播放）----
-var STATS_API = 'https://stats.longchen-nyingtik.wiki';
 var pageViewSlug = null;
 var pageViewStartTime = 0;
 var audioPlayName = null;
@@ -2189,7 +2385,7 @@ function show(slug){
       ev.preventDefault();
       var target = a.dataset.page;
       var hit = bySlug[target] || matchByTitle(target);
-      if (hit) show(hit.slug); else alert('未找到页面：' + target);
+      if (hit) go(hit.slug); else alert('未找到页面：' + target);
     };
   });
   // 首页导览卡片点击跳转
@@ -2198,7 +2394,7 @@ function show(slug){
       ev.preventDefault();
       var target = a.dataset.page;
       var hit = bySlug[target] || matchByTitle(target);
-      if (hit) show(hit.slug); else alert('未找到页面：' + target);
+      if (hit) go(hit.slug); else alert('未找到页面：' + target);
     };
   });
   // 首页导览音频项 → 直接播放（有详情页链接的除外，让其正常跳转）
@@ -2217,7 +2413,7 @@ function show(slug){
       if (a.dataset.dir && isMobile){ openDirList(a.dataset.dir); return; }
       var target = a.dataset.page;
       var hit = bySlug[target] || matchByTitle(target);
-      if (hit) show(hit.slug); else alert('未找到页面：' + target);
+      if (hit) go(hit.slug); else alert('未找到页面：' + target);
     };
   });
   // 播放按钮 → 触发全局播放器
@@ -2250,6 +2446,18 @@ function show(slug){
   // GoatCounter SPA 页面切换统计
   if (window.goatcounter && window.goatcounter.count){
     try { window.goatcounter.count({path: location.pathname + location.hash}); } catch(e){}
+  }
+}
+
+// ── 统一导航入口：所有"用户点击触发"的跳转必须走 go()，写入历史栈 ──
+// 程序/前进后退/初始加载 → show()；用户点击 → go()
+function go(slug){
+  if (!slug || slug === currentSlug) return;
+  var target = '#/' + slug.split('/').map(encodeURIComponent).join('/');
+  if (location.hash !== target) {
+    location.hash = target;   // 写入历史 → 触发 hashchange → show()
+  } else {
+    show(slug);
   }
 }
 
@@ -2630,9 +2838,9 @@ function walkBlock(node, prefix, depth, parentNum, defaultCollapsed, introMap){
       + (depth === 0 && defaultCollapsed && totalArticleCount > 0 ? '<span class="dir-article-count" style="font-size:.75em;color:var(--ink-faint);flex:0 0 auto;margin-left:-.2rem;">(' + totalArticleCount + '篇)</span>' : '')
       + '<span class="audio-group-spacer"></span>'
       + '</div>');
-    // 一级目录引导语（仅在defaultCollapsed模式下显示）
+    // 一级目录引导语（仅在defaultCollapsed模式下显示，默认隐藏，展开目录时显示）
     if (depth === 0 && defaultCollapsed && introMap && introMap[cleanDirName(name)]){
-      arr.push('<div class="dir-intro" style="padding-left:1.6rem;padding-bottom:.3rem;font-size:.85em;color:var(--ink-soft);font-style:italic;">' + esc(introMap[cleanDirName(name)]) + '</div>');
+      arr.push('<div class="dir-intro" style="display:none;padding-left:1.6rem;padding-bottom:.3rem;font-size:.85em;color:var(--ink-soft);line-height:1.6;">' + esc(introMap[cleanDirName(name)]) + '</div>');
     }
     arr.push('<div class="dir-group-body" style="' + (isDefaultOpen ? '' : 'display:none;') + 'padding-left:1rem;">');
     walkBlock(sub, full, depth + 1, num, defaultCollapsed, introMap).forEach(function(x){ arr.push(x); });
@@ -2676,15 +2884,20 @@ function toggleDirGroup(header){
   var group = header.parentElement;
   var body = group.querySelector('.dir-group-body');
   var chev = header.querySelector('.dir-group-chev');
+  var intro = group.querySelector('.dir-intro');
   if (body.style.display === 'none'){
     body.style.display = '';
     chev.textContent = '▼';
+    // 展开时显示引导语
+    if (intro) intro.style.display = '';
     // 展开时显示所有隐藏的文章
     var hiddenPages = body.querySelectorAll('.hn-hidden-page');
     hiddenPages.forEach(function(el){ el.style.display = ''; });
   } else {
     body.style.display = 'none';
     chev.textContent = '▶';
+    // 折叠时隐藏引导语
+    if (intro) intro.style.display = 'none';
     // 折叠时重新隐藏超过2篇的文章
     var hiddenPages = body.querySelectorAll('.hn-hidden-page');
     var visibleCount = 0;
@@ -2755,7 +2968,7 @@ function renderHomeNav(){
     var meta = META[dirName] || {icon:'📜', title:cleanDirName(dirName), desc:'点击进入查看相关内容。'};
     html.push('<section class="hn-sec">');
     var dirIndexSlug = dirName + '/index';
-    html.push('<h2 class="hn-sec-title" style="cursor:pointer;" onclick="show(\'' + esc(dirIndexSlug) + '\')" title="点击进入' + esc(meta.title) + '目录">' + meta.icon + ' ' + esc(meta.title) + ' <span style="font-size:.7em;color:var(--ink-faint);font-weight:normal;">›</span></h2>');
+    html.push('<h2 class="hn-sec-title" style="cursor:pointer;" onclick="go(\'' + esc(dirIndexSlug) + '\')" title="点击进入' + esc(meta.title) + '目录">' + meta.icon + ' ' + esc(meta.title) + ' <span style="font-size:.7em;color:var(--ink-faint);font-weight:normal;">›</span></h2>');
     if (meta.desc) html.push('<p class="hn-desc">' + meta.desc + '</p>');
     if (meta.tips){
       html.push('<ul class="hn-tips">'
@@ -3297,7 +3510,7 @@ function doPanelSearch(){
     results.innerHTML = '<div style="font-weight:600;margin-bottom:.5rem;color:var(--ink-soft);">📚 相关文章（' + matched.length + '）</div>' +
       matched.slice(0, 10).map(function(p){
         var path = p.slug.replace(/\//g, ' / ');
-        return '<div class="search-result-item" onclick="minimizeSearchPanel();show(\'' + p.slug.replace(/'/g, "\\'") + '\')">'
+        return '<div class="search-result-item" onclick="minimizeSearchPanel();go(\'' + p.slug.replace(/'/g, "\\'") + '\')">'
           + '<div class="sr-title">' + esc(p.title) + '</div>'
           + '<div class="sr-path">' + esc(path) + '</div></div>';
       }).join('');
@@ -3384,20 +3597,24 @@ function searchKnowledge(question){
     var title = item.title || '';
     var content = item.content || '';
     var tags = item.tags || [];
+    var itemType = item.type || 'article';
     
     expandedKeywords.forEach(function(kw){
       if (kw.length < 2) return;
-      // 标题匹配权重高
-      if (title.indexOf(kw) >= 0) score += 5;
+      // 标题匹配权重最高
+      if (title.indexOf(kw) >= 0) score += 10;
       // 内容匹配
-      if (content.indexOf(kw) >= 0) score += 1;
+      if (content.indexOf(kw) >= 0) score += 2;
       // tags匹配
       if (tags && tags.length > 0) {
         tags.forEach(function(tag){
-          if (tag.indexOf(kw) >= 0 || kw.indexOf(tag) >= 0) score += 3;
+          if (tag.indexOf(kw) >= 0 || kw.indexOf(tag) >= 0) score += 5;
         });
       }
     });
+    
+    // 文章级条目额外加分（因为包含完整摘要）
+    if (itemType === 'article') score += 3;
     
     // 模糊匹配：计算问题与标题的字符重叠度
     var overlap = 0;
@@ -3405,13 +3622,35 @@ function searchKnowledge(question){
       if (title.indexOf(question[i]) >= 0) overlap++;
     }
     if (overlap >= Math.min(3, question.length * 0.5)) {
-      score += overlap * 0.5;
+      score += overlap * 0.8;
+    }
+    
+    // 匹配密度加分：匹配的关键词占比
+    var matchedCount = 0;
+    expandedKeywords.forEach(function(kw){
+      if (kw.length < 2) return;
+      if (title.indexOf(kw) >= 0 || content.indexOf(kw) >= 0) matchedCount++;
+    });
+    if (expandedKeywords.length > 0) {
+      score += (matchedCount / expandedKeywords.length) * 5;
     }
     
     if (score > 0) results.push({item: item, score: score});
   });
   
   results.sort(function(a, b){ return b.score - a.score; });
+  
+  // 按文章slug去重，保留得分最高的条目
+  var seenSlugs = {};
+  var uniqueResults = [];
+  results.forEach(function(r){
+    var slug = r.item.slug;
+    if (!seenSlugs[slug]) {
+      seenSlugs[slug] = true;
+      uniqueResults.push(r);
+    }
+  });
+  results = uniqueResults;
   
   // 过滤规则1：永远不要引用更新日志
   results = results.filter(function(r){
@@ -3433,8 +3672,17 @@ function searchKnowledge(question){
     });
   }
   
-  // 返回得分最高的5篇
-  return results.slice(0, 5).map(function(r){ return r.item; });
+  // 返回得分最高的8篇（增加数量，给AI更多参考）
+  return results.slice(0, 8).map(function(r){ 
+    return {
+      slug: r.item.slug,
+      title: r.item.title,
+      tags: r.item.tags || [],
+      content: r.item.content,
+      type: r.item.type || 'article',
+      score: r.score
+    }; 
+  });
 }
 
 // 发送问题（接受可选 question 参数）
@@ -3448,60 +3696,85 @@ function sendAiAsk(question){
   // 显示用户问题
   messages.innerHTML = '<div style="text-align:right;margin:.5rem 0;"><span style="display:inline-block;background:var(--accent);color:#fff;padding:.5rem .8rem;border-radius:12px 12px 2px 12px;max-width:80%;">' + esc(question) + '</span></div>';
 
-  // 搜索相关内容
-  var related = searchKnowledge(question);
-  var hasContext = related.length > 0;
-
-  // 显示"正在思考"
+  // 显示"正在加载知识库"
   var thinkingId = 'ai-thinking-' + Date.now();
-  var thinkingText = hasContext ? '正在基于本站内容思考...' : '正在基于通用知识思考...';
-  messages.innerHTML += '<div id="' + thinkingId + '" style="text-align:left;margin:.5rem 0;color:var(--ink-faint);">' + thinkingText + '</div>';
+  messages.innerHTML += '<div id="' + thinkingId + '" style="text-align:left;margin:.5rem 0;color:var(--ink-faint);">正在加载知识库...</div>';
   messages.scrollTop = messages.scrollHeight;
 
-  // 如果未配置 API，显示本地搜索结果（降级模式）
-  if (!AI_API_ENDPOINT){
-    if (hasContext){
-      var answer = '根据本站相关文章：\n\n';
-      related.forEach(function(item, idx){
-        answer += (idx+1) + '. 《' + item.title + '》\n';
-        answer += item.content.slice(0, 200) + '...\n';
-        answer += '[查看全文](#' + item.slug + ')\n\n';
-      });
-      answer += '（AI 代理未配置，当前显示相关文章摘要。配置 API 后可获得智能回答。）';
-    } else {
-      var answer = '本网站未收集到相关资料，以下内容由 AI 基于通用知识生成，可能与本网站观点不一致，请谨慎参考。\n\n（AI 代理未配置，无法生成智能回答。配置 API 后可获得基于通用知识的回答。）';
+  // 先加载知识库（按需加载，首次使用时才下载）
+  loadKnowledge().then(function(){
+    // 搜索相关内容
+    var related = searchKnowledge(question);
+    var hasContext = related.length > 0;
+
+    // 更新"正在思考"
+    document.getElementById(thinkingId).textContent = hasContext ? '正在基于本站内容思考...' : '正在基于通用知识思考...';
+
+    // 如果未配置 API，显示本地搜索结果（降级模式）
+    if (!AI_API_ENDPOINT){
+      if (hasContext){
+        var answer = '根据本站相关文章：\n\n';
+        related.forEach(function(item, idx){
+          answer += (idx+1) + '. 《' + item.title + '》\n';
+          answer += item.content.slice(0, 200) + '...\n';
+          answer += '[查看全文](#' + item.slug + ')\n\n';
+        });
+        answer += '（AI 代理未配置，当前显示相关文章摘要。配置 API 后可获得智能回答。）';
+      } else {
+        var answer = '本网站未收集到相关资料，以下内容由 AI 基于通用知识生成，可能与本网站观点不一致，请谨慎参考。\n\n（AI 代理未配置，无法生成智能回答。配置 API 后可获得基于通用知识的回答。）';
+      }
+      document.getElementById(thinkingId).remove();
+      messages.innerHTML += '<div style="text-align:left;margin:.5rem 0;"><span style="display:inline-block;background:var(--surface-soft);color:var(--ink);padding:.7rem 1rem;border-radius:12px 12px 12px 2px;max-width:90%;white-space:pre-wrap;line-height:1.7;">' + esc(answer) + '</span></div>';
+      messages.scrollTop = messages.scrollHeight;
+      return;
     }
-    document.getElementById(thinkingId).remove();
-    messages.innerHTML += '<div style="text-align:left;margin:.5rem 0;"><span style="display:inline-block;background:var(--surface-soft);color:var(--ink);padding:.7rem 1rem;border-radius:12px 12px 12px 2px;max-width:90%;white-space:pre-wrap;line-height:1.7;">' + esc(answer) + '</span></div>';
-    messages.scrollTop = messages.scrollHeight;
-    return;
+
+    // 调用 API（通过 Cloudflare Workers 代理）
+    // 构建结构化的context，让AI更容易基于本站内容回答
+  var context = '';
+  if (hasContext) {
+    context = '【本站相关资料】\n\n';
+    related.forEach(function(item, idx){
+      context += '资料' + (idx+1) + '：《' + item.title + '》\n';
+      if (item.tags && item.tags.length > 0) {
+        context += '标签：' + item.tags.join('、') + '\n';
+      }
+      context += '内容：' + item.content + '\n\n';
+    });
+    context += '【回答要求】\n';
+    context += '1. 请优先基于以上本站资料回答问题\n';
+    context += '2. 回答中引用资料时，请标注资料编号（如[1]）\n';
+    context += '3. 如果资料中没有相关内容，请明确说明"本站暂无相关内容"\n';
+    context += '4. 语气温暖平和、生活化，有智慧见地，给人希望和信心\n';
   }
-
-  // 调用 API（通过 Cloudflare Workers 代理）
-  var context = hasContext ? related.map(function(item){
-    return '《' + item.title + '》\n' + item.content;
-  }).join('\n\n---\n\n') : '';
-
+  
   fetch(AI_API_ENDPOINT, {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
     body: JSON.stringify({
       question: question,
       context: context,
+      hasContext: hasContext,
       related: related.map(function(r){ return {title: r.title, slug: r.slug}; })
     })
   }).then(function(r){ return r.json(); })
   .then(function(data){
     document.getElementById(thinkingId).remove();
     var answer = data.answer || data.response || '抱歉，AI 暂时无法回答，请稍后再试。';
+    
+    // 如果本站无相关内容，添加提示
+    if (!hasContext) {
+      answer = '⚠️ 本站暂无相关内容，以下信息是基于网络和大模型自身相关知识的回答，仅供参考。\n\n' + answer;
+    }
+    
     var answerHtml = '<div style="text-align:left;margin:.5rem 0;"><span style="display:inline-block;background:var(--surface-soft);color:var(--ink);padding:.7rem 1rem;border-radius:12px 12px 12px 2px;max-width:90%;white-space:pre-wrap;line-height:1.7;">' + esc(answer) + '</span></div>';
     // 如果有参考资料，在回答末尾添加引用来源列表
     if (hasContext && related && related.length > 0){
       answerHtml += '<div style="text-align:left;margin:.3rem 0 .5rem 0;padding-left:.5rem;">'
-        + '<div style="font-size:.8em;color:var(--ink-faint);margin-bottom:.3rem;">📚 引用来源（点击跳转）：</div>'
+        + '<div style="font-size:.8em;color:var(--ink-faint);margin-bottom:.3rem;">📚 引用来源（点击可直接跳转到对应文章）：</div>'
         + related.map(function(item, idx){
             var path = item.slug.replace(/\//g, ' / ');
-            return '<div class="search-result-item" style="padding:.25rem .5rem;margin:.15rem 0;font-size:.85em;cursor:pointer;border-radius:4px;" onclick="minimizeSearchPanel();show(\'' + item.slug.replace(/'/g, "\\'") + '\')">'
+            return '<div class="search-result-item" style="padding:.25rem .5rem;margin:.15rem 0;font-size:.85em;cursor:pointer;border-radius:4px;" onclick="minimizeSearchPanel();go(\'' + item.slug.replace(/'/g, "\\'") + '\')">'
               + '<div style="display:flex;align-items:baseline;gap:.3rem;">'
               + '<span style="color:var(--gold-deep);font-weight:600;flex:0 0 auto;">[' + (idx+1) + ']</span>'
               + '<span style="font-weight:500;">' + esc(item.title) + '</span>'
@@ -3515,8 +3788,9 @@ function sendAiAsk(question){
     messages.scrollTop = messages.scrollHeight;
   }).catch(function(err){
     document.getElementById(thinkingId).remove();
-    messages.innerHTML += '<div style="text-align:left;margin:.5rem 0;color:#c0392b;">调用失败：' + esc(err.message) + '</div>';
+    messages.innerHTML += '<div style="text-align:left;margin:.5rem 0;color:#c0392b;">调用失败：' + esc(err.message) + '，请稍后重试。</div>';
   });
+  }); // 闭合 loadKnowledge().then()
 }
 
 
@@ -3542,14 +3816,92 @@ function matchByTitle(t){
   return null;
 }
 
+// ---- PWA安装引导 & 微信浏览器检测 ----
+(function(){
+  var ua = navigator.userAgent;
+  var isWeChat = /MicroMessenger/i.test(ua);
+  var isIOS = /iPad|iPhone|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  var isStandalone = window.navigator.standalone === true || window.matchMedia('(display-mode: standalone)').matches;
+
+  // 微信浏览器：显示引导条
+  if (isWeChat) {
+    try {
+      var dismissed = localStorage.getItem('wechat_hint_dismissed');
+      if (!dismissed) {
+        var wechatHint = document.getElementById('wechatHint');
+        if (wechatHint) wechatHint.style.display = 'block';
+        var wechatOk = document.getElementById('wechatHintOk');
+        if (wechatOk) wechatOk.addEventListener('click', function(){
+          if (wechatHint) wechatHint.style.display = 'none';
+          try { localStorage.setItem('wechat_hint_dismissed', '1'); }catch(e){}
+        });
+      }
+    } catch(e) {}
+    return; // 微信中不显示PWA安装引导
+  }
+
+  // iOS Safari且未安装PWA：用户第一次点播放时弹出安装引导
+  if (isIOS && !isStandalone) {
+    try {
+      var dismissed = localStorage.getItem('pwa_install_hint_dismissed');
+      if (dismissed) return;
+
+      var pwaHint = document.getElementById('pwaInstallHint');
+      var pwaOk = document.getElementById('pwaHintOk');
+      var pwaClose = document.getElementById('pwaHintClose');
+
+      if (pwaOk) pwaOk.addEventListener('click', function(){
+        if (pwaHint) pwaHint.style.display = 'none';
+      });
+      if (pwaClose) pwaClose.addEventListener('click', function(){
+        if (pwaHint) pwaHint.style.display = 'none';
+        try { localStorage.setItem('pwa_install_hint_dismissed', '1'); }catch(e){}
+      });
+
+      // 监听第一次播放按钮点击
+      var showHintOnce = function(){
+        if (pwaHint && pwaHint.style.display === 'none') {
+          pwaHint.style.display = 'block';
+        }
+        document.removeEventListener('click', showHintOnce);
+      };
+      // 延迟绑定，确保播放器按钮已渲染
+      setTimeout(function(){
+        document.addEventListener('click', function(e){
+          var target = e.target;
+          if (target && (target.classList.contains('play-btn') || target.closest('.play-btn') ||
+              target.classList.contains('hn-audio') || target.closest('.hn-audio'))) {
+            showHintOnce();
+          }
+        });
+      }, 1000);
+    } catch(e) {}
+  }
+})();
+
 // ---- 全局音频播放器 ----
 // iOS 锁屏控制要求 <audio> 元素在 DOM 中，故用 createElement + appendChild，而非 new Audio()
 var playerAudio = document.createElement('audio');
-playerAudio.preload = 'metadata';   // iOS 需预加载元数据才能在锁屏显示标题/时长
+playerAudio.preload = 'auto';   // 预加载音频，确保锁屏控制正常工作
 // iOS：允许内联播放，后台/锁屏时保持播放并启用 Media Session 锁屏控制
 try{ playerAudio.playsInline = true; playerAudio.setAttribute('playsinline', ''); }catch(e){}
+try{ playerAudio.setAttribute('x5-playsinline', ''); }catch(e){}  // 微信X5内核
+try{ playerAudio.setAttribute('webkit-playsinline', ''); }catch(e){}  // iOS Safari
 playerAudio.style.display = 'none';
 document.body.appendChild(playerAudio);
+
+// 前台恢复逻辑：切回前台时如果之前在播放，恢复播放
+var wasPlayingBeforeHide = false;
+document.addEventListener('visibilitychange', function(){
+  if (document.visibilityState === 'visible') {
+    if (playerAudio.readyState >= 2 && !playerAudio.ended && wasPlayingBeforeHide) {
+      playerAudio.play().catch(function(){});
+    }
+  } else {
+    wasPlayingBeforeHide = !playerAudio.paused;
+  }
+});
+
 // 播放进度记忆：每5秒保存一次
 playerAudio.addEventListener('timeupdate', function(){
   if (curIdx >= 0 && playerAudio.currentTime > 5) {
@@ -3596,6 +3948,26 @@ function updateModeBtn(){
   var b = document.getElementById('pMode');
   if (b) b.textContent = PLAY_ICONS[curMode()] + ' ' + curMode();
 }
+
+// iOS连播兜底：锁屏状态下ended事件可能丢失，用timeupdate监测"疑似播完"主动触发下一首
+playerAudio.addEventListener('timeupdate', function(){
+  if (!needsKeepAlive) return; // 仅iOS Safari浏览器内启用
+  if (playerAudio.duration
+      && playerAudio.duration - playerAudio.currentTime < 0.5
+      && !playerAudio.paused) {
+    if (!window.__advancing) {
+      window.__advancing = true;
+      setTimeout(function(){ window.__advancing = false; }, 2000);
+      if (curMode() === '单曲') {
+        playerAudio.currentTime = 0;
+        playerAudio.play().catch(function(){});
+      } else {
+        var n = autoNext(curIdx);
+        if (n >= 0) playTrack(n);
+      }
+    }
+  }
+});
 
 function fmtTime(s){
   if (!isFinite(s) || s < 0) s = 0;
@@ -3645,19 +4017,22 @@ function updateMini(){
   document.getElementById('pmPlay').textContent = playerAudio.paused ? '▶' : '⏸';
 }
 
-// ---- 设置 Media Session 元信息（iOS 锁屏显示标题/封面/控制）----
+// ---- 设置 Media Session 元信息（iOS/Android 锁屏显示标题/封面/控制按钮）----
 // 需在 playTrack 和 play 事件中都调用：iOS 有时要在音频真正开始播放后才能识别
 function setMediaMeta(t){
   if (!('mediaSession' in navigator) || !t) return;
   try{
+    // artwork只声明真实的512x512尺寸，避免假声明导致部分系统不显示封面
     navigator.mediaSession.metadata = new MediaMetadata({
       title: t.title,
       artist: '龙的传人｜Longchen Nyingtik',
       album: (t.folder || '音频资源').replace(/^\d+\.\s*/, ''),
-      artwork: [{ src: new URL('assets/cover.png', location.href).href, sizes: '512x512', type: 'image/png' }]
+      artwork: [
+        { src: new URL('assets/cover.png', location.href).href, sizes: '512x512', type: 'image/png' }
+      ]
     });
     navigator.mediaSession.playbackState = 'playing';
-  }catch(e){}
+  }catch(e){ console.log('MediaSession设置失败:', e); }
 }
 
 function playTrack(idx){
@@ -3671,6 +4046,8 @@ function playTrack(idx){
   var t = AUDIO_TRACKS[idx];
   audioPlayName = t.title;
   audioPlayStartTime = now;
+  // 切歌时重置位置状态，避免旧duration残留导致锁屏进度条闪跳
+  try{ if ('mediaSession' in navigator) navigator.mediaSession.setPositionState({ duration: 0 }); }catch(e){}
   playerAudio.src = t.src;
   playerAudio.playbackRate = SPEEDS[speedIdx];
   // 恢复上次播放进度（如果有保存）
@@ -3679,7 +4056,17 @@ function playTrack(idx){
   if (savedPos > 0 && savedPos < (t.duration || 99999)) {
     playerAudio.currentTime = savedPos;
   }
-  playerAudio.play();
+  // 播放：处理Promise，确保后台/自动连播时也能正常播放
+  var playPromise = playerAudio.play();
+  if (playPromise !== undefined) {
+    playPromise.catch(function(err){
+      console.log('自动播放被阻止，尝试重试:', err);
+      // 自动播放被阻止时，延迟100ms重试（用户已有交互，通常能成功）
+      setTimeout(function(){
+        playerAudio.play().catch(function(e){ console.log('重试播放失败:', e); });
+      }, 100);
+    });
+  }
   // 保存当前播放
   try { localStorage.setItem('longchen-audio-cur', String(idx)); } catch(e){}
   document.getElementById('pStatusText').innerHTML = '正在播放：<b>' + esc(t.title) + '</b>';
@@ -3764,10 +4151,26 @@ playerAudio.addEventListener('timeupdate', function(){
 });
 playerAudio.addEventListener('ended', function(){
   // 依据当前播放模式自动连播：单曲循环重播本曲；顺序到末曲停止；逆序到首曲停止；随机取下一首
-  if (curMode() === '单曲'){ playerAudio.currentTime = 0; playerAudio.play(); return; }
+  if (curMode() === '单曲'){
+    playerAudio.currentTime = 0;
+    var playPromise = playerAudio.play();
+    if (playPromise !== undefined) {
+      playPromise.catch(function(err){
+        console.log('单曲循环播放失败:', err);
+        // 自动播放被阻止时，尝试延迟重试
+        setTimeout(function(){ playerAudio.play(); }, 100);
+      });
+    }
+    return;
+  }
   var n = autoNext(curIdx);
-  if (n >= 0) playTrack(n);
-  else { document.getElementById('pPlay').textContent = '▶'; updateMini(); }
+  if (n >= 0) {
+    // 自动连播：使用Promise处理，确保后台也能正常切换
+    playTrack(n);
+  } else {
+    document.getElementById('pPlay').textContent = '▶';
+    updateMini();
+  }
 });
 playerAudio.addEventListener('play', function(){
   document.getElementById('pPlay').textContent = '⏸'; updateMini();
@@ -3797,15 +4200,51 @@ if ('mediaSession' in navigator){
     navigator.mediaSession.setActionHandler('nexttrack', function(){ if (curIdx >= 0) playTrack(manualNext(curIdx)); });
     navigator.mediaSession.setActionHandler('seekbackward', function(){ if (curIdx >= 0) playerAudio.currentTime = Math.max(0, playerAudio.currentTime - 15); });
     navigator.mediaSession.setActionHandler('seekforward', function(){ if (curIdx >= 0 && playerAudio.duration) playerAudio.currentTime = Math.min(playerAudio.duration, playerAudio.currentTime + 15); });
-  }catch(e){}
+    // seekto：Android锁屏进度条拖动
+    try {
+      navigator.mediaSession.setActionHandler('seekto', function(details){
+        if (details.fastSeek && playerAudio.fastSeek) {
+          playerAudio.fastSeek(details.seekTime);
+        } else {
+          playerAudio.currentTime = details.seekTime;
+        }
+        if (playerAudio.duration) {
+          try{ navigator.mediaSession.setPositionState({ duration: playerAudio.duration, playbackRate: playerAudio.playbackRate, position: playerAudio.currentTime }); }catch(e){}
+        }
+      });
+    } catch(e) { /* Safari不支持seekto，忽略 */ }
+    // stop：停止播放
+    try {
+      navigator.mediaSession.setActionHandler('stop', function(){
+        playerAudio.pause();
+        playerAudio.currentTime = 0;
+        try{ navigator.mediaSession.playbackState = 'none'; }catch(e){}
+      });
+    } catch(e) {}
+    console.log('MediaSession: action handlers 已注册');
+  }catch(e){ console.log('MediaSession: action handlers 注册失败:', e); }
+} else {
+  console.log('MediaSession: 当前浏览器不支持');
 }
+// 音频可以播放时设置metadata，确保锁屏显示
+playerAudio.addEventListener('canplay', function(){
+  if (curIdx >= 0 && AUDIO_TRACKS[curIdx]) {
+    setMediaMeta(AUDIO_TRACKS[curIdx]);
+    console.log('MediaSession: canplay时设置metadata');
+  }
+});
 // 锁屏进度条：timeupdate 时同步 position state，部分浏览器锁屏显示进度
+// 节流：最多每1秒同步一次，避免部分Android机锁屏卡顿
+var lastPosSync = 0;
 playerAudio.addEventListener('loadedmetadata', function(){
   if ('mediaSession' in navigator && playerAudio.duration){
     try{ navigator.mediaSession.setPositionState({ duration: playerAudio.duration, playbackRate: playerAudio.playbackRate, position: playerAudio.currentTime }); }catch(e){}
   }
 });
 playerAudio.addEventListener('timeupdate', function(){
+  var now = Date.now();
+  if (now - lastPosSync < 1000) return;
+  lastPosSync = now;
   if ('mediaSession' in navigator && playerAudio.duration && !playerAudio.paused){
     try{ navigator.mediaSession.setPositionState({ duration: playerAudio.duration, playbackRate: playerAudio.playbackRate, position: playerAudio.currentTime }); }catch(e){}
   }
@@ -3938,7 +4377,7 @@ pmProg.addEventListener('mousedown', function(ev){ seekFromEvent(ev, pmProg); })
 pmProg.addEventListener('touchstart', function(ev){ seekFromEvent(ev, pmProg); }, {passive:true});
 
 // 顶栏品牌点击返回主页
-document.getElementById('brandHome').onclick = function(){ show('index'); };
+document.getElementById('brandHome').onclick = function(){ go('index'); };
 
 function esc(s){ var d=document.createElement('div'); d.textContent = s==null?'':String(s); return d.innerHTML; }
 
@@ -4554,102 +4993,6 @@ window.addEventListener('scroll', function(){
 })();
 
 </script>
-<script>
-/* ===== 文章内容按需加载模块 =====
- * 在原始show函数之后加载，重写show函数实现按需加载
- */
-(function(){
-  // 已加载的文章内容缓存
-  var pageContentCache = {};
-  // 正在加载的文章，避免重复请求
-  var pageLoading = {};
-  // 保存原始的show函数
-  var originalShow = window.show;
-
-  // 生成安全的文件名（与构建器一致）
-  function getSafeFilename(slug) {
-    return slug.replace(/\//g, "__").replace(/ /g, "_").replace(/[?？:："'<>*|]/g, "");
-  }
-
-  // 加载文章内容
-  function loadPageContent(slug) {
-    return new Promise(function(resolve, reject) {
-      // 已缓存，直接返回
-      if (pageContentCache[slug]) {
-        resolve(pageContentCache[slug]);
-        return;
-      }
-      // 正在加载，等待完成
-      if (pageLoading[slug]) {
-        pageLoading[slug].push({resolve: resolve, reject: reject});
-        return;
-      }
-      // 开始加载
-      pageLoading[slug] = [{resolve: resolve, reject: reject}];
-      var url = "pages/" + getSafeFilename(slug) + ".json";
-      fetch(url, {cache: "force-cache"})
-        .then(function(r) {
-          if (!r.ok) throw new Error("HTTP " + r.status);
-          return r.json();
-        })
-        .then(function(data) {
-          pageContentCache[slug] = data;
-          var waiters = pageLoading[slug] || [];
-          delete pageLoading[slug];
-          waiters.forEach(function(w) { w.resolve(data); });
-        })
-        .catch(function(err) {
-          delete pageLoading[slug];
-          var waiters = pageLoading[slug] || [];
-          waiters.forEach(function(w) { w.reject(err); });
-        });
-    });
-  }
-
-  // 重写show函数
-  window.show = function(slug) {
-    var p = window.bySlug ? window.bySlug[slug] : null;
-    if (!p) {
-      // 没有找到页面，调用原始show函数处理404
-      if (originalShow) originalShow(slug);
-      return;
-    }
-
-    // 如果不需要按需加载，或者是目录页，直接调用原始show函数
-    if (!p._need_load || p.is_index || slug === "index") {
-      if (originalShow) originalShow(slug);
-      return;
-    }
-
-    // 需要按需加载
-    // 先显示加载状态（简化版，直接设置内容）
-    var contentEl = document.getElementById('content');
-    if (contentEl) {
-      contentEl.innerHTML = '<div class="article"><div style="text-align:center;padding:3rem 0;color:var(--ink-faint);"><div style="font-size:2rem;margin-bottom:1rem;">📖</div><div>正在加载文章内容...</div></div></div>';
-    }
-
-    // 加载文章内容
-    loadPageContent(slug).then(function(data) {
-      // 加载成功，把内容赋值给p对象，然后调用原始show函数
-      p.html = data.html;
-      p.meta = data.meta || p.meta;
-      p.tags = data.tags || p.tags;
-      p._need_load = false; // 标记已加载，避免重复加载
-      // 调用原始show函数渲染
-      if (originalShow) originalShow(slug);
-    }).catch(function(err) {
-      // 加载失败
-      if (contentEl) {
-        contentEl.innerHTML = '<div class="article"><div style="text-align:center;padding:3rem 0;color:var(--ink-faint);"><div style="font-size:2rem;margin-bottom:1rem;">⚠️</div><div>文章内容加载失败</div><div style="font-size:.85rem;margin-top:.5rem;">' + (err.message || '') + '</div><button onclick="location.reload()" style="margin-top:1rem;padding:.5rem 1rem;border-radius:8px;border:1px solid var(--accent);background:var(--accent-soft);color:var(--accent-deep);cursor:pointer;">重新加载</button></div></div>';
-      }
-    });
-  };
-
-  // 暴露loadPageContent函数供外部使用
-  window.loadPageContent = loadPageContent;
-})();
-
-</script>
 </body>
 </html>
 """
@@ -4919,7 +5262,7 @@ def main():
     # 重新生成 tree（包含详情页，但渲染时过滤 is_audio_detail / hide_from_nav）
     tree = build_tree(pages)
 
-    # 生成 AI 问答知识库索引：直接遍历 Obsidian 中所有非 index 的 .md 文件
+    # 生成 AI 问答知识库索引：全文分段索引，支持精准检索
     knowledge_base = []
     for root, dirs, files in os.walk(CONTENT_DIR):
         dirs[:] = [d for d in dirs if not is_excluded_dir(d)]
@@ -4930,30 +5273,72 @@ def main():
             try:
                 with open(fpath, 'r', encoding='utf-8') as f:
                     raw = f.read()
-                # 去掉 frontmatter
+                # 提取 frontmatter 中的 tags
+                tags = []
                 if raw.startswith('---'):
                     end = raw.find('---', 3)
                     if end > 0:
+                        fm = raw[3:end]
+                        # 提取 tags
+                        tag_match = re.search(r'tags:\s*\[([^\]]+)\]', fm)
+                        if tag_match:
+                            tags = [t.strip().strip("'\"") for t in tag_match.group(1).split(',') if t.strip()]
                         raw = raw[end+3:]
                 # 去掉 Obsidian 语法，提取纯文本
                 text = re.sub(r'\[\[[^\]]+\]\]', '', raw)  # 去掉 [[链接]]
                 text = re.sub(r'!\[\[[^\]]+\]\]', '', text)  # 去掉 ![[图片]]
                 text = re.sub(r'^#+\s*', '', text, flags=re.MULTILINE)  # 去掉标题标记
                 text = re.sub(r'[*_>`~-]', '', text)  # 去掉markdown格式标记
-                text = re.sub(r'\s+', ' ', text).strip()
+                # 按段落拆分
+                paragraphs = [p.strip() for p in re.split(r'\n\s*\n', text) if p.strip() and len(p.strip()) > 10]
                 # 计算相对路径作为slug
                 rel_path = os.path.relpath(fpath, CONTENT_DIR).replace('\\', '/')
                 slug = rel_path[:-3] if rel_path.endswith('.md') else rel_path
                 title = fname[:-3] if fname.endswith('.md') else fname
-                if text or title:
-                    knowledge_base.append({
-                        "slug": slug,
-                        "title": title,
-                        "content": text[:3000] if text else title  # 每篇截取前3000字
-                    })
+                # 文章级摘要（前500字）
+                full_text = ' '.join(paragraphs)
+                summary = full_text[:500] if full_text else title
+                # 添加文章级条目（用于标题匹配和摘要）
+                knowledge_base.append({
+                    "slug": slug,
+                    "title": title,
+                    "tags": tags,
+                    "content": summary,
+                    "type": "article",
+                    "paragraphIndex": -1
+                })
+                # 添加段落级条目（用于全文检索，每段最多500字）
+                for i, para in enumerate(paragraphs):
+                    if len(para) > 500:
+                        # 长段落再拆分
+                        for j in range(0, len(para), 400):
+                            chunk = para[j:j+500]
+                            knowledge_base.append({
+                                "slug": slug,
+                                "title": title,
+                                "tags": tags,
+                                "content": chunk,
+                                "type": "paragraph",
+                                "paragraphIndex": i
+                            })
+                    else:
+                        knowledge_base.append({
+                            "slug": slug,
+                            "title": title,
+                            "tags": tags,
+                            "content": para,
+                            "type": "paragraph",
+                            "paragraphIndex": i
+                        })
             except Exception as e:
                 print(f"  跳过文件 {fname}: {e}")
-    print(f"AI知识库索引: {len(knowledge_base)} 篇文章")
+    print(f"AI知识库索引: {len(knowledge_base)} 条（文章+段落）")
+    
+    # 把知识库保存为单独的JSON文件，按需加载（减少HTML体积）
+    knowledge_path = os.path.join(DIST_DIR, "knowledge.json")
+    with open(knowledge_path, 'w', encoding='utf-8') as kf:
+        json.dump(knowledge_base, kf, ensure_ascii=False)
+    print(f"知识库已保存为单独文件: knowledge.json ({os.path.getsize(knowledge_path)/1024/1024:.2f} MB)")
 
     html_out = PAGE_TEMPLATE
     html_out = html_out.replace("@@SITE_TITLE_JSON@@", json.dumps(site_title, ensure_ascii=False))
@@ -4979,7 +5364,8 @@ def main():
     print(f"文章内容拆分: {len(pages) - len([p for p in pages if p.get('is_index') or p['slug'] == 'index'])} 篇文章已拆分为单独JSON文件")
     html_out = html_out.replace("@@PAGES_JSON@@", json.dumps(pages_meta, ensure_ascii=False))
     html_out = html_out.replace("@@TREE_JSON@@", json.dumps(tree, ensure_ascii=False))
-    html_out = html_out.replace("@@KNOWLEDGE_BASE_JSON@@", json.dumps(knowledge_base, ensure_ascii=False))
+    # 知识库不再嵌入HTML，改为按需加载（初始为空数组，使用时fetch knowledge.json）
+    html_out = html_out.replace("@@KNOWLEDGE_BASE_JSON@@", "[]")
     html_out = html_out.replace("@@HOME_UPDATE_JSON@@", json.dumps(home_update_html, ensure_ascii=False))
     html_out = html_out.replace("@@HOME_UPDATE_DATE@@", home_update_date)
     html_out = html_out.replace("@@SITE_TITLE@@", site_title)
@@ -5063,6 +5449,15 @@ def main():
     gen_cover_png(cover_path)
     print("封面图生成: %s" % cover_path)
 
+    # 复制 PWA 图标到 dist/assets/（避免 assets/assets 双层目录）
+    pwa_icons = ["icon-192.png", "icon-512.png", "icon-maskable-512.png",
+                 "apple-touch-icon-180.png", "favicon-32.png", "favicon-64.png"]
+    for icon_name in pwa_icons:
+        icon_src = os.path.join(CONTENT_DIR, "assets", icon_name)
+        if os.path.exists(icon_src):
+            shutil.copy2(icon_src, os.path.join(assets_dir, icon_name))
+    print("PWA图标已复制: 6个")
+
     # 复制 content/sw.js 到 dist/ 根（Service Worker：音频离线缓存 + 页面更新策略）
     sw_src = os.path.join(CONTENT_DIR, "sw.js")
     if os.path.exists(sw_src):
@@ -5072,6 +5467,12 @@ def main():
     _headers_src = os.path.join(os.path.dirname(os.path.abspath(__file__)), "cloudflare", "_headers")
     if os.path.exists(_headers_src):
         shutil.copy2(_headers_src, os.path.join(DIST_DIR, "_headers"))
+
+    # 复制 PWA manifest.json 到 dist/ 根（支持添加到主屏幕，iOS后台播放正道）
+    manifest_src = os.path.join(os.path.dirname(os.path.abspath(__file__)), "manifest.json")
+    if os.path.exists(manifest_src):
+        shutil.copy2(manifest_src, os.path.join(DIST_DIR, "manifest.json"))
+        print("PWA manifest已复制: dist/manifest.json")
 
     # 复制管理后台 admin.html 到 dist/admin/index.html
     admin_src = os.path.join(os.path.dirname(os.path.abspath(__file__)), "admin.html")
