@@ -1431,11 +1431,29 @@ img{height:auto;max-width:100%}
 <script>
 @@QRCODE_LIB@@
 // ---- Service Worker 注册：音频离线缓存 + 页面更新策略（sw.js 由构建时复制到 dist 根） ----
-if ('serviceWorker' in navigator){
-  window.addEventListener('load', function(){
-    navigator.serviceWorker.register('sw.js').catch(function(e){ console.warn('SW 注册失败:', e); });
-  });
-}
+// 2026-09-14 修复：仅在确认"已登录"后才注册 SW。
+// 此前 SW 在匿名阶段也会注册并接管后续请求，登录后跳转时会被旧缓存/旧 SW 回放
+// 401 或旧登录页，表现为"输密码登不上"（需手动清缓存才能进）。
+// 登录页在登录成功时会写入 ACCESS_KEY 标记，此处据此判断。
+(function(){
+  var AUTHD = 'longchen-access-granted';
+  function isAuthed(){ try{ return localStorage.getItem(AUTHD) === 'true'; }catch(e){ return false; } }
+  if('serviceWorker' in navigator){
+    if(isAuthed()){
+      window.addEventListener('load', function(){
+        navigator.serviceWorker.register('sw.js').catch(function(e){ console.warn('SW 注册失败:', e); });
+      });
+    }else{
+      // 未登录：主动注销可能残留的旧 SW 并清空其缓存，杜绝旧内容回放
+      try{
+        if(window.caches){ caches.keys().then(function(ks){ ks.forEach(function(k){ caches.delete(k); }); }); }
+        if(navigator.serviceWorker.getRegistrations){
+          navigator.serviceWorker.getRegistrations().then(function(rs){ rs.forEach(function(r){ r.unregister(); }); });
+        }
+      }catch(e){}
+    }
+  }
+})();
 
 
 

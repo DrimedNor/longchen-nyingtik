@@ -181,14 +181,38 @@ function loginPageHTML(message) {
   }catch(e){}
   var u=document.getElementById('u'),p=document.getElementById('p'),b=document.getElementById('go'),m=document.getElementById('m');
   function fail(t){m.className='msg err';m.textContent=t;}
+  // 登录前后清干净本机缓存与 Service Worker。
+  // 2026-09-14 修复：此前只在「匿名落到登录页」时清一次，输密码那一刻不清，
+  //   导致旧 SW 仍可接管跳转后的首页请求、回放 401/旧登录页，表现为"输密码登不上"。
+  async function purge(){
+    try{
+      if(window.caches){
+        var ks=await caches.keys();
+        await Promise.all(ks.map(function(k){return caches.delete(k);}));
+      }
+    }catch(e){}
+    try{
+      if(navigator.serviceWorker&&navigator.serviceWorker.getRegistrations){
+        var rs=await navigator.serviceWorker.getRegistrations();
+        await Promise.all(rs.map(function(r){return r.unregister();}));
+      }
+    }catch(e){}
+  }
   async function go(){
     if(!u.value.trim()||!p.value){fail('请输入用户名和密码');return;}
     b.disabled=true;b.textContent='登录中…';
     try{
       var r=await fetch('/__auth/login',{method:'POST',headers:{'Content-Type':'application/json'},
+        cache:'no-store',
         body:JSON.stringify({username:u.value.trim(),password:p.value})});
       var d=await r.json();
-      if(d&&d.success){location.replace('/');return;}
+      if(d&&d.success){
+        try{ localStorage.setItem('longchen-access-granted','true'); }catch(e){}
+        await purge();                      // 关键：跳转前清干净，杜绝旧缓存回放
+        location.replace('/?v='+Date.now()); // 带时间戳绕过任何中间层缓存
+        return;
+      }
+      await purge();
       fail((d&&d.message)||'登录失败，请重试');
     }catch(e){fail('网络错误，请稍后重试');}
     b.disabled=false;b.textContent='进入网站';
@@ -276,6 +300,7 @@ function logoutPageHTML() {
 <button onclick="location.replace('/login')">返回登录页</button>
 <script>
 (async function(){
+  try{ localStorage.removeItem('longchen-access-granted'); }catch(e){}
   try{
     if(window.caches){var ks=await caches.keys();await Promise.all(ks.map(function(k){return caches.delete(k);}));}
     if(navigator.serviceWorker&&navigator.serviceWorker.getRegistrations){
