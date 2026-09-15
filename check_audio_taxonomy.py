@@ -2,7 +2,7 @@
 """
 音频分类一致性检查（发布前必跑）
 ================================
-规则：「音频资源/1. 上师开示（AI朗读）」的文件夹结构，必须严格镜像「上师开示」的文件夹结构；
+规则：「1. 听法音/1. 上师开示（AI朗读）」的文件夹结构，必须严格镜像「2. 读开示」的文件夹结构；
       每个音频必须待在与它对应文章相同的分类下。
 
 判定依据（优先级从高到低）：
@@ -21,8 +21,8 @@ import sys
 import shutil
 
 ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "content")
-KS = os.path.join(ROOT, "上师开示")                          # 分类真相源
-AUD = os.path.join(ROOT, "音频资源", "1. 上师开示（AI朗读）")   # 被校验方
+KS = os.path.join(ROOT, "2. 读开示")                          # 分类真相源
+AUD = os.path.join(ROOT, "1. 听法音", "1. 上师开示（AI朗读）")   # 被校验方
 
 LINK = re.compile(r"\[\[([^\]\|]+?\.(?:mp3|m4a|wav))\]\]", re.I)
 
@@ -81,12 +81,12 @@ def main():
     # 1) 分类目录是否齐全（空分类允许，但要存在，保证结构镜像）
     for c in cats:
         if not os.path.isdir(os.path.join(AUD, c)):
-            errors.append("缺少分类目录：音频资源/1. 上师开示（AI朗读）/%s" % c)
+            errors.append("缺少分类目录：1. 听法音/1. 上师开示（AI朗读）/%s" % c)
 
     # 2) 音频是否出现多余分类（上师开示里没有的分类）
     for c in actual:
         if c and c not in cats:
-            errors.append("多余分类目录（上师开示中没有）：%s" % c)
+            errors.append("多余分类目录（读开示中没有）：%s" % c)
 
     # 3) 每个音频是否待在正确分类
     for c, files in actual.items():
@@ -111,8 +111,8 @@ def main():
     # ---- 输出 ----
     print("=" * 60)
     print("音频分类一致性检查")
-    print("  分类真相源：content/上师开示            （%d 个分类）" % len(cats))
-    print("  被 校 验 方：content/音频资源/1. 上师开示（AI朗读）（%d 个音频）"
+    print("  分类真相源：content/2. 读开示            （%d 个分类）" % len(cats))
+    print("  被 校 验 方：content/1. 听法音/1. 上师开示（AI朗读）（%d 个音频）"
           % len(all_audio))
     print("=" * 60)
 
@@ -126,7 +126,7 @@ def main():
             print("  x " + e)
 
     if not errors and not warns:
-        print("\n✓ 完全一致：音频分类与「上师开示」文章目录严格对应。")
+        print("\n✓ 完全一致：音频分类与「读开示」文章目录严格对应。")
         return 0
 
     if "--fix" in sys.argv and errors:

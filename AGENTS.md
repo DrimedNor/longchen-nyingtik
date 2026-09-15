@@ -21,10 +21,19 @@
 
 ## 硬约束
 
-1. **content/ 是发布源**：`is_excluded_dir()`（build_site.py:252）只排除目录名含「不推送」、`.` 开头、`_backup`、assets——**新文件进 content/ 前必须确认允许上线；私人日志只进 `日志-不推送\`**
+1. **content/ 是发布源**：`is_excluded_dir()`（build_site.py）只排除目录名含「不推送」、`.` 开头、`_backup`、assets——**新文件进 content/ 前必须确认允许上线；私人日志只进 `日志-不推送\`**
 2. 不动 `.workbuddy\`；密钥/密码不入库不入 git（密码 610 除外，它是合规设计的站内密码）
 3. 操作前备份（规范第七章维护规则）；`工作进度看板.md` 不入 git
-4. **音频分类必须镜像「上师开示」**：`content/音频资源/1. 上师开示（AI朗读）/` 的文件夹结构与 `content/上师开示/` 严格一致，音频跟着文章走（规范 6.2）。**每次发布前先跑 `python check_audio_taxonomy.py`，不通过不许发布**（规范 6.4）
+4. **音频分类必须镜像「读开示」**：`content/1. 听法音/1. 上师开示（AI朗读）/` 的文件夹结构与 `content/2. 读开示/` 严格一致，音频跟着文章走（规范 6.2）。**每次发布前先跑 `python check_audio_taxonomy.py`，不通过不许发布**（规范 6.4）
+5. **一级目录命名（2026-09-15 板块重组）**：`1. 听法音 / 2. 读开示 / 3. 知传承 / 4. 阅典籍 / 5. 瞻法照 / 9. 关于本站`。首页与导航显示顺序由 `build_site.py` 的 `TOP_ORDER` / `ORDER` 决定（知传承 → 听法音 → 读开示 → 阅典籍 → 瞻法照 → 关于本站）。**改名必须全库收口**：`TOP_ORDER` `TOP_LABELS` `META` `ORDER` `DIR_INTROS` `OTHER_INTROS` `DIR_ALIASES`、`audio_folder_rel()`、`_article_dir`、`check_audio_taxonomy.py` 的 `KS/AUD`，改完必须 `grep -rn "旧名"` 复核（历史三次「改一层漏一层」踩坑）
+6. **图片入库（2026-09-15）**：`content/**` 与 `content/assets/**` 下的图片都可被 Obsidian 嵌入 `![[文件名.jpg]]` 引用（`find_image_src()` 两段查找）；相册网格用块语法
+   ```
+   :::gallery
+   ![[图片名.jpg|说明文字]]
+   :::
+   ```
+   渲染为响应式网格、点击放大（复用 `showPosterBig`）。注意 `![[图|数字]]` 里的数字仍是宽度；相册块内第二段才当说明文字。
+7. **构建会累积旧文件**：`build_site.py` 不清理 `dist/`，改名后旧分片会残留（2026-09-15 实测 235 个旧名分片）。**每次改名后先 `mv dist dist_old_<日期>` 或删空再构建**（dist/ 已 gitignore，可安全重建）
 
 ## 工作流
 
