@@ -1005,13 +1005,13 @@ button:active, .player-launch:active, .search-fab:active{transform:scale(.95)}
 .dir-children{margin-top:.6rem}
 .dir-children .hn-link{font-size:.95em}
 /* —— 相册网格（瞻法照板块，2026-09-15）—— */
-.photo-gallery{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:.7rem;margin:1rem 0}
+.photo-gallery{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:.7rem;margin:1rem 0;align-items:start}
 .photo-gallery .pg-item{margin:0;background:var(--surface);border:1px solid var(--line);border-radius:6px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.05)}
-.photo-gallery .pg-item img{display:block;width:100%;height:210px;object-fit:contain;background:var(--surface-soft);cursor:zoom-in}
+.photo-gallery .pg-item img{display:block;width:100%;height:auto;max-height:240px;object-fit:contain;background:var(--surface-soft);cursor:zoom-in}
 .photo-gallery .pg-item figcaption{padding:.4rem .5rem;font-size:.78em;color:var(--ink-soft);text-align:center;line-height:1.35}
 @media (max-width:760px){
   .photo-gallery{grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:.5rem}
-  .photo-gallery .pg-item img{height:150px}
+  .photo-gallery .pg-item img{max-height:170px}
 }
 /* 目录 Index 完整目录树容器 */
 .dir-full-tree{margin-top:1.4rem; padding-top:.6rem}
@@ -5608,6 +5608,9 @@ def main():
             src_path = os.path.join(poster_dir, pname)
             webp_name = key + ".webp"
             dst_path = os.path.join(poster_dist_dir, webp_name)
+            # 2026-09-15：海报原图一并复制到 dist（供「瞻法照」等页面按原文件名 ![[xxx.jpg]] 嵌入；
+            # 压缩版 .webp 供音频详情页使用，两者并存，互不替代）
+            shutil.copy2(src_path, os.path.join(poster_dist_dir, pname))
             try:
                 from PIL import Image
                 img = Image.open(src_path)
