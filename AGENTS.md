@@ -34,6 +34,9 @@
    ```
    渲染为响应式网格、点击放大（复用 `showPosterBig`）。注意 `![[图|数字]]` 里的数字仍是宽度；相册块内第二段才当说明文字。
 7. **构建会累积旧文件**：`build_site.py` 不清理 `dist/`，改名后旧分片会残留（2026-09-15 实测 235 个旧名分片）。**每次改名后先 `mv dist dist_old_<日期>` 或删空再构建**（dist/ 已 gitignore，可安全重建）
+8. **海报「原图 + 压缩图」必须两路都进 dist（2026-09-15）**：法音详情页引用 `poster_map` 生成的 `xxx.webp`（需 Pillow），而「瞻法照」等页面按**原文件名** `![[xxx.jpg]]` 嵌入原图。`build_site.py` 海报循环须 `shutil.copy2` 原图 **且** 生成 webp，缺任一即断图（实测「圣像与法物」19 张断 18 张）。**构建一律用 `D:\Program Files\Python\python.exe`**——托管 Python 无 Pillow 会静默降级，且 dist 未清理时旧 webp 残留会造成假通过
+9. **发布前必须真实渲染复验（2026-09-15）**：构建退出码 0 与门禁绿灯**都不保证图片能加载**。发布前用 Playwright 实渲染逐页统计断图数（脚本模板见技能 `longchen-publish` → `references/verify_pages.js`），**累计断图必须为 0**；同时核对导航标签顺序
+10. **推送与部署须留可复核实证**：`git push` 可能静默失败（无输出无报错）→ 必须 `git ls-remote origin v5` 对比远端 commit；部署后必须 `npx wrangler pages deployment list` 确认 `Environment=Production` 且 `Source=<本地 HEAD>`。**不以命令回显判断成败**
 
 ## 工作流
 
