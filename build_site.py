@@ -1960,6 +1960,7 @@ var PAGES = @@PAGES_JSON@@;
 var TREE = @@TREE_JSON@@;
 var AUDIO_ALBUM = @@AUDIO_ALBUM_JSON@@;
 var AUDIO_TRACKS = @@AUDIO_TRACKS_JSON@@;
+var FAZHAO_IMG_COUNT = @@FAZHAO_IMG_COUNT@@;   // 「瞻法照」已收录图片数（构建时统计 content/assets/法照）
 var HOME_UPDATE_HTML = @@HOME_UPDATE_JSON@@;   // 首页「本次更新内容」区块（纯用户资料，不含技术调整）
 var HOME_UPDATE_DATE = "@@HOME_UPDATE_DATE@@"; // 首页公告区标题用的更新日期（取自内容文件 frontmatter date 字段）
 var KNOWLEDGE_BASE = @@KNOWLEDGE_BASE_JSON@@;  // AI问答知识库索引（按需加载，初始为空）
@@ -2999,7 +3000,8 @@ function renderHomeCards(){
   var items = [];
   // 2026-09-15 板块重组：知传承 / 听法音 / 读开示 / 阅典籍 / 瞻法照
   if (bySlug['3. 知传承/index']){
-    items.push({icon:'🐉', title:'知传承', desc:'先认识上师，看这个法怎么传下来的', slug:'3. 知传承/index', count:''});
+    var nZc = hcCountUnder('3. 知传承');
+    items.push({icon:'🐉', title:'知传承', desc:'先认识上师，看这个法怎么传下来的', slug:'3. 知传承/index', count:(nZc > 0 ? nZc + ' 篇' : '')});
   }
   if (bySlug['1. 听法音/index'] && AUDIO_TRACKS.length > 0){
     items.push({icon:'🎧', title:'听法音', desc:'路上、干活的时候，点开就能听', slug:'1. 听法音/index', count:AUDIO_TRACKS.length + ' 条'});
@@ -3017,7 +3019,7 @@ function renderHomeCards(){
     }
   }
   if (bySlug['5. 瞻法照/index']){
-    items.push({icon:'🪷', title:'瞻法照', desc:'上师尊容、历代祖师与圣像法物', slug:'5. 瞻法照/index', count:''});
+    items.push({icon:'🪷', title:'瞻法照', desc:'上师尊容、历代祖师与圣像法物', slug:'5. 瞻法照/index', count:(FAZHAO_IMG_COUNT > 0 ? FAZHAO_IMG_COUNT + ' 张' : '')});
   }
   if (!items.length) return '';
   var html = '<nav class="home-cards" aria-label="首页快捷入口">';
@@ -5850,6 +5852,14 @@ def main():
     html_out = html_out.replace("@@TREE_JSON@@", json.dumps(tree, ensure_ascii=False))
     # 知识库不再嵌入HTML，改为按需加载（初始为空数组，使用时fetch knowledge.json）
     html_out = html_out.replace("@@KNOWLEDGE_BASE_JSON@@", "[]")
+    # 「瞻法照」图片数：构建时统计 content/assets/法照 下的图片文件（首页快速访问卡片显示用）
+    _fazhao_dir = os.path.join(CONTENT_DIR, "assets", "法照")
+    _fazhao_n = 0
+    if os.path.isdir(_fazhao_dir):
+        _fazhao_n = len([f for f in os.listdir(_fazhao_dir)
+                        if f.lower().endswith((".webp", ".jpg", ".jpeg", ".png", ".gif"))])
+    html_out = html_out.replace("@@FAZHAO_IMG_COUNT@@", str(_fazhao_n))
+    print("瞻法照图片数: %d" % _fazhao_n)
     html_out = html_out.replace("@@HOME_UPDATE_JSON@@", json.dumps(home_update_html, ensure_ascii=False))
     html_out = html_out.replace("@@HOME_UPDATE_DATE@@", home_update_date)
     html_out = html_out.replace("@@SITE_TITLE@@", site_title)
@@ -5978,6 +5988,21 @@ def main():
                 os.makedirs(os.path.dirname(dst), exist_ok=True)
                 shutil.copy2(src, dst)
                 img_copied += 1
+
+    # 复制 content/assets/ 公共图库到 dist/assets/（2026-09-15 新增）
+    # 上面那次 walk 用了 is_excluded_dir，而它会把名为 assets 的目录整个剪掉，
+    # 于是 content/assets/法照/*.webp 这类公共图库永远进不了 dist → 页面全断图。故此处单列一遍。
+    _pub_assets = os.path.join(CONTENT_DIR, "assets")
+    if os.path.isdir(_pub_assets):
+        for _dp, _dn, _fn in os.walk(_pub_assets):
+            for f in _fn:
+                if f.lower().endswith(IMG_EXT):
+                    src = os.path.join(_dp, f)
+                    rel = os.path.relpath(src, _pub_assets)
+                    dst = os.path.join(assets_dir, rel)
+                    os.makedirs(os.path.dirname(dst), exist_ok=True)
+                    shutil.copy2(src, dst)
+                    img_copied += 1
 
     # 生成锁屏封面图 assets/cover.png（Media Session artwork 用）
     cover_path = os.path.join(assets_dir, "cover.png")
