@@ -236,6 +236,46 @@ def md_to_html(body):
             i = j + 1
             continue
 
+        # 入口卡片块（2026-09-16 为「瞻法照」板块首页引入）
+        # 写法（每行一张卡，用 | 分段；后两段可省）：
+        #   [[目标slug]] | 标题 | 副标题 | 封面图文件名 | 数量文字
+        # 渲染为响应式卡片网格：封面图 + 标题 + 数量徽标 + 副标题，整卡可点进入子页。
+        if stripped in (":::entry", ":::入口"):
+            flush_list(); flush_quote()
+            j = i + 1
+            cards = []
+            while j < n and lines[j].strip() != ":::":
+                parts = [x.strip() for x in lines[j].strip().split("|")]
+                if len(parts) >= 2:
+                    m_link = re.match(r"^\[\[([^\]|]+)(?:\|([^\]]*))?\]\]$", parts[0])
+                    if m_link:
+                        _slug = m_link.group(1).strip()
+                        _title = parts[1] or (m_link.group(2) or "").strip() or _slug
+                        _sub = parts[2] if len(parts) > 2 else ""
+                        _cover = parts[3] if len(parts) > 3 else ""
+                        _count = parts[4] if len(parts) > 4 else ""
+                        # 与前端 hcHref 的 encodeURIComponent 保持一致的转义集
+                        _href = "#/" + "/".join(quote(seg, safe="-_.!~*'()") for seg in _slug.split("/"))
+                        _thumb = ""
+                        if _cover:
+                            _src = find_image_src(_cover)
+                            if _src:
+                                _thumb = ('<div class="en-thumb"><img src="%s" alt="%s" loading="lazy"></div>'
+                                          % (html_mod.escape(_src, quote=True),
+                                             html_mod.escape(_title, quote=True)))
+                        _badge = ('<span class="en-count">%s</span>' % html_mod.escape(_count)) if _count else ""
+                        _sub_html = ('<div class="en-sub">%s</div>' % inline(_sub)) if _sub else ""
+                        cards.append(
+                            '<a class="en-card" href="%s">%s<div class="en-body">'
+                            '<div class="en-title">%s%s</div>%s</div></a>'
+                            % (html_mod.escape(_href, quote=True), _thumb,
+                               html_mod.escape(_title), _badge, _sub_html))
+                j += 1
+            if cards:
+                out.append('<div class="entry-grid">%s</div>' % "".join(cards))
+            i = j + 1
+            continue
+
         # callout 起始: > [!...] 或 > [!...] 后续正文
         if stripped.startswith("> [!"):
             flush_list(); flush_quote()
@@ -1012,6 +1052,20 @@ button:active, .player-launch:active, .search-fab:active{transform:scale(.95)}
 @media (max-width:760px){
   .photo-gallery{grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:.5rem}
   .photo-gallery .pg-item img{max-height:170px}
+}
+/* —— 板块首页入口卡片（2026-09-16）—— */
+.entry-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(175px,1fr));gap:.9rem;margin:1.1rem 0}
+.entry-grid .en-card{display:block;text-decoration:none;color:inherit;background:var(--surface);border:1px solid var(--line);border-radius:8px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.05);transition:transform .18s ease,box-shadow .18s ease}
+.entry-grid .en-card:hover{transform:translateY(-2px);box-shadow:0 6px 18px rgba(0,0,0,.10)}
+.entry-grid .en-thumb{background:var(--surface-soft);aspect-ratio:4/5;overflow:hidden}
+.entry-grid .en-thumb img{width:100%;height:100%;object-fit:cover;display:block}
+.entry-grid .en-body{padding:.6rem .7rem .75rem}
+.entry-grid .en-title{font-weight:600;display:flex;align-items:baseline;gap:.4rem;flex-wrap:wrap;line-height:1.4}
+.entry-grid .en-count{font-size:.75em;font-weight:normal;color:var(--gold-deep);border:1px solid var(--gold-deep);border-radius:999px;padding:0 .42rem;line-height:1.6}
+.entry-grid .en-sub{margin-top:.3rem;font-size:.82em;color:var(--ink-soft);line-height:1.5}
+@media (max-width:520px){
+  .entry-grid{grid-template-columns:repeat(auto-fill,minmax(138px,1fr));gap:.6rem}
+  .entry-grid .en-title{font-size:.95em}
 }
 /* 目录 Index 完整目录树容器 */
 .dir-full-tree{margin-top:1.4rem; padding-top:.6rem}
