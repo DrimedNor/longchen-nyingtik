@@ -4,7 +4,7 @@
 //  - 图片文件：cache-first（海报/封面/图标不变动，永久缓存）
 //  - 文章内容JSON：stale-while-revalidate（先缓存秒开，后台更新）
 //  - HTML/JS/CSS：network-first（保证功能更新即时生效）
-const CACHE = "lct-cache-v3"
+const CACHE = "lct-cache-v4"
 const AUDIO_EXT = [".mp3", ".wav", ".ogg", ".m4a", ".aac", ".flac"]
 
 self.addEventListener("install", function () {

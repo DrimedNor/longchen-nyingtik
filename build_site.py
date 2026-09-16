@@ -943,8 +943,9 @@ button:active, .player-launch:active, .search-fab:active{transform:scale(.95)}
 /* 首页面包屑只有「主页」一词，全端隐藏 */
 .crumb-home{display:none}
 /* 首页 hero 轮播：全出血铺到视口两边，高度占上 1/3 屏；负 margin 抵消 content(2.6rem)+welcome(2.4rem) 顶距，图片直接顶到顶栏；桌面端左溢出部分被不透明侧栏（z-index:6）遮住 */
-.welcome-hero{position:relative; width:100vw; max-width:none; height:33vh; margin:-5rem calc(50% - 50vw) 1.3rem; border-radius:0; overflow:hidden}
-.welcome-hero .hc-slide{position:absolute; inset:0; width:100%; height:100%; object-fit:cover; object-position:center 35%; opacity:0; transition:opacity 1s ease}
+.welcome-hero{position:relative; width:100vw; max-width:none; aspect-ratio:21/9; height:auto; margin:-5rem calc(50% - 50vw) 1.3rem; border-radius:0; overflow:hidden; touch-action:pan-y}
+.welcome-hero .hc-slide{position:absolute; inset:0; width:100%; height:100%; object-fit:cover; opacity:0; transition:opacity 1s ease}
+.welcome-hero picture{position:absolute; inset:0; display:block}
 .welcome-hero .hc-slide.active{opacity:1}
 .welcome-hero .hc-dots{position:absolute; bottom:10px; left:50%; transform:translateX(-50%); display:flex; gap:8px; z-index:2}
 .welcome-hero .hc-dot{width:8px; height:8px; border-radius:50%; background:rgba(255,255,255,.45); transition:background .3s}
@@ -1220,7 +1221,7 @@ button:active, .player-launch:active, .search-fab:active{transform:scale(.95)}
   .content{padding:1.1rem 1.1rem 9rem}
   /* 首页 welcome 紧凑化：标题由顶栏品牌栏承担（welcome .big 移动端隐藏避免重复），「龙钦宁提资料库」保持小字副标题 */
   .welcome{padding:.95rem .9rem .9rem; margin-bottom:.9rem}
-  .welcome-hero{margin:-3.05rem calc(50% - 50vw) .8rem; height:33vh}
+  .welcome-hero{margin:-3.05rem calc(50% - 50vw) .8rem; aspect-ratio:4/5; height:auto}
   .welcome .big{display:none}
   .player{height:auto; min-height:34vh; max-height:34vh}
   .player.pl-open{max-height:80vh}
@@ -2274,7 +2275,7 @@ window.addEventListener('beforeunload', function() {
 
 // ---- 显示页面 ----
 var currentSlug = null;
-// 首页 hero 轮播驱动：4.5s 自动淡切，圆点同步；重复进入首页时清旧定时器
+// 首页 hero 轮播驱动：4.5s 自动淡切＋左右滑动手势＋触摸/切后台暂停（A 方案：比例自适应＋手势与暂停）
 function initHeroCarousel(){
   var box = document.getElementById('heroCarousel');
   if (!box) return;
@@ -2283,11 +2284,23 @@ function initHeroCarousel(){
   var dots = box.querySelectorAll('.hc-dot');
   if (!slides.length) return;
   var idx = 0;
-  box._timer = setInterval(function(){
-    idx = (idx + 1) % slides.length;
-    slides.forEach(function(s, i){ s.classList.toggle('active', i === idx); });
-    dots.forEach(function(d, i){ d.classList.toggle('active', i === idx); });
-  }, 4500);
+  function render(){ slides.forEach(function(s,i){ s.classList.toggle('active', i===idx); }); dots.forEach(function(d,i){ d.classList.toggle('active', i===idx); }); }
+  function start(){ stop(); box._timer = setInterval(function(){ idx = (idx+1)%slides.length; render(); }, 4500); }
+  function stop(){ if (box._timer){ clearInterval(box._timer); box._timer = null; } }
+  // 手势：横向滑动切片；触摸期间暂停，松手 8 秒后恢复自动播放
+  var startX = null;
+  box.addEventListener('touchstart', function(e){ stop(); box._paused = true; startX = e.touches[0].clientX; }, {passive:true});
+  box.addEventListener('touchmove', function(e){ if (startX === null) return;
+    var dx = e.touches[0].clientX - startX;
+    if (Math.abs(dx) < 40) return;
+    idx = (idx + (dx < 0 ? 1 : slides.length - 1)) % slides.length; render(); startX = e.touches[0].clientX;
+  }, {passive:true});
+  box.addEventListener('touchend', function(){ startX = null; box._paused = false;
+    if (box._resume) clearTimeout(box._resume);
+    box._resume = setTimeout(start, 8000);
+  }, {passive:true});
+  document.addEventListener('visibilitychange', function(){ document.hidden ? stop() : (box._paused ? null : start()); });
+  render(); start();
 }
 function show(slug){
   // 页面浏览统计：计算上一个页面的阅读时长并上报
@@ -2342,9 +2355,8 @@ function show(slug){
   var inner = titleHtml + metaHtml + tocHtml + p.html;
   if (isHome){
     inner = '<div class="welcome"><div class="welcome-hero" id="heroCarousel">'
-          + [0,1,2,3,4].map(function(i){ return '<img class="hc-slide' + (i===0?' active':'') + '" src="assets/carousel-' + (i+1) + '.webp" alt="上师照片">'; }).join('')
-          + '<div class="hc-dots">' + [0,1,2,3,4].map(function(i){ return '<span class="hc-dot' + (i===0?' active':'') + '"></span>'; }).join('') + '</div>'
-          + '</div><div class="big">' + esc(SITE_TITLE) + '</div>'
+          + [1,2,3,4,5].map(function(n){ return '<picture class="hc-p"><source media="(max-width:768px)" srcset="assets/carousel-' + n + '-t.webp"><img class="hc-slide' + (n===1?' active':'') + '" src="assets/carousel-' + n + '-w.webp" alt="上师照片" draggable="false"></picture>'; }).join('')
+          + '<div class="hc-dots">' + [1,2,3,4,5].map(function(n){ return '<span class="hc-dot' + (n===1?' active':'') + '"></span>'; }).join('') + '</div></div><div class="big">' + esc(SITE_TITLE) + '</div>'
           + '<div class="welcome-sub"><span class="ws-line"></span>龙钦宁提资料库<span class="ws-line"></span></div></div>'
           + renderHomeCards()
           + '<section class="hn-sec home-update"><h2 class="hn-sec-title">最近更新 · ' + HOME_UPDATE_DATE + '</h2>'
@@ -6074,10 +6086,11 @@ def main():
 
     # 首页 hero 轮播图（content/assets 被 walker 排除，这里显式复制）
     for _i in range(1, 6):
-        hero_src = os.path.join(CONTENT_DIR, "assets", "carousel-%d.webp" % _i)
-        if os.path.exists(hero_src):
-            shutil.copy2(hero_src, os.path.join(assets_dir, "carousel-%d.webp" % _i))
-    print("首页hero轮播图已复制: carousel-1~5.webp")
+        for _tag in ("", "-w", "-t"):
+            hero_src = os.path.join(CONTENT_DIR, "assets", "carousel-%d%s.webp" % (_i, _tag))
+            if os.path.exists(hero_src):
+                shutil.copy2(hero_src, os.path.join(assets_dir, "carousel-%d%s.webp" % (_i, _tag)))
+    print("首页hero轮播图已复制: carousel-1~5[-w/-t].webp")
 
     # 复制 content/sw.js 到 dist/ 根（Service Worker：音频离线缓存 + 页面更新策略）
     sw_src = os.path.join(CONTENT_DIR, "sw.js")
