@@ -38,6 +38,9 @@
 9. **发布前必须真实渲染复验（2026-09-15）**：构建退出码 0 与门禁绿灯**都不保证图片能加载**。发布前用 Playwright 实渲染逐页统计断图数（脚本模板见技能 `longchen-publish` → `references/verify_pages.js`），**累计断图必须为 0**；同时核对导航标签顺序
 10. **推送与部署须留可复核实证**：`git push` 可能静默失败（无输出无报错）→ 必须 `git ls-remote origin v5` 对比远端 commit；部署后必须 `npx wrangler pages deployment list` 确认 `Environment=Production` 且 `Source=<本地 HEAD>`。**不以命令回显判断成败**
 
+11. **板块首页不能只有文字**：首页快捷卡片、导航点击后落到的都是板块首页（`content/<板块>/index.md`）。若板块首页只有文字与链接、一张图都没有，用户会直接反馈「这个板块看不到图片」——即使子页相册完全正常。**建有子级图文的板块，首页必须用 `:::entry` 出封面入口卡**（语法见技能 `longchen-publish` → `references/content-blocks.md`）。同理：收到「某板块没图/没内容」的报障，**先看板块首页，再查子页**。
+12. **新增内容块必须复验「渲染出来了」**：真实渲染复验只保证「已渲染的图没断」，不保证「新块被解析」。新增 `:::` 围栏块后，必须数一次产出标记（如 `entry-grid`/`en-card`）的出现次数。⚠️ 索引页 HTML 嵌在 JSON 字符串中、属性带转义反斜杠（`class=\"en-card\"`），**用 grep 会误报 0**，须用脚本 `html.count('en-card')` 计数。
+
 ## 工作流
 
 1. **接任务**：读总持 `AI协作\任务包\` 中状态为「待开工」的任务包 → 按 PRD 实施
