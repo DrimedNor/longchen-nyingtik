@@ -2355,7 +2355,7 @@ function show(slug){
   var inner = titleHtml + metaHtml + tocHtml + p.html;
   if (isHome){
     inner = '<div class="welcome"><div class="welcome-hero" id="heroCarousel">'
-          + [1,2,3,4,5].map(function(n){ return '<picture class="hc-p"><source media="(max-width:768px)" srcset="assets/carousel-' + n + '-t.webp"><img class="hc-slide' + (n===1?' active':'') + '" src="assets/carousel-' + n + '-w.webp" alt="上师照片" draggable="false"></picture>'; }).join('')
+          + [1,2,3,4,5].map(function(n){ return '<picture class="hc-p"><source media="(max-width:768px)" srcset="assets/carousel-' + n + '-t.webp?v=20260917b"><img class="hc-slide' + (n===1?' active':'') + '" src="assets/carousel-' + n + '-w.webp?v=20260917b" alt="上师照片" draggable="false"></picture>'; }).join('')
           + '<div class="hc-dots">' + [1,2,3,4,5].map(function(n){ return '<span class="hc-dot' + (n===1?' active':'') + '"></span>'; }).join('') + '</div></div><div class="big">' + esc(SITE_TITLE) + '</div>'
           + '<div class="welcome-sub"><span class="ws-line"></span>龙钦宁提资料库<span class="ws-line"></span></div></div>'
           + renderHomeCards()
