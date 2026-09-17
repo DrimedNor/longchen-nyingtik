@@ -945,7 +945,8 @@ button:active, .player-launch:active, .search-fab:active{transform:scale(.95)}
 /* 首页 hero 轮播：全出血铺到视口两边，高度占上 1/3 屏；负 margin 抵消 content(2.6rem)+welcome(2.4rem) 顶距，图片直接顶到顶栏；桌面端左溢出部分被不透明侧栏（z-index:6）遮住 */
 .welcome-hero{position:relative; width:100vw; max-width:none; aspect-ratio:21/9; height:auto; margin:-5rem calc(50% - 50vw) 1.3rem; border-radius:0; overflow:hidden; touch-action:pan-y; background:var(--surface)}
 .welcome-hero .hc-slide{position:absolute; inset:0; width:100%; height:100%; object-fit:contain; opacity:0; transition:opacity 1s ease}
-.welcome-hero picture{position:absolute; inset:0; display:block}
+.welcome-hero .hc-m,.welcome-hero .hc-dots-m{display:none}
+@media(max-width:768px){.welcome-hero .hc-d,.hc-dots-d{display:none}.welcome-hero .hc-m{display:block}.welcome-hero .hc-dots-m{display:flex}}
 .welcome-hero .hc-slide.active{opacity:1}
 .welcome-hero .hc-dots{position:absolute; bottom:10px; left:50%; transform:translateX(-50%); display:flex; gap:8px; z-index:2}
 .welcome-hero .hc-dot{width:8px; height:8px; border-radius:50%; background:rgba(255,255,255,.45); transition:background .3s}
@@ -2275,25 +2276,34 @@ window.addEventListener('beforeunload', function() {
 
 // ---- 显示页面 ----
 var currentSlug = null;
-// 首页 hero 轮播驱动：4.5s 自动淡切＋左右滑动手势＋触摸/切后台暂停（A 方案：比例自适应＋手势与暂停）
+// 首页 hero 轮播驱动（小谦方案：桌面/手机各自独立图组）：桌面组 hc-d、手机组 hc-m 分开；4.5s 淡切＋左右滑＋触摸/后台暂停
 function initHeroCarousel(){
   var box = document.getElementById('heroCarousel');
   if (!box) return;
   if (box._timer) clearInterval(box._timer);
-  var slides = box.querySelectorAll('.hc-slide');
-  var dots = box.querySelectorAll('.hc-dot');
-  if (!slides.length) return;
-  var idx = 0;
-  function render(){ slides.forEach(function(s,i){ s.classList.toggle('active', i===idx); }); dots.forEach(function(d,i){ d.classList.toggle('active', i===idx); }); }
-  function start(){ stop(); box._timer = setInterval(function(){ idx = (idx+1)%slides.length; render(); }, 4500); }
+  var mq = window.matchMedia('(max-width:768px)');
+  var sets = { d: Array.prototype.slice.call(box.querySelectorAll('.hc-slide.hc-d')),
+               m: Array.prototype.slice.call(box.querySelectorAll('.hc-slide.hc-m')) };
+  var dots = { d: Array.prototype.slice.call(box.querySelectorAll('.hc-dot.hc-dot-d')),
+               m: Array.prototype.slice.call(box.querySelectorAll('.hc-dot.hc-dot-m')) };
+  function cur(){ return mq.matches ? 'm' : 'd'; }
+  if (!sets.d.length && !sets.m.length) return;
+  var idx = { d: 0, m: 0 };
+  function render(){
+    var a = cur();
+    ['d','m'].forEach(function(k){
+      sets[k].forEach(function(s,i){ s.classList.toggle('active', k===a && i===idx[k]); });
+      dots[k].forEach(function(dd,i){ dd.classList.toggle('active', k===a && i===idx[k]); });
+    });
+  }
+  function start(){ stop(); box._timer = setInterval(function(){ var a = cur(); idx[a] = (idx[a]+1) % sets[a].length; render(); }, 4500); }
   function stop(){ if (box._timer){ clearInterval(box._timer); box._timer = null; } }
-  // 手势：横向滑动切片；触摸期间暂停，松手 8 秒后恢复自动播放
   var startX = null;
   box.addEventListener('touchstart', function(e){ stop(); box._paused = true; startX = e.touches[0].clientX; }, {passive:true});
   box.addEventListener('touchmove', function(e){ if (startX === null) return;
     var dx = e.touches[0].clientX - startX;
     if (Math.abs(dx) < 40) return;
-    idx = (idx + (dx < 0 ? 1 : slides.length - 1)) % slides.length; render(); startX = e.touches[0].clientX;
+    var a = cur(); idx[a] = (idx[a] + (dx < 0 ? 1 : sets[a].length - 1)) % sets[a].length; render(); startX = e.touches[0].clientX;
   }, {passive:true});
   box.addEventListener('touchend', function(){ startX = null; box._paused = false;
     if (box._resume) clearTimeout(box._resume);
@@ -2355,8 +2365,11 @@ function show(slug){
   var inner = titleHtml + metaHtml + tocHtml + p.html;
   if (isHome){
     inner = '<div class="welcome"><div class="welcome-hero" id="heroCarousel">'
-          + [1,2,3,4,5].map(function(n){ return '<picture class="hc-p"><source media="(max-width:768px)" srcset="assets/carousel-' + n + '-t.webp?v=20260917b"><img class="hc-slide' + (n===1?' active':'') + '" src="assets/carousel-' + n + '-w.webp?v=20260917b" alt="上师照片" draggable="false"></picture>'; }).join('')
-          + '<div class="hc-dots">' + [1,2,3,4,5].map(function(n){ return '<span class="hc-dot' + (n===1?' active':'') + '"></span>'; }).join('') + '</div></div><div class="big">' + esc(SITE_TITLE) + '</div>'
+    inner += [1,2,3,4,5].map(function(n){ return '<img class="hc-slide hc-d' + (n===1?' active':'') + '" src="assets/carousel-d' + n + '.webp" alt="上师照片" draggable="false">'; }).join('')
+          + '<div class="hc-dots hc-dots-d">' + [1,2,3,4,5].map(function(n){ return '<span class="hc-dot hc-dot-d' + (n===1?' active':'') + '"></span>'; }).join('') + '</div>'
+          + [1,2,3,4,5].map(function(n){ return '<img class="hc-slide hc-m' + (n===1?' active':'') + '" src="assets/carousel-m' + n + '.webp" alt="上师照片" draggable="false">'; }).join('')
+          + '<div class="hc-dots hc-dots-m">' + [1,2,3,4,5].map(function(n){ return '<span class="hc-dot hc-dot-m' + (n===1?' active':'') + '"></span>'; }).join('') + '</div>'
+          + '</div><div class="big">' + esc(SITE_TITLE) + '</div>'
           + '<div class="welcome-sub"><span class="ws-line"></span>龙钦宁提资料库<span class="ws-line"></span></div></div>'
           + renderHomeCards()
           + '<section class="hn-sec home-update"><h2 class="hn-sec-title">最近更新 · ' + HOME_UPDATE_DATE + '</h2>'
@@ -6086,11 +6099,11 @@ def main():
 
     # 首页 hero 轮播图（content/assets 被 walker 排除，这里显式复制）
     for _i in range(1, 6):
-        for _tag in ("", "-w", "-t"):
-            hero_src = os.path.join(CONTENT_DIR, "assets", "carousel-%d%s.webp" % (_i, _tag))
+        for _tag in ("d", "m"):
+            hero_src = os.path.join(CONTENT_DIR, "assets", "carousel-%s%d.webp" % (_tag, _i))
             if os.path.exists(hero_src):
-                shutil.copy2(hero_src, os.path.join(assets_dir, "carousel-%d%s.webp" % (_i, _tag)))
-    print("首页hero轮播图已复制: carousel-1~5[-w/-t].webp")
+                shutil.copy2(hero_src, os.path.join(assets_dir, "carousel-%s%d.webp" % (_tag, _i)))
+    print("首页hero轮播图已复制: carousel-d1~5(桌面横幅组) / carousel-m1~5(手机竖幅组)")
 
     # 复制 content/sw.js 到 dist/ 根（Service Worker：音频离线缓存 + 页面更新策略）
     sw_src = os.path.join(CONTENT_DIR, "sw.js")
