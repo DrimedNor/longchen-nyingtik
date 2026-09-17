@@ -943,8 +943,8 @@ button:active, .player-launch:active, .search-fab:active{transform:scale(.95)}
 /* 首页面包屑只有「主页」一词，全端隐藏 */
 .crumb-home{display:none}
 /* 首页 hero 轮播：全出血铺到视口两边，高度占上 1/3 屏；负 margin 抵消 content(2.6rem)+welcome(2.4rem) 顶距，图片直接顶到顶栏；桌面端左溢出部分被不透明侧栏（z-index:6）遮住 */
-.welcome-hero{position:relative; width:100vw; max-width:none; aspect-ratio:21/9; height:auto; margin:-5rem calc(50% - 50vw) 1.3rem; border-radius:0; overflow:hidden; touch-action:pan-y}
-.welcome-hero .hc-slide{position:absolute; inset:0; width:100%; height:100%; object-fit:cover; opacity:0; transition:opacity 1s ease}
+.welcome-hero{position:relative; width:100vw; max-width:none; aspect-ratio:21/9; height:auto; margin:-5rem calc(50% - 50vw) 1.3rem; border-radius:0; overflow:hidden; touch-action:pan-y; background:var(--surface)}
+.welcome-hero .hc-slide{position:absolute; inset:0; width:100%; height:100%; object-fit:contain; opacity:0; transition:opacity 1s ease}
 .welcome-hero picture{position:absolute; inset:0; display:block}
 .welcome-hero .hc-slide.active{opacity:1}
 .welcome-hero .hc-dots{position:absolute; bottom:10px; left:50%; transform:translateX(-50%); display:flex; gap:8px; z-index:2}
