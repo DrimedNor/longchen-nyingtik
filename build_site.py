@@ -3101,6 +3101,50 @@ function hcCountUnder(dirName){
 // 页面仅额外补「藏历新年」标记（藏历正月初一，由换算结果 month==='正' 判定）。
 // 两种交互：①指定日期查询（date input）②月历浏览（上/下月翻页，格内标藏历日＋节日点）。
 // ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// 藏历查询页（2026-09-18 新增；2026-09-18 二补：理发日吉凶＋回到今天）
+// 数据源：zangli.js（MIT © Stone Huang, github.com/stonelf/zangli），本地内联；
+// 数据依据《藏历、公历、农历对照百年历书（1951-2050）》，可换算范围 1951-01-08 ~ 2051-02-11。
+// 节日：库内置 extraInfo（神变节/莲师荟供日/空行母荟供日/药师/观音/地藏/释迦…），
+// 页面仅额外补「藏历新年」标记（藏历正月初一，由换算结果 month==='正' 判定）。
+// 理发日吉凶：出自佛说《菩萨头发品》（藏传通行传本，30 日逐日），网站多源同表交叉核对一致；
+//   「八吉同聚」（乔美仁波切、米旁仁波切口传认定，是日纵其他星宿显凶亦无妨、诸事吉祥）
+//   与「九凶同聚」（是日诸事不吉，尤忌嫁娶）逐月日子表一并纳入；闰日依藏历本序沿用该日数。
+// 两种交互：①指定日期查询（date input）②月历浏览（上/下月翻页＋【回到今天】，格内标藏历日＋节日点）。
+// ---------------------------------------------------------------------------
+// 理发日吉凶表（藏历日 1..30，出自《菩萨头发品》；t=吉 g/凶 b 记号）
+var Z_HAIRCUT = {
+  1:['短命','凶'], 2:['多病，有口舌之争','凶'], 3:['得财富','吉'], 4:['得权势、增容颜','吉'],
+  5:['增财','吉'], 6:['损颜，极不利','凶'], 7:['遇诉讼','凶'], 8:['长寿','吉'],
+  9:['艳遇（少年）','中'], 10:['增欢喜','吉'], 11:['增智慧','吉'], 12:['患病，危及生命','凶'],
+  13:['能精进，极殊胜','吉'], 14:['增财富','吉'], 15:['大福德','吉'], 16:['诸事不吉，患病','凶'],
+  17:['目不明，肤色暗','凶'], 18:['破财，不吉','凶'], 19:['增妙法','吉'], 20:['遇饥饿，不吉','凶'],
+  21:['遇传染病','凶'], 22:['多病','凶'], 23:['得财','吉'], 24:['遇瘟疫','凶'],
+  25:['患眼疾，不吉','凶'], 26:['得福乐','吉'], 27:['吉祥','吉'], 28:['遇纷争','凶'],
+  29:['幽魂不吉，声哑','凶'], 30:['恶口成真，遇凶害，不吉','凶']
+};
+// 八吉同聚（逐月；是日诸事吉祥）
+var Z_8 = { 1:[3,15,27], 2:[10,22], 3:[5,17,29], 4:[12,24], 5:[7,19], 6:[2,14,26], 7:[9,21], 8:[4,16,28], 9:[11,23], 10:[6,18,30], 11:[1,13,25], 12:[8,20] };
+// 九凶同聚（逐月；是日诸事不吉，尤忌嫁娶）
+var Z_9 = { 1:[13], 2:[11], 3:[9], 4:[7], 5:[5], 6:[3], 7:[29], 8:[27], 9:[25], 10:[23], 11:[21], 12:[19] };
+
+// 由 zangli 结果取（月号, 日号）：'正'->1、'十一/十二'->11/12；闰月按其主月同表（传统无另表，页脚注明）
+function zDayNum(z){
+  var M = { '正': 1, '二': 2, '三': 3, '四': 4, '五': 5, '六': 6, '七': 7, '八': 8, '九': 9, '十': 10, '十一': 11, '十二': 12 };
+  var D = { '初一': 1, '初二': 2, '初三': 3, '初四': 4, '初五': 5, '初六': 6, '初七': 7, '初八': 8, '初九': 9, '初十': 10,
+            '十一': 11, '十二': 12, '十三': 13, '十四': 14, '十五': 15, '十六': 16, '十七': 17, '十八': 18, '十九': 19, '二十': 20,
+            '廿一': 21, '廿二': 22, '廿三': 23, '廿四': 24, '廿五': 25, '廿六': 26, '廿七': 27, '廿八': 28, '廿九': 29, '三十': 30 };
+  var mname = (z.month || '').replace('闰', '');
+  var dnum = D[(z.day || '').replace('闰', '')] || 0;
+  return { m: M[mname] || 0, d: dnum };
+}
+function zHaircut(z){
+  var nd = zDayNum(z);
+  var item = Z_HAIRCUT[nd.d] || null;
+  var in8 = (Z_8[nd.m] || []).indexOf(nd.d) >= 0;
+  var in9 = (Z_9[nd.m] || []).indexOf(nd.d) >= 0;
+  return { m: nd.m, d: nd.d, item: item, j8: in8, j9: in9 };
+}
 function renderZangliPage(){
   var css = ''
     + '<style>'
@@ -3140,7 +3184,7 @@ function renderZangliPage(){
     + '<p style="color:var(--ink-soft);font-size:.9rem;line-height:1.8">公历日期、藏历日期与佛教节日同一视图对照。可查指定日期，也可逐月浏览。换算数据依《藏历、公历、农历对照百年历书（1951-2050）》，支持 1951-01-08 至 2051-02-11。</p>'
     + '<div class="zangli-querybar"><input type="date" id="zangliDate" min="1951-01-08" max="2051-02-11"><button onclick="zangliGoto()">查这一天</button><button style="background:var(--surface-soft);color:var(--ink);border:1px solid var(--line)" onclick="zangliToday()">今天</button></div>'
     + '<div id="zangliMain"></div>'
-    + '<div class="zangli-legend">🛕 金标＝佛教节日（含每月初十「莲师荟供日」与廿五「空行母荟供日」，及各佛菩萨节日、殊胜日功德说明）｜ ⭕ 红框＝今天（本地时区）</div>'
+    + '<div class="zangli-legend">🛕 金标＝佛教节日（含每月初十「莲师荟供日」与廿五「空行母荟供日」等）｜ ⭕ 红框＝今天｜ ✂ 理发日吉凶出自佛说《菩萨头发品》（30 日逐日，传统传本）；「八吉同聚」＝乔美仁波切、米旁仁波切口传认定，是日纵遇他星显凶无妨；「九凶同聚」＝诸事不吉，尤忌嫁娶；闰日依藏历本序同数查表；以上为传统历算之说，供参考</div>'
     + '<p style="color:var(--ink-soft);font-size:.78rem;margin-top:.8rem">藏历换算与节日数据来自开源项目 <a href="https://github.com/stonelf/zangli" target="_blank" rel="noopener">stonelf/zangli</a>（MIT 许可），数据源自《藏历、公历、农历对照百年历书（1951-2050）》，本站已原样内嵌、离线可用。</p>'
     + '</div>';
   return html;
@@ -3160,7 +3204,7 @@ function initZangliPage(){
   window._zView = { y: y, m: m, sel: null };
   document.getElementById('zangliDate').addEventListener('change', function(){
     var v = this.value; if (!v) return;
-    var p = v.split('-'); window._zView.sel = new Date(+p[0], +p[1]-1, +p[2], 12, 0, 0);
+    var p = v.split('-'); window._zView.sel = new Date(+p[0], +p[1]-1, +p[2]);
     _zRenderMain();
   });
   _zRenderMain();
@@ -3169,20 +3213,20 @@ function zangliGoto(){   // 「查这一天」按钮
   var v = document.getElementById('zangliDate').value;
   if (!v) return;
   var p = v.split('-');
-  window._zView.sel = new Date(+p[0], +p[1]-1, +p[2], 12, 0, 0);
+  window._zView.sel = new Date(+p[0], +p[1]-1, +p[2]);
   // 若查询日期不在当前浏览月份，跳转月历
   window._zView.y = +p[0]; window._zView.m = +p[1]-1;
   _zRenderMain();
 }
 function zangliToday(){
-  var t = new Date(); t.setHours(12,0,0,0);
+  var t = new Date(); t.setHours(0,0,0,0);
   document.getElementById('zangliDate').value = t.getFullYear() + '-' + String(t.getMonth()+1).padStart(2,'0') + '-' + String(t.getDate()).padStart(2,'0');
   window._zView = { y: t.getFullYear(), m: t.getMonth(), sel: t };
   _zRenderMain();
 }
 function zangliShift(dy, dm){
   var v = window._zView;
-  var d = new Date(v.y + dy, v.m + dm, 1, 12, 0, 0);
+  var d = new Date(v.y + dy, v.m + dm, 1, 0, 0, 0);
   window._zView.y = d.getFullYear(); window._zView.m = d.getMonth();
   _zRenderMain();
 }
@@ -3199,7 +3243,7 @@ function _zRenderMain(){
   var today = new Date(); today.setHours(0,0,0,0);
   var fmt = function(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); };
   // —— 主视图：选中日（默认今天）大卡 ——
-  var selD = v.sel || (function(){ var t=new Date(); t.setHours(12,0,0,0); return t; })();
+  var selD = v.sel || (function(){ var t=new Date(); t.setHours(0,0,0,0); return t; })();
   var z = getZangli(selD);
   var festMain = '';
   if (z && z.value !== 'error'){
@@ -3213,19 +3257,50 @@ function _zRenderMain(){
   } else {
     z = { value:'超出可换算范围', extraInfo:'', extraInfo2:'', year:'', month:'', day:'' };
   }
+  // 主卡：公历/藏历/节日 + 理发日吉凶（2026-09-18 二补）
+  var hc = zHaircut(z);
+  var hairHtml = '';
+  if (hc.d && hc.item){
+    var tagColor = hc.j8 ? '#2e7d32' : (hc.j9 ? '#c62828' : (hc.item[1] === '吉' ? '#2e7d32' : (hc.item[1] === '凶' ? '#c62828' : '#8d6e63')));
+    var hairTag = hc.j8 ? '八吉同聚' : (hc.j9 ? '九凶同聚' : hc.item[1]);
+    var hairMain = (hc.j8 ? '诸事皆吉祥' : (hc.j9 ? '诸事不吉，尤忌嫁娶' : hc.item[0]));
+    var hairSub = hc.j8 ? '乔美仁波切：是日纵遇他星显凶亦无妨，有八吉祥海螺同聚故' : (hc.j9 ? '九凶同聚，无论作何事不吉' : '');
+    hairHtml = '<div style="margin-top:.5rem;font-size:.98rem;line-height:1.65">'
+      + '<span style="display:inline-block;border-radius:6px;padding:.12rem .55rem;color:#fff;background:' + tagColor + ';font-weight:600">✂ 理发 ' + hairTag + '</span>'
+      + ' <span style="color:var(--ink)">' + hairMainText() + '</span>'
+      + '<div style="color:var(--ink-soft);font-size:.85rem;margin-top:.15rem">' + hairSubText() + '</div>'
+      + '</div>';
+  } else if (z.value === '超出可换算范围') {
+    hairHtml = '';
+  }
+  function hairMainText(){
+    if (hc.j8) return '藏历' + zMonthName(hc.m) + '月' + zNumName(hc.d) + ' 见「八吉同聚」，诸事吉祥';
+    if (hc.j9) return '藏历' + zMonthName(hc.m) + '月' + zNumName(hc.d) + ' 见「九凶同聚」，诸事不吉，尤忌嫁娶';
+    return '藏历' + zMonthName(hc.m) + '月' + zNumName(hc.d) + '：' + (hc.item ? hc.item[0] : '');
+  }
+  function hairSubText(){
+    if (hc.j8) return '《菩萨头发品》吉为：' + (hc.item ? hc.item[0] : '') + '（同聚之日凶星无妨）';
+    if (hc.j9) return '《菩萨头发品》：' + (hc.item ? hc.item[0] : '');
+    return '';
+  }
+  function zMonthName(n){ return ['','正','二','三','四','五','六','七','八','九','十','十一','十二'][n] || ''; }
+  function zNumName(n){ return ['','初一','初二','初三','初四','初五','初六','初七','初八','初九','初十','十一','十二','十三','十四','十五','十六','十七','十八','十九','二十','廿一','廿二','廿三','廿四','廿五','廿六','廿七','廿八','廿九','三十'][n] || ''; }
   var main = '<div class="zangli-today">'
     + '<div class="zangli-greg">公历 ' + zangliFmtG(selD) + '</div>'
     + '<div class="zangli-tib">藏历 ' + esc(z.value || '') + '</div>'
     + '<div class="zangli-fest">' + (fest.length ? '<span class="zangli-fest-name">' + fest[0] + '</span>' + (fest[1] ? ' <span class="zangli-fest-note">' + fest[1] + '</span>' : '') : '<span style="color:var(--ink-soft)">本日无特定节日</span>') + '</div>'
+    + (hairHtml ? '<div class="zangli-hair">' + hairHtml + '</div>' : '')
     + '</div>';
+
+
   // —— 月历（自适应网格：格子内容多时自动换行、行高随内容增高，绝不横向溢出）——
-  var first = new Date(v.y, v.m, 1, 12, 0, 0);
+  var first = new Date(v.y, v.m, 1, 0, 0, 0);
   var dim = new Date(v.y, v.m + 1, 0).getDate();
   var lead = first.getDay();
   var cells = '';
   for (var i = 0; i < lead; i++) cells += '<div><div class="zangli-cell zangli-empty"></div></div>';
   for (var d0 = 1; d0 <= dim; d0++){
-    var d = new Date(v.y, v.m, d0, 12, 0, 0);
+    var d = new Date(v.y, v.m, d0, 0, 0, 0);
     var zz = getZangli(d);
     var isFest = !!(zz && zz.extraInfo);
     var isNew = !!(zz && zz.day === '初一' && zz.month === '正');
@@ -3247,6 +3322,7 @@ function _zRenderMain(){
     + '<button onclick="zangliShift(0,-1)">‹ 上月</button>'
     + '<div class="zangli-cal-title">' + v.y + '年' + (v.m+1) + '月 <small>（点任一天查询）</small></div>'
     + '<button onclick="zangliShift(0,1)">下月 ›</button>'
+    + '<button onclick="zangliToday()" title="回到今天的日期与本月">◎ 今天</button>'
     + '</div>'
     + '<div class="zangli-week"><div>日</div><div>一</div><div>二</div><div>三</div><div>四</div><div>五</div><div>六</div></div>'
     + '<div class="zangli-grid">' + cells + '</div>'
