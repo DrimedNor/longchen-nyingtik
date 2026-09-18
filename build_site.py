@@ -1549,6 +1549,7 @@ img{height:auto;max-width:100%}
 </div>
 
 <script>
+@@ZANGLI_LIB@@
 @@QRCODE_LIB@@
 // ---- Service Worker 注册：音频离线缓存 + 页面更新策略（sw.js 由构建时复制到 dist 根） ----
 // 2026-09-14 修复：仅在确认"已登录"后才注册 SW。
@@ -2139,6 +2140,11 @@ function renderNav(){
     + '<div class="nav-sec-head" onclick="openSearchPanel()">'
     + '<span class="nav-chev nav-chev-none">🔍</span>'
     + '<span class="dir-label">AI 搜索</span></div></div>';
+  // 藏历入口（2026-09-18 新增功能页，与 AI 搜索同为工具入口）
+  html += '<div class="nav-sec" data-depth="0">'
+    + '<div class="nav-sec-head" onclick="go(\'__zangli\'); if (window.innerWidth <= 760) closeSidebar();">'
+    + '<span class="nav-chev nav-chev-none">📅</span>'
+    + '<span class="dir-label">藏历</span></div></div>';
   html += '<hr style="border:none;border-top:1px solid var(--line);margin:.5rem 0;">';
   Object.keys(TREE.dirs).sort(function(a, b){ return topKey(a) - topKey(b); }).forEach(function(name){
     var target = name + '/index';
@@ -2320,6 +2326,20 @@ function show(slug){
   pageViewSlug = slug;
   pageViewStartTime = now;
   var p = bySlug[slug];
+  if (slug === '__zangli'){
+    // 「藏历」功能页（2026-09-18 新增）：查询＋月历双交互，客户端本地换算，无网络请求
+    currentSlug = slug;
+    document.title = SITE_TITLE + ' · 藏历';
+    document.getElementById('pageCrumbs').textContent = ' / 藏历';
+    var contentElZ = document.getElementById('content');
+    contentElZ.innerHTML = '<div class="article">' + renderZangliPage() + '</div>';
+    contentElZ.classList.remove('page-anim');
+    void contentElZ.offsetWidth;
+    contentElZ.classList.add('page-anim');
+    initZangliPage();
+    window.scrollTo({top:0, behavior:'smooth'});
+    return;
+  }
   if (!p){
     // 404 页面
     currentSlug = slug;
@@ -3072,8 +3092,171 @@ function hcCountUnder(dirName){
     return !x.is_index && x.slug.indexOf(dirName + '/') === 0;
   }).length;
 }
+// ---------------------------------------------------------------------------
+// 藏历查询页（2026-09-18 新增）
+// 数据源：zangli.js（MIT © Stone Huang, github.com/stonelf/zangli），本地内联；
+// 数据依据《藏历、公历、农历对照百年历书（1951-2050）》，可换算范围 1951-01-08 ~ 2051-02-11。
+// 对照方式：客户端按公历日期直接调 getZangli() 得藏历（五行生肖年/月名/日序，闰缺日内建）；
+// 节日：库内置 extraInfo（神变节/莲师荟供日/空行母荟供日/药师/观音/地藏/释迦…），
+// 页面仅额外补「藏历新年」标记（藏历正月初一，由换算结果 month==='正' 判定）。
+// 两种交互：①指定日期查询（date input）②月历浏览（上/下月翻页，格内标藏历日＋节日点）。
+// ---------------------------------------------------------------------------
+function renderZangliPage(){
+  var css = ''
+    + '<style>'
+    + '.zangli-wrap{max-width:52rem;margin:0 auto}'
+    + '.zangli-today{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:1.3rem 1.4rem;margin:1rem 0}'
+    + '.zangli-greg{font-size:1.15rem;font-weight:700;color:var(--ink)}'
+    + '.zangli-tib{font-size:1.5rem;font-weight:700;color:var(--accent);margin:.5rem 0 .2rem}'
+    + '.zangli-fest{margin-top:.55rem;font-size:1.02rem;color:var(--ink);line-height:1.65}'
+    + '.zangli-fest-name{display:inline-block;background:var(--accent);color:#fff;border-radius:6px;padding:.12rem .55rem;margin-right:.45rem;font-weight:600}'
+    + '.zangli-fest-note{color:var(--ink-soft);font-size:.92rem}'
+    + '.zangli-cal{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:1rem;margin-top:1.1rem}'
+    + '.zangli-cal-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:.6rem}'
+    + '.zangli-cal-title{font-weight:700;color:var(--ink)}'
+    + '.zangli-cal-title small{color:var(--ink-soft);font-weight:400}'
+    + '.zangli-cal button{border:1px solid var(--line);background:var(--surface-soft);color:var(--ink);border-radius:8px;padding:.35rem .85rem;cursor:pointer}'
+    + '.zangli-cal-table{width:100%;border-collapse:collapse;table-layout:fixed}'
+    + '.zangli-cal-table th{font-size:.78em;color:var(--ink-soft);font-weight:500;padding:.3rem 0}'
+    + '.zangli-cal-table td{vertical-align:top;padding:.28rem 2px;min-height:3.9em;border-top:1px solid var(--line-soft,var(--line))}'
+    + '.zangli-cell{display:block;padding:.22rem .3rem;border-radius:8px;cursor:pointer;line-height:1.25;text-align:center}'
+    + '.zangli-cell-g{font-size:.82em;color:var(--ink-soft)}'
+    + '.zangli-cell-t{display:block;font-size:.9em;color:var(--ink)}'
+    + '.zangli-cell-f{display:block;font-size:.66em;color:#b08d2f;line-height:1.15;overflow:hidden}'
+    + '.zangli-cell-today{box-shadow:inset 0 0 0 2px var(--accent)}'
+    + '.zangli-cell-sel{background:var(--surface-soft);outline:1px solid var(--accent)}'
+    + '.zangli-cell-hasfest .zangli-cell-t{color:var(--accent);font-weight:700}'
+    + '.zangli-legend{color:var(--ink-soft);font-size:.8rem;margin-top:.5rem;line-height:1.7}'
+    + '.zangli-querybar{display:flex;gap:.6rem;align-items:center;flex-wrap:wrap;margin:1rem 0 .2rem}'
+    + '.zangli-querybar input[type=date]{padding:.5rem .7rem;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--ink);font-family:inherit}'
+    + '.zangli-querybar button{padding:.5rem .9rem;border:1px solid var(--accent);background:var(--accent);color:#fff;border-radius:8px;cursor:pointer;font-family:inherit}'
+    + '@media(max-width:768px){.zangli-cell-g{font-size:.68em}.zangli-cell-t{font-size:.74em}.zangli-cell-f{font-size:.56em}.zangli-today{padding:1rem}.zangli-tib{font-size:1.15rem}}'
+    + '</style>';
+  var html = css
+    + '<div class="zangli-wrap">'
+    + '<h1 style="font-size:1.3rem">藏历查询</h1>'
+    + '<p style="color:var(--ink-soft);font-size:.9rem;line-height:1.8">公历日期、藏历日期与佛教节日同一视图对照。可查指定日期，也可逐月浏览。换算数据依《藏历、公历、农历对照百年历书（1951-2050）》，支持 1951-01-08 至 2051-02-11。</p>'
+    + '<div class="zangli-querybar"><input type="date" id="zangliDate" min="1951-01-08" max="2051-02-11"><button onclick="zangliGoto()">查这一天</button><button style="background:var(--surface-soft);color:var(--ink);border:1px solid var(--line)" onclick="zangliToday()">今天</button></div>'
+    + '<div id="zangliMain"></div>'
+    + '<div class="zangli-legend">🛕 金标＝佛教节日（含每月初十「莲师荟供日」与廿五「空行母荟供日」，及各佛菩萨节日、殊胜日功德说明）｜ ⭕ 红框＝今天（本地时区）</div>'
+    + '<p style="color:var(--ink-soft);font-size:.78rem;margin-top:.8rem">藏历换算与节日数据来自开源项目 <a href="https://github.com/stonelf/zangli" target="_blank" rel="noopener">stonelf/zangli</a>（MIT 许可），数据源自《藏历、公历、农历对照百年历书（1951-2050）》，本站已原样内嵌、离线可用。</p>'
+    + '</div>';
+  return html;
+}
+
+function zangliFmtG(d){
+  var wd = ['日','一','二','三','四','五','六'][d.getDay()];
+  return d.getFullYear() + ' 年 ' + (d.getMonth()+1) + ' 月 ' + d.getDate() + ' 日 · 星期' + wd;
+}
+function zangliOf(d){ return window.getZangli ? getZangli(d) : { value: 'error', extraInfo: '', extraInfo2: '' }; }
+
+function initZangliPage(){
+  var input = document.getElementById('zangliDate');
+  var today = new Date();
+  var y = today.getFullYear(), m = today.getMonth();
+  input.value = today.getFullYear() + '-' + String(today.getMonth()+1).padStart(2,'0') + '-' + String(today.getDate()).padStart(2,'0');
+  window._zView = { y: y, m: m, sel: null };
+  document.getElementById('zangliDate').addEventListener('change', function(){
+    var v = this.value; if (!v) return;
+    var p = v.split('-'); window._zView.sel = new Date(+p[0], +p[1]-1, +p[2], 12, 0, 0);
+    _zRenderMain();
+  });
+  _zRenderMain();
+}
+function zangliGoto(){   // 「查这一天」按钮
+  var v = document.getElementById('zangliDate').value;
+  if (!v) return;
+  var p = v.split('-');
+  window._zView.sel = new Date(+p[0], +p[1]-1, +p[2], 12, 0, 0);
+  // 若查询日期不在当前浏览月份，跳转月历
+  window._zView.y = +p[0]; window._zView.m = +p[1]-1;
+  _zRenderMain();
+}
+function zangliToday(){
+  var t = new Date(); t.setHours(12,0,0,0);
+  document.getElementById('zangliDate').value = t.getFullYear() + '-' + String(t.getMonth()+1).padStart(2,'0') + '-' + String(t.getDate()).padStart(2,'0');
+  window._zView = { y: t.getFullYear(), m: t.getMonth(), sel: t };
+  _zRenderMain();
+}
+function zangliShift(dy, dm){
+  var v = window._zView;
+  var d = new Date(v.y + dy, v.m + dm, 1, 12, 0, 0);
+  window._zView.y = d.getFullYear(); window._zView.m = d.getMonth();
+  _zRenderMain();
+}
+function _zCellClick(ts){
+  window._zView.sel = new Date(ts);
+  var d = window._zView.sel;
+  document.getElementById('zangliDate').value = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+  _zRenderMain();
+}
+function _zRenderMain(){
+  var box = document.getElementById('zangliMain');
+  if (!box) return;
+  var v = window._zView;
+  var today = new Date(); today.setHours(0,0,0,0);
+  var fmt = function(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); };
+  // —— 主视图：选中日（默认今天）大卡 ——
+  var selD = v.sel || (function(){ var t=new Date(); t.setHours(12,0,0,0); return t; })();
+  var z = getZangli(selD);
+  var festMain = '';
+  if (z && z.value !== 'error'){
+    var fest = [];
+    if (z.extraInfo) fest.push(z.extraInfo.replace(/<br>/g,''));
+    if (z.day === '初一' && z.month === '正' && fest.indexOf('藏历新年') < 0) fest.push('藏历新年');
+    if (z.extraInfo2) fest.push(z.extraInfo2);
+    festMain = fest.length
+      ? fest.map(function(f){ return '<span class="zangli-fest-name">' + f + '</span>'; }).join(' ')
+      : '<span style="color:var(--ink-soft)">普通日</span>';
+  } else {
+    z = { value:'超出可换算范围', extraInfo:'', extraInfo2:'', year:'', month:'', day:'' };
+  }
+  var main = '<div class="zangli-today">'
+    + '<div class="zangli-greg">公历 ' + zangliFmtG(selD) + '</div>'
+    + '<div class="zangli-tib">藏历 ' + esc(z.value || '') + '</div>'
+    + '<div class="zangli-fest">' + (fest.length ? '<span class="zangli-fest-name">' + fest[0] + '</span>' + (fest[1] ? ' <span class="zangli-fest-note">' + fest[1] + '</span>' : '') : '<span style="color:var(--ink-soft)">本日无特定节日</span>') + '</div>'
+    + '</div>';
+  // —— 月历 ——
+  var first = new Date(v.y, v.m, 1, 12, 0, 0);
+  var dim = new Date(v.y, v.m + 1, 0).getDate();
+  var lead = first.getDay();
+  var cells = '';
+  for (var i = 0; i < lead; i++) cells += '<td></td>';
+  for (var d0 = 1; d0 <= dim; d0++){
+    var d = new Date(v.y, v.m, d0, 12, 0, 0);
+    var zz = getZangli(d);
+    var isFest = !!(zz && zz.extraInfo);
+    var isNew = !!(zz && zz.day === '初一' && zz.month === '正');
+    var isToday = fmt(d) === fmt(today);
+    var isSel = v.sel && fmt(v.sel) === fmt(d);
+    var cls = 'zangli-cell';
+    if (isFest || isNew) cls += ' zangli-cell-hasfest';
+    if (isToday) cls += ' zangli-cell-today';
+    if (isSel) cls += ' zangli-cell-sel';
+    var fLabel = isNew ? '洛萨' : (zz && zz.extraInfo ? zz.extraInfo.replace(/<br>/g,'') : '');
+    cells += '<td><span class="' + cls + '" onclick="_zCellClick(' + d.getTime() + ')">'
+      + '<span class="zangli-cell-g">' + d0 + '</span>'
+      + '<span class="zangli-cell-t">' + (zz && zz.day ? zz.day.replace('闰','闰') : '') + '</span>'
+      + (fLabel ? '<span class="zangli-cell-f">' + fLabel.replace('莲师荟供日','莲师荟供').replace('空行母荟供日','空行荟供').replace('节日','') + '</span>' : '')
+      + '</span></td>';
+    if ((lead + d0) % 7 === 0 && d0 < dim) cells += '</tr><tr>';
+  }
+  var table = '<div class="zangli-cal">'
+    + '<div class="zangli-cal-head">'
+    + '<button onclick="zangliShift(0,-1)">‹ 上月</button>'
+    + '<div class="zangli-cal-title">' + v.y + '年' + (v.m+1) + '月 <small>（点任一天查询）</small></div>'
+    + '<button onclick="zangliShift(0,1)">下月 ›</button>'
+    + '</div>'
+    + '<table class="zangli-cal-table"><tr><td>日</td><td>一</td><td>二</td><td>三</td><td>四</td><td>五</td><td>六</td></tr><tr>' + cells + '</tr></table>'
+    + '</div>';
+  box.innerHTML = main + table;
+}
+function openZangli(){ go('__zangli'); }
+
 function renderHomeCards(){
   var items = [];
+  // 藏历（2026-09-18 新增功能页）
+  items.push({icon:'📅', title:'藏历', desc:'公历藏历对照与佛教节日', slug:'__zangli', count:''});
   // 2026-09-15 板块重组：知传承 / 听法音 / 读开示 / 阅典籍 / 瞻法照
   if (bySlug['3. 知传承/index']){
     var nZc = hcCountUnder('3. 知传承');
@@ -5988,6 +6171,16 @@ def main():
     # 确保 qrcode 暴露为全局变量（UMD 库在浏览器中可能不自动挂载）
     qrcode_lib += "\n;window.qrcode = (typeof qrcode !== 'undefined') ? qrcode : (window.qrcode || null);\n"
     html_out = html_out.replace("@@QRCODE_LIB@@", qrcode_lib)
+    # 内联藏历库（zangli.js，MIT，stonelf/zangli：1951-2050 公历藏历对照＋节日；2026-09-18 新增「藏历」功能）
+    zangli_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "content", "assets", "zangli.js")
+    if os.path.exists(zangli_path):
+        with open(zangli_path, "r", encoding="utf-8") as f:
+            zangli_lib = f.read()
+        # 防库尾 zangli_callback 干扰：强制为无回调环境
+        zangli_lib += "\n;window.getZangli = (typeof getZangli === 'function') ? getZangli : window.getZangli;\n"
+    else:
+        zangli_lib = "/* zangli.js not found */"
+    html_out = html_out.replace("@@ZANGLI_LIB@@", zangli_lib)
 
     os.makedirs(DIST_DIR, exist_ok=True)
     out_path = os.path.join(DIST_DIR, "index.html")
