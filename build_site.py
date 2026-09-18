@@ -3104,33 +3104,35 @@ function hcCountUnder(dirName){
 function renderZangliPage(){
   var css = ''
     + '<style>'
-    + '.zangli-wrap{max-width:52rem;margin:0 auto}'
-    + '.zangli-today{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:1.3rem 1.4rem;margin:1rem 0}'
+    + '.zangli-wrap{max-width:52rem;margin:0 auto;overflow-x:hidden}'
+    + '.zangli-today{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:1.3rem 1.4rem;margin:1rem 0;overflow-wrap:break-word}'
     + '.zangli-greg{font-size:1.15rem;font-weight:700;color:var(--ink)}'
-    + '.zangli-tib{font-size:1.5rem;font-weight:700;color:var(--accent);margin:.5rem 0 .2rem}'
+    + '.zangli-tib{font-size:1.5rem;font-weight:700;color:var(--accent);margin:.5rem 0 .2rem;overflow-wrap:break-word}'
     + '.zangli-fest{margin-top:.55rem;font-size:1.02rem;color:var(--ink);line-height:1.65}'
     + '.zangli-fest-name{display:inline-block;background:var(--accent);color:#fff;border-radius:6px;padding:.12rem .55rem;margin-right:.45rem;font-weight:600}'
     + '.zangli-fest-note{color:var(--ink-soft);font-size:.92rem}'
-    + '.zangli-cal{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:1rem;margin-top:1.1rem}'
-    + '.zangli-cal-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:.6rem}'
-    + '.zangli-cal-title{font-weight:700;color:var(--ink)}'
+    + '.zangli-cal{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:1rem;margin-top:1.1rem;overflow-x:hidden}'
+    + '.zangli-cal-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:.6rem;gap:.4rem}'
+    + '.zangli-cal-title{font-weight:700;color:var(--ink);text-align:center;overflow-wrap:break-word}'
     + '.zangli-cal-title small{color:var(--ink-soft);font-weight:400}'
-    + '.zangli-cal button{border:1px solid var(--line);background:var(--surface-soft);color:var(--ink);border-radius:8px;padding:.35rem .85rem;cursor:pointer}'
-    + '.zangli-cal-table{width:100%;border-collapse:collapse;table-layout:fixed}'
-    + '.zangli-cal-table th{font-size:.78em;color:var(--ink-soft);font-weight:500;padding:.3rem 0}'
-    + '.zangli-cal-table td{vertical-align:top;padding:.28rem 2px;min-height:3.9em;border-top:1px solid var(--line-soft,var(--line))}'
-    + '.zangli-cell{display:block;padding:.22rem .3rem;border-radius:8px;cursor:pointer;line-height:1.25;text-align:center}'
-    + '.zangli-cell-g{font-size:.82em;color:var(--ink-soft)}'
-    + '.zangli-cell-t{display:block;font-size:.9em;color:var(--ink)}'
-    + '.zangli-cell-f{display:block;font-size:.66em;color:#b08d2f;line-height:1.15;overflow:hidden}'
+    + '.zangli-cal button{border:1px solid var(--line);background:var(--surface-soft);color:var(--ink);border-radius:8px;padding:.35rem .85rem;cursor:pointer;flex:none}'
+    + '.zangli-week{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;margin-bottom:2px}'
+    + '.zangli-week div{text-align:center;font-size:.78em;color:var(--ink-soft);padding:.3rem 0}'
+    + '.zangli-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;align-items:stretch}'
+    + '.zangli-grid>div{min-height:0}'
+    + '.zangli-cell{display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding:.25rem 1px;border-radius:8px;cursor:pointer;line-height:1.25;text-align:center;height:100%;overflow-wrap:break-word;word-break:break-word}'
+    + '.zangli-empty{}'
+    + '.zangli-cell-g{font-size:.82em;color:var(--ink-soft);line-height:1.2}'
+    + '.zangli-cell-t{font-size:.9em;color:var(--ink);line-height:1.2}'
+    + '.zangli-cell-f{display:block;font-size:.62em;color:#b08d2f;line-height:1.2;overflow-wrap:anywhere;max-width:100%}'
     + '.zangli-cell-today{box-shadow:inset 0 0 0 2px var(--accent)}'
     + '.zangli-cell-sel{background:var(--surface-soft);outline:1px solid var(--accent)}'
     + '.zangli-cell-hasfest .zangli-cell-t{color:var(--accent);font-weight:700}'
-    + '.zangli-legend{color:var(--ink-soft);font-size:.8rem;margin-top:.5rem;line-height:1.7}'
+    + '.zangli-legend{color:var(--ink-soft);font-size:.8rem;margin-top:.5rem;line-height:1.7;overflow-wrap:break-word}'
     + '.zangli-querybar{display:flex;gap:.6rem;align-items:center;flex-wrap:wrap;margin:1rem 0 .2rem}'
-    + '.zangli-querybar input[type=date]{padding:.5rem .7rem;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--ink);font-family:inherit}'
+    + '.zangli-querybar input[type=date]{padding:.5rem .7rem;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--ink);font-family:inherit;max-width:42vw}'
     + '.zangli-querybar button{padding:.5rem .9rem;border:1px solid var(--accent);background:var(--accent);color:#fff;border-radius:8px;cursor:pointer;font-family:inherit}'
-    + '@media(max-width:768px){.zangli-cell-g{font-size:.68em}.zangli-cell-t{font-size:.74em}.zangli-cell-f{font-size:.56em}.zangli-today{padding:1rem}.zangli-tib{font-size:1.15rem}}'
+    + '@media(max-width:768px){.zangli-cell{padding:.18rem 1px}.zangli-cell-g{font-size:.72em}.zangli-cell-t{font-size:.78em}.zangli-cell-f{font-size:.54em}.zangli-today{padding:.9rem .9rem}.zangli-tib{font-size:1.12rem}.zangli-fest{font-size:.95rem}.zangli-cal{padding:.7rem}}'
     + '</style>';
   var html = css
     + '<div class="zangli-wrap">'
@@ -3216,12 +3218,12 @@ function _zRenderMain(){
     + '<div class="zangli-tib">藏历 ' + esc(z.value || '') + '</div>'
     + '<div class="zangli-fest">' + (fest.length ? '<span class="zangli-fest-name">' + fest[0] + '</span>' + (fest[1] ? ' <span class="zangli-fest-note">' + fest[1] + '</span>' : '') : '<span style="color:var(--ink-soft)">本日无特定节日</span>') + '</div>'
     + '</div>';
-  // —— 月历 ——
+  // —— 月历（自适应网格：格子内容多时自动换行、行高随内容增高，绝不横向溢出）——
   var first = new Date(v.y, v.m, 1, 12, 0, 0);
   var dim = new Date(v.y, v.m + 1, 0).getDate();
   var lead = first.getDay();
   var cells = '';
-  for (var i = 0; i < lead; i++) cells += '<td></td>';
+  for (var i = 0; i < lead; i++) cells += '<div><div class="zangli-cell zangli-empty"></div></div>';
   for (var d0 = 1; d0 <= dim; d0++){
     var d = new Date(v.y, v.m, d0, 12, 0, 0);
     var zz = getZangli(d);
@@ -3234,12 +3236,11 @@ function _zRenderMain(){
     if (isToday) cls += ' zangli-cell-today';
     if (isSel) cls += ' zangli-cell-sel';
     var fLabel = isNew ? '洛萨' : (zz && zz.extraInfo ? zz.extraInfo.replace(/<br>/g,'') : '');
-    cells += '<td><span class="' + cls + '" onclick="_zCellClick(' + d.getTime() + ')">'
+    cells += '<div><span class="' + cls + '" onclick="_zCellClick(' + d.getTime() + ')">'
       + '<span class="zangli-cell-g">' + d0 + '</span>'
-      + '<span class="zangli-cell-t">' + (zz && zz.day ? zz.day.replace('闰','闰') : '') + '</span>'
+      + '<span class="zangli-cell-t">' + (zz && zz.day ? zz.day : '') + '</span>'
       + (fLabel ? '<span class="zangli-cell-f">' + fLabel.replace('莲师荟供日','莲师荟供').replace('空行母荟供日','空行荟供').replace('节日','') + '</span>' : '')
-      + '</span></td>';
-    if ((lead + d0) % 7 === 0 && d0 < dim) cells += '</tr><tr>';
+      + '</span></div>';
   }
   var table = '<div class="zangli-cal">'
     + '<div class="zangli-cal-head">'
@@ -3247,7 +3248,8 @@ function _zRenderMain(){
     + '<div class="zangli-cal-title">' + v.y + '年' + (v.m+1) + '月 <small>（点任一天查询）</small></div>'
     + '<button onclick="zangliShift(0,1)">下月 ›</button>'
     + '</div>'
-    + '<table class="zangli-cal-table"><tr><td>日</td><td>一</td><td>二</td><td>三</td><td>四</td><td>五</td><td>六</td></tr><tr>' + cells + '</tr></table>'
+    + '<div class="zangli-week"><div>日</div><div>一</div><div>二</div><div>三</div><div>四</div><div>五</div><div>六</div></div>'
+    + '<div class="zangli-grid">' + cells + '</div>'
     + '</div>';
   box.innerHTML = main + table;
 }
