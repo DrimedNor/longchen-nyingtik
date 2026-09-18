@@ -23,12 +23,23 @@ export default {
     const url = new URL(request.url);
     const path = url.pathname;
     
-    // CORS 头
-    const corsHeaders = {
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type, X-Device-ID, X-Admin-Password',
-    };
+    // CORS 头（2026-09-18 收窄：仅本站与预览域，严禁 *）
+    const corsHeaders = (function () {
+      const origin = request.headers.get('Origin') || '';
+      const allowed = [
+        'https://longchen-nyingtik.wiki',
+        'https://www.longchen-nyingtik.wiki',
+        // Pages 预览/部署子域（2c7b639f.longchen-nyingtik.pages.dev 形态）
+        origin.endsWith('.longchen-nyingtik.pages.dev') ? origin : null,
+      ].filter(Boolean);
+      const hit = allowed.includes(origin);
+      return {
+        'Access-Control-Allow-Origin': hit ? origin : 'null',
+        'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type, X-Device-ID, X-Admin-Token',
+        'Vary': 'Origin',
+      };
+    })();
     
     // 处理 OPTIONS 预检请求
     if (request.method === 'OPTIONS') {
@@ -172,8 +183,8 @@ export default {
           });
         }
         
-        // 简单密码哈希（实际生产应使用bcrypt，这里用简单哈希）
-        const passwordHash = simpleHash(password);
+        // 密码哈希（2026-09-18：注册即 PBKDF2；弱哈希 simpleHash 仅保留用于存量比对）
+        const passwordHash = await pbkdf2Hash(password);
         
         // 生成用户ID
         const userId = 'user_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
@@ -247,9 +258,9 @@ export default {
           });
         }
         
-        // 验证密码
-        const passwordHash = simpleHash(password);
-        if (user.passwordHash !== passwordHash) {
+        // 验证密码（2026-09-18：PBKDF2/旧格式自适应；旧格式验证通过时惰性升级）
+        const pwCheck = await verifyPassword(user.passwordHash, password);
+        if (!pwCheck.ok) {
           return new Response(JSON.stringify({ success: false, message: '密码错误' }), {
             status: 401,
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -270,13 +281,17 @@ export default {
           });
         }
         
-        // 更新登录信息
+        // 更新登录信息；旧式 simpleHash 在验证通过后惰性升级 PBKDF2（对用户无感，硬约束防弱哈希存量）
         user.lastLoginTime = new Date().toISOString();
         user.loginCount = (user.loginCount || 0) + 1;
+        if (pwCheck && pwCheck.rehash) {
+          user.passwordHash = await pbkdf2Hash(password);
+        }
         await env.STATS_KV.put('user_' + username, JSON.stringify(user));
         
         // 生成登录会话：写入 KV（30 天 TTL），Pages 中间件凭此 token 放行全站
-        const token = 'sess_' + simpleHash(username + Date.now() + Math.random());
+        // 2026-09-18：token 改为 crypto.getRandomValues 强随机；不再用 simpleHash
+        const token = 'sess_' + randomToken(32);
         await env.STATS_KV.put('session_' + token, JSON.stringify({
           username: user.username,
           nickname: user.nickname,
@@ -1330,6 +1345,62 @@ export default {
 };
 
 // 简单哈希函数（用于密码，实际生产应使用bcrypt）
+// ---------------------------------------------------------------------------
+// 密码哈希（2026-09-18 升级）：PBKDF2-SHA256 + 惰性迁移
+// 存储格式：
+//   旧行内哈希：'h_xxxx_<len>'（simpleHash，弱；仅用于读旧比对）
+//   新格式：'pbkdf2$<iterations>$<saltB64>$<hashB64>'（登录成功时惰性重哈希存量用户）
+// Workers 原生支持 crypto.subtle（Web Crypto），PBKDF2-SHA256 10 万次约几十 ms
+// ---------------------------------------------------------------------------
+const PBKDF2_ITERATIONS = 100000;
+
+function b64encode(bytes) {
+  let bin = '';
+  for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+  return btoa(bin);
+}
+function b64decode(s) {
+  const bin = atob(s);
+  const u = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i);
+  return u;
+}
+
+// 新格式：'pbkdf2$<iterations>$<saltB64>$<hashB64>'
+async function pbkdf2Hash(password, saltB64, iterations) {
+  const fromB64 = !!saltB64;
+  const salt = saltB64 ? b64decode(saltB64) : crypto.getRandomValues(new Uint8Array(16));
+  const keyMaterial = await crypto.subtle.importKey(
+    'raw', new TextEncoder().encode(password), 'PBKDF2', false, ['deriveBits']
+  );
+  const bits = await crypto.subtle.deriveBits(
+    { name: 'PBKDF2', hash: 'SHA-256', salt: salt, iterations: iterations || PBKDF2_ITERATIONS },
+    keyMaterial,
+    256
+  );
+  return ['pbkdf2', (iterations || PBKDF2_ITERATIONS), b64encode(salt), b64encode(new Uint8Array(bits))].join('$');
+}
+// 校验：按存储格式分派；能识别的格式都返回 { ok, rehash? }（rehash=旧格式验证通过后需要升级）
+async function verifyPassword(stored, password) {
+  if (typeof stored === 'string' && stored.indexOf('pbkdf2$') === 0) {
+    const parts = stored.split('$');
+    const iters = parseInt(parts[1], 10) || PBKDF2_ITERATIONS;
+    const saltB64 = parts[2], want = parts[3];
+    const got = await pbkdf2Hash(password, saltB64, iters);
+    const gotHash = got.split('$')[3];
+    let diff = want.length ^ gotHash.length;
+    for (let i = 0; i < want.length && i < gotHash.length; i++) diff |= want.charCodeAt(i) ^ gotHash.charCodeAt(i);
+    return { ok: diff === 0, rehash: false };
+  }
+  // 旧格式（simpleHash）
+  const legacy = simpleHash(password);
+  if (legacy === stored) return { ok: true, rehash: true };
+  return { ok: false, rehash: false };
+}
+function randomToken(n) {
+  const u = crypto.getRandomValues(new Uint8Array(n || 32));
+  return b64encode(u).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
 function simpleHash(str) {
   let hash = 0;
   for (let i = 0; i < str.length; i++) {
@@ -1380,7 +1451,7 @@ function getAdminDeviceIds(env) {
 
 /**
  * 管理员统一鉴权（2026-09-06 新增，含防爆破锁定）
- * - 密码来源：X-Admin-Password 请求头（兼容 ?admin= 查询参数）
+ * - 密码来源：X-Admin-Token 请求头（兼容 ?admin= 查询参数）
  * - 防爆破：同一 IP 15 分钟窗口内连续失败 5 次 → 锁定 15 分钟（KV 计数）
  * - 密码正确时自动清除失败计数
  * 返回 { ok: true } 或 { ok: false, response: Response }
@@ -1389,14 +1460,17 @@ async function checkAdminAuth(request, env, url) {
   const json = (obj, status) => new Response(JSON.stringify(obj), {
     status,
     headers: {
-      'Access-Control-Allow-Origin': '*',
+      // 2026-09-18：管理响应同样收窄到本站（admin.html 与本 Worker 同站使用，无跨站调用方）
+      'Access-Control-Allow-Origin': (request.headers.get('Origin') || '').endsWith('longchen-nyingtik.wiki')
+        ? request.headers.get('Origin') : 'null',
       'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type, X-Device-ID, X-Admin-Password',
+      'Access-Control-Allow-Headers': 'Content-Type, X-Device-ID, X-Admin-Token',
+      'Vary': 'Origin',
       'Content-Type': 'application/json',
     },
   });
 
-  const inputPass = request.headers.get('X-Admin-Password') || url.searchParams.get('admin') || '';
+  const inputPass = request.headers.get('X-Admin-Token') || url.searchParams.get('admin') || '';
   // 2026-09-18：移除内置兜底（旧口令已入 git 历史视同泄露）。未配置 ADMIN_PASSWORD 时
   // 明确失败（500），绝不静默放行或落到仓库明文——口令只存 Cloudflare Secret
   if (!env.ADMIN_PASSWORD) {

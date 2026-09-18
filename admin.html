@@ -471,7 +471,7 @@ function login() {
   
   // 验证密码（调用待审核 API 测试）
   fetch(API_BASE + '/api/admin/pending', {
-    headers: { 'X-Admin-Password': pwd }
+    headers: { 'X-Admin-Token': pwd }
   })
   .then(r => r.json())
   .then(data => {
@@ -509,7 +509,7 @@ function loadStats() {
     ? API_BASE + '/api/admin/stats?devices=all'
     : API_BASE + '/api/admin/stats';
   fetch(statsUrl, {
-    headers: { 'X-Admin-Password': adminPassword }
+    headers: { 'X-Admin-Token': adminPassword }
   })
   .then(r => r.json())
   .then(data => {
@@ -650,7 +650,7 @@ async function editDeviceName(deviceId) {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'X-Admin-Password': adminPassword
+        'X-Admin-Token': adminPassword
       },
       body: JSON.stringify({ deviceId: deviceId, name: newName })
     });
@@ -803,7 +803,7 @@ function loadPending() {
   container.innerHTML = '<div class="loading">加载中...</div>';
   
   fetch(API_BASE + '/api/admin/pending', {
-    headers: { 'X-Admin-Password': adminPassword }
+    headers: { 'X-Admin-Token': adminPassword }
   })
   .then(r => r.json())
   .then(data => {
@@ -853,7 +853,7 @@ async function review(regId, action) {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'X-Admin-Password': adminPassword
+        'X-Admin-Token': adminPassword
       },
       body: JSON.stringify({ regId, action })
     });
@@ -970,7 +970,7 @@ async function loadAllDevices() {
   const btn = document.getElementById('loadAllBtn');
   btn.disabled = true; btn.textContent = '加载中...';
   try {
-    const r = await fetch(API_BASE + '/api/admin/stats?devices=all', { headers: { 'X-Admin-Password': adminPassword } });
+    const r = await fetch(API_BASE + '/api/admin/stats?devices=all', { headers: { 'X-Admin-Token': adminPassword } });
     const data = await r.json();
     if (data.success) {
       window._allDevices = data.recentDevices || [];
@@ -999,7 +999,7 @@ async function backfillClassify() {
   const btn = document.getElementById('backfillBtn');
   btn.disabled = true; btn.textContent = '重算中...';
   try {
-    const r = await fetch(API_BASE + '/api/admin/backfill-classify', { method: 'POST', headers: { 'X-Admin-Password': adminPassword } });
+    const r = await fetch(API_BASE + '/api/admin/backfill-classify', { method: 'POST', headers: { 'X-Admin-Token': adminPassword } });
     const data = await r.json();
     if (data.success) {
       showToast(data.message, 'ok');
@@ -1195,7 +1195,7 @@ async function loadAiAskStats() {
   try {
     // 2026-09-06：AI统计接口已加管理员鉴权，请求必须携带密码头
     const response = await fetch(API_BASE + '/api/stats/ai-ask', {
-      headers: { 'X-Admin-Password': adminPassword }
+      headers: { 'X-Admin-Token': adminPassword }
     });
     const data = await response.json();
 
@@ -1358,7 +1358,7 @@ async function loadInvites() {
   const container = document.getElementById('inviteList');
   try {
     const response = await fetch(API_BASE + '/api/admin/invite/list', {
-      headers: { 'X-Admin-Password': adminPassword }
+      headers: { 'X-Admin-Token': adminPassword }
     });
     const data = await response.json();
     
@@ -1416,7 +1416,7 @@ async function createInvite() {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'X-Admin-Password': adminPassword
+        'X-Admin-Token': adminPassword
       },
       body: JSON.stringify({ code: code || null, note: note, maxUses: 1 })
     });

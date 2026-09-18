@@ -1404,7 +1404,6 @@ img{height:auto;max-width:100%}
 .pwa-install-hint .pwa-btn-ok{background:var(--accent); color:#fff}
 .pwa-install-hint .pwa-btn-close{background:var(--surface-soft); color:var(--ink-soft)}
 </style>
-<script data-goatcounter="https://drimed.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
 </head>
 <body>
 
@@ -2561,12 +2560,8 @@ function show(slug){
   } else {
     window.scrollTo({top:0, behavior:'smooth'});
   }
-  // 页面访问统计（本地记录，不显示；GoatCounter 后台统计真实访问量）
+  // 页面访问统计（本地记录，不显示；2026-09-18 移除第三方访问统计打点：登录墙内站不应外发访问轨迹）
   if (typeof trackPageView === 'function') trackPageView();
-  // GoatCounter SPA 页面切换统计
-  if (window.goatcounter && window.goatcounter.count){
-    try { window.goatcounter.count({path: location.pathname + location.hash}); } catch(e){}
-  }
 }
 
 // ── 统一导航入口：所有"用户点击触发"的跳转必须走 go()，写入历史栈 ──
