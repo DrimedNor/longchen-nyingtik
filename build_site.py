@@ -3164,8 +3164,10 @@ function renderZangliPage(){
     + '.zangli-week div{text-align:center;font-size:.78em;color:var(--ink-soft);padding:.3rem 0}'
     + '.zangli-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;align-items:stretch}'
     + '.zangli-grid>div{min-height:0}'
-    + '.zangli-cell{display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding:.25rem 1px;border-radius:8px;cursor:pointer;line-height:1.25;text-align:center;height:100%;overflow-wrap:break-word;word-break:break-word}'
+    + '.zangli-cell{display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding:.25rem 1px;border-radius:8px;cursor:pointer;line-height:1.25;text-align:center;height:100%;overflow-wrap:break-word;word-break:break-word;position:relative}'
     + '.zangli-empty{}'
+    + '.zangli-hairdot{position:absolute;top:3px;right:4px;width:6px;height:6px;border-radius:50%;background:var(--accent)}'
+    + '.zangli-cell-hui{color:var(--accent)}'
     + '.zangli-cell-g{font-size:.82em;color:var(--ink-soft);line-height:1.2}'
     + '.zangli-cell-t{font-size:.9em;color:var(--ink);line-height:1.2}'
     + '.zangli-cell-f{display:block;font-size:.62em;color:#b08d2f;line-height:1.2;overflow-wrap:anywhere;max-width:100%}'
@@ -3185,8 +3187,8 @@ function renderZangliPage(){
     + '<div class="zangli-querybar"><input type="date" id="zangliDate" min="1951-01-08" max="2051-02-11"><button onclick="zangliGoto()">查这一天</button><button style="background:var(--surface-soft);color:var(--ink);border:1px solid var(--line)" onclick="zangliToday()">今天</button></div>'
     + '<div id="zangliMain"></div>'
     + '<div class="zangli-legend" style="text-align:left">'
-    + '<div>🛕 金标＝佛教节日（含每月初十「莲师荟供日」与廿五「空行母荟供日」等殊胜日）</div>'
-    + '<div>⭕ 红框＝今天；灰底＝选中日；格内第二行＝藏历日（闰/缺原样标注）</div>'
+    + '<div>🛕 金标＝佛教节日殊胜日；<span style="color:var(--accent);font-weight:700">红字＝荟供日</span>（每月藏历初十「莲师荟供日」、廿五「空行母荟供日」）</div>'
+    + '<div><span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--accent)"></span> 红点＝理发吉祥日（藏历日序吉日＋八吉同聚日）；⭕ 红框＝今天；灰底＝选中日；格内第二行＝藏历日（闰/缺原样标注）</div>'
     + '<div>✂ 理发日吉凶出自佛说《菩萨头发品》（30 日逐日，传统传本）；「八吉同聚」＝乔美仁波切、米旁仁波切口传认定，是日纵遇他星显凶无妨；「九凶同聚」＝诸事不吉，尤忌嫁娶</div>'
     + '<div>口径说明：理发日按藏历日序 1–30 固定取表（不按月份循环）；闰日依藏历本序同数查表；以上为传统历算之说，供参考</div>'
     + '<div>📅 数据依据《藏历、公历、农历对照百年历书（1951–2050）》，换算库 stonelf/zangli（MIT），本站离线内嵌</div>'
@@ -3310,18 +3312,23 @@ function _zRenderMain(){
     var d = new Date(v.y, v.m, d0, 0, 0, 0);
     var zz = getZangli(d);
     var isFest = !!(zz && zz.extraInfo);
+    var isHui = !!(zz && zz.extraInfo && zz.extraInfo.indexOf('荟供') >= 0);
     var isNew = !!(zz && zz.day === '初一' && zz.month === '正');
     var isToday = fmt(d) === fmt(today);
     var isSel = v.sel && fmt(v.sel) === fmt(d);
+    // 理发吉祥日（含八吉同聚日）＝红色小点
+    var hairGood = false;
+    try { var hz = zHaircut(zz); hairGood = !!(hz.item && (hz.item[1] === '吉' || hz.j8)); } catch (e) {}
     var cls = 'zangli-cell';
     if (isFest || isNew) cls += ' zangli-cell-hasfest';
     if (isToday) cls += ' zangli-cell-today';
     if (isSel) cls += ' zangli-cell-sel';
     var fLabel = isNew ? '洛萨' : (zz && zz.extraInfo ? zz.extraInfo.replace(/<br>/g,'') : '');
     cells += '<div><span class="' + cls + '" onclick="_zCellClick(' + d.getTime() + ')">'
-      + '<span class="zangli-cell-g">' + d0 + '</span>'
-      + '<span class="zangli-cell-t">' + (zz && zz.day ? zz.day : '') + '</span>'
-      + (fLabel ? '<span class="zangli-cell-f">' + fLabel.replace('莲师荟供日','莲师荟供').replace('空行母荟供日','空行荟供').replace('节日','') + '</span>' : '')
+      + '<span class="zangli-cell-g"' + (isHui ? ' style="color:var(--accent);font-weight:700"' : '') + '>' + d0 + '</span>'
+      + '<span class="zangli-cell-t"' + (isHui ? ' style="color:var(--accent);font-weight:700"' : '') + '>' + (zz && zz.day ? zz.day : '') + '</span>'
+      + (hairGood ? '<span class="zangli-hairdot" title="理发吉祥日"></span>' : '')
+      + (fLabel ? '<span class="zangli-cell-f' + (isHui ? ' zangli-cell-hui' : '') + '">' + fLabel.replace('莲师荟供日','莲师荟供').replace('空行母荟供日','空行荟供').replace('节日','') + '</span>' : '')
       + '</span></div>';
   }
   var table = '<div class="zangli-cal">'
