@@ -3184,7 +3184,13 @@ function renderZangliPage(){
     + '<p style="color:var(--ink-soft);font-size:.9rem;line-height:1.8">公历日期、藏历日期与佛教节日同一视图对照。可查指定日期，也可逐月浏览。换算数据依《藏历、公历、农历对照百年历书（1951-2050）》，支持 1951-01-08 至 2051-02-11。</p>'
     + '<div class="zangli-querybar"><input type="date" id="zangliDate" min="1951-01-08" max="2051-02-11"><button onclick="zangliGoto()">查这一天</button><button style="background:var(--surface-soft);color:var(--ink);border:1px solid var(--line)" onclick="zangliToday()">今天</button></div>'
     + '<div id="zangliMain"></div>'
-    + '<div class="zangli-legend">🛕 金标＝佛教节日（含每月初十「莲师荟供日」与廿五「空行母荟供日」等）｜ ⭕ 红框＝今天｜ ✂ 理发日吉凶出自佛说《菩萨头发品》（30 日逐日，传统传本）；「八吉同聚」＝乔美仁波切、米旁仁波切口传认定，是日纵遇他星显凶无妨；「九凶同聚」＝诸事不吉，尤忌嫁娶；闰日依藏历本序同数查表；以上为传统历算之说，供参考</div>'
+    + '<div class="zangli-legend" style="text-align:left">'
+    + '<div>🛕 金标＝佛教节日（含每月初十「莲师荟供日」与廿五「空行母荟供日」等殊胜日）</div>'
+    + '<div>⭕ 红框＝今天；灰底＝选中日；格内第二行＝藏历日（闰/缺原样标注）</div>'
+    + '<div>✂ 理发日吉凶出自佛说《菩萨头发品》（30 日逐日，传统传本）；「八吉同聚」＝乔美仁波切、米旁仁波切口传认定，是日纵遇他星显凶无妨；「九凶同聚」＝诸事不吉，尤忌嫁娶</div>'
+    + '<div>口径说明：理发日按藏历日序 1–30 固定取表（不按月份循环）；闰日依藏历本序同数查表；以上为传统历算之说，供参考</div>'
+    + '<div>📅 数据依据《藏历、公历、农历对照百年历书（1951–2050）》，换算库 stonelf/zangli（MIT），本站离线内嵌</div>'
+    + '</div>'
     + '<p style="color:var(--ink-soft);font-size:.78rem;margin-top:.8rem">藏历换算与节日数据来自开源项目 <a href="https://github.com/stonelf/zangli" target="_blank" rel="noopener">stonelf/zangli</a>（MIT 许可），数据源自《藏历、公历、农历对照百年历书（1951-2050）》，本站已原样内嵌、离线可用。</p>'
     + '</div>';
   return html;
@@ -3261,7 +3267,8 @@ function _zRenderMain(){
   var hc = zHaircut(z);
   var hairHtml = '';
   if (hc.d && hc.item){
-    var tagColor = hc.j8 ? '#2e7d32' : (hc.j9 ? '#c62828' : (hc.item[1] === '吉' ? '#2e7d32' : (hc.item[1] === '凶' ? '#c62828' : '#8d6e63')));
+    // 2026-09-18 小谦定色：吉=红（藏红）、凶=黑、中性=灰；八吉同聚视为吉、九凶同聚视为凶
+    var tagColor = (hc.j8 || hc.item[1] === '吉') ? 'var(--accent)' : (hc.j9 || hc.item[1] === '凶') ? '#1f1a17' : '#8d8d8d';
     var hairTag = hc.j8 ? '八吉同聚' : (hc.j9 ? '九凶同聚' : hc.item[1]);
     var hairMain = (hc.j8 ? '诸事皆吉祥' : (hc.j9 ? '诸事不吉，尤忌嫁娶' : hc.item[0]));
     var hairSub = hc.j8 ? '乔美仁波切：是日纵遇他星显凶亦无妨，有八吉祥海螺同聚故' : (hc.j9 ? '九凶同聚，无论作何事不吉' : '');
