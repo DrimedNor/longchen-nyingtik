@@ -12,7 +12,20 @@ from datetime import datetime
 
 # 配置
 API_BASE = "https://stats.longchen-nyingtik.wiki"
-ADMIN_PASSWORD = "admin610"
+# 2026-09-18：口令不再入仓库（旧口令已按泄露处理并轮换）。
+# 读取顺序：环境变量 ADMIN_PASSWORD → 本机机密目录「龙的传人-管理口令-2026-09-18.txt」
+def _load_admin_password():
+    env = os.environ.get("ADMIN_PASSWORD")
+    if env:
+        return env
+    secret_path = r"D:\Users\Drime\Documents\机密-不入云\龙的传人-管理口令-2026-09-18.txt"
+    if os.path.exists(secret_path):
+        for line in open(secret_path, encoding="utf-8"):
+            if line.startswith("ADMIN_PASSWORD="):
+                return line.split("=", 1)[1].strip()
+    raise SystemExit("未找到管理口令：请设置环境变量 ADMIN_PASSWORD 或确认机密目录文件存在")
+
+ADMIN_PASSWORD = _load_admin_password()
 OUTPUT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "访问数据导出")
 
 def export_data():

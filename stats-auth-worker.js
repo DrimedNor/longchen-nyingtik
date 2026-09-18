@@ -1397,7 +1397,13 @@ async function checkAdminAuth(request, env, url) {
   });
 
   const inputPass = request.headers.get('X-Admin-Password') || url.searchParams.get('admin') || '';
-  const correctPass = env.ADMIN_PASSWORD || 'admin610';
+  // 2026-09-18：移除内置兜底（旧口令已入 git 历史视同泄露）。未配置 ADMIN_PASSWORD 时
+  // 明确失败（500），绝不静默放行或落到仓库明文——口令只存 Cloudflare Secret
+  if (!env.ADMIN_PASSWORD) {
+    console.error('ADMIN_PASSWORD secret 未配置，拒绝管理请求');
+    return { ok: false, response: json({ success: false, message: '服务端未配置管理口令（ADMIN_PASSWORD）' }, 500) };
+  }
+  const correctPass = env.ADMIN_PASSWORD;
   const ip = request.headers.get('CF-Connecting-IP') || 'unknown';
   const failKey = 'admin_fail_' + ip;
 

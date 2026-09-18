@@ -4,7 +4,7 @@
 
 ## 项目快照
 
-- 自研零依赖 Python 构建器 `build_site.py`（约 5600 行），**无 package.json/node_modules**
+- 自研零依赖 Python 构建器 `build_site.py`（约 6340 行），**无 package.json/node_modules**
 - 产物：`dist/index.html`（预渲染）+ `dist/pages/*.json`（按需）+ `knowledge.json`（AI 搜索语料）
 - 后端：Cloudflare Workers（`stats-auth-worker.js` 统计/密码/注册遮罩；`ai-ask-worker.js` AI 问答代理）+ KV
 - 托管：Cloudflare Pages，正式域名 longchen-nyingtik.wiki；**发布＝本地构建 + `npx wrangler pages deploy dist --branch=main`，git push 不触发部署**。⚠️ **生产分支是 main 而非 v5**：不带 `--branch=main` 会部署成 Preview（生产域名不更新）；git 仓库里并没有 main 分支，`--branch=main` 只是部署元数据（2026-09-09 实测踩坑，WorkBuddy）
@@ -22,7 +22,7 @@
 ## 硬约束
 
 1. **content/ 是发布源**：`is_excluded_dir()`（build_site.py）只排除目录名含「不推送」、`.` 开头、`_backup`、assets——**新文件进 content/ 前必须确认允许上线；私人日志只进 `日志-不推送\`**
-2. 不动 `.workbuddy\`；密钥/密码不入库不入 git（密码 610 除外，它是合规设计的站内密码）
+2. 不动 `.workbuddy\`；密钥/口令一律不入库不入 git（口令只存 Cloudflare Secret 或本机 `机密-不入云` 目录，2026-09-18 起无任何例外）
 3. 操作前备份（规范第七章维护规则）；`工作进度看板.md` 不入 git
 4. **音频分类必须镜像「读开示」**：`content/1. 听法音/1. 上师开示（AI朗读）/` 的文件夹结构与 `content/2. 读开示/` 严格一致，音频跟着文章走（规范 6.2）。**每次发布前先跑 `python check_audio_taxonomy.py`，不通过不许发布**（规范 6.4）
 5. **一级目录命名（2026-09-15 板块重组）**：`1. 听法音 / 2. 读开示 / 3. 知传承 / 4. 阅典籍 / 5. 瞻法照 / 9. 关于本站`。首页与导航显示顺序由 `build_site.py` 的 `TOP_ORDER` / `ORDER` 决定（知传承 → 听法音 → 读开示 → 阅典籍 → 瞻法照 → 关于本站）。**改名必须全库收口**：`TOP_ORDER` `TOP_LABELS` `META` `ORDER` `DIR_INTROS` `OTHER_INTROS` `DIR_ALIASES`、`audio_folder_rel()`、`_article_dir`、`check_audio_taxonomy.py` 的 `KS/AUD`，改完必须 `grep -rn "旧名"` 复核（历史三次「改一层漏一层」踩坑）

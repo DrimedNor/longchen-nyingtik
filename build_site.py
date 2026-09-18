@@ -2364,10 +2364,12 @@ function show(slug){
   // 文章页（非目录 index）不加分享按钮
   var inner = titleHtml + metaHtml + tocHtml + p.html;
   if (isHome){
+    var D_ALTS = ['遍主多智钦·龙洋仁波切', '上师法相（官方名号卡）', '上师笑颜', '上师大笑', '上师笑颜'];
+    var M_ALTS = ['上师法相（仪轨）', '上师端坐', '上师传法', '上师端坐', '上师端坐'];
     inner = '<div class="welcome"><div class="welcome-hero" id="heroCarousel">'
-    inner += [1,2,3,4,5].map(function(n){ return '<img class="hc-slide hc-d' + (n===1?' active':'') + '" src="assets/carousel-d' + n + '.webp" alt="上师照片" draggable="false">'; }).join('')
+    inner += [1,2,3,4,5].map(function(n){ return '<img class="hc-slide hc-d' + (n===1?' active':'') + '" src="assets/carousel-d' + n + '.webp" alt="' + D_ALTS[n-1] + '" draggable="false">'; }).join('')
           + '<div class="hc-dots hc-dots-d">' + [1,2,3,4,5].map(function(n){ return '<span class="hc-dot hc-dot-d' + (n===1?' active':'') + '"></span>'; }).join('') + '</div>'
-          + [1,2,3,4,5].map(function(n){ return '<img class="hc-slide hc-m' + (n===1?' active':'') + '" src="assets/carousel-m' + n + '.webp" alt="上师照片" draggable="false">'; }).join('')
+          + [1,2,3,4,5].map(function(n){ return '<img class="hc-slide hc-m' + (n===1?' active':'') + '" src="assets/carousel-m' + n + '.webp" alt="' + M_ALTS[n-1] + '" draggable="false">'; }).join('')
           + '<div class="hc-dots hc-dots-m">' + [1,2,3,4,5].map(function(n){ return '<span class="hc-dot hc-dot-m' + (n===1?' active':'') + '"></span>'; }).join('') + '</div>'
           + '</div><div class="big">' + esc(SITE_TITLE) + '</div>'
           + '<div class="welcome-sub"><span class="ws-line"></span>龙钦宁提资料库<span class="ws-line"></span></div></div>'
@@ -5927,18 +5929,51 @@ def main():
             meta_page["_need_load"] = True
             pages_meta.append(meta_page)
     print(f"文章内容拆分: {len(pages) - len([p for p in pages if p.get('is_index') or p['slug'] == 'index'])} 篇文章已拆分为单独JSON文件")
+    # 「瞻法照」分类计数占位符：@@FAZHAO_NUM:<类名>@@（2026-09-18 硬约束升级：入口卡数量不再手写）
+    # 按 content/assets/法照/<类名>-NN.ext 计数；_来源对照.tsv 等 _开头文件不计入
+    _fazhao_dir = os.path.join(CONTENT_DIR, "assets", "法照")
+    _fazhao_counts = {}
+    if os.path.isdir(_fazhao_dir):
+        import re as _re
+        for _f in os.listdir(_fazhao_dir):
+            _m = _re.match(r"^(.+)-\d+\.webp$", _f)
+            if _m:
+                _fazhao_counts[_m.group(1)] = _fazhao_counts.get(_m.group(1), 0) + 1
+    def _swap_fazhao_num(text):
+        import re as _re2
+        return _re2.sub(r"@@FAZHAO_NUM:([^@]+)@@", lambda m: str(_fazhao_counts.get(m.group(1), 0)), text)
+    _pages_html_done = []
+    for _p in pages:
+        _ph = _swap_fazhao_num(_p.get("html", ""))
+        _o = dict(_p)
+        _o["html"] = _ph
+        _pages_html_done.append(_o)
+    pages = _pages_html_done
+    # 首页 🪷 卡片计数（构建时统计 content/assets/法照 全目录）
+    _fazhao_n = sum(_fazhao_counts.values())
+    pages_meta = []
+    for p in pages:
+        if p.get("is_index") or p["slug"] == "index":
+            # 目录页和首页保留html内容
+            pages_meta.append(p)
+        else:
+            # 非目录页：把html内容保存到单独JSON文件，PAGES只保留元数据
+            safe_name = p["slug"].replace("/", "__").replace(" ", "_").replace("?？:：\"'<>*|", "")
+            json_path = os.path.join(pages_dir, safe_name + ".json")
+            with open(json_path, 'w', encoding='utf-8') as jf:
+                json.dump({"html": p.get("html", ""), "meta": p.get("meta", {}), "tags": p.get("tags", [])}, jf, ensure_ascii=False)
+            meta_page = {k: v for k, v in p.items() if k != "html"}
+            meta_page["_need_load"] = True
+            pages_meta.append(meta_page)
+    print(f"文章内容拆分: {len(pages) - len([p for p in pages if p.get('is_index') or p['slug'] == 'index'])} 篇文章已拆分为单独JSON文件")
     html_out = html_out.replace("@@PAGES_JSON@@", json.dumps(pages_meta, ensure_ascii=False))
     html_out = html_out.replace("@@TREE_JSON@@", json.dumps(tree, ensure_ascii=False))
     # 知识库不再嵌入HTML，改为按需加载（初始为空数组，使用时fetch knowledge.json）
     html_out = html_out.replace("@@KNOWLEDGE_BASE_JSON@@", "[]")
     # 「瞻法照」图片数：构建时统计 content/assets/法照 下的图片文件（首页快速访问卡片显示用）
-    _fazhao_dir = os.path.join(CONTENT_DIR, "assets", "法照")
-    _fazhao_n = 0
-    if os.path.isdir(_fazhao_dir):
-        _fazhao_n = len([f for f in os.listdir(_fazhao_dir)
-                        if f.lower().endswith((".webp", ".jpg", ".jpeg", ".png", ".gif"))])
     html_out = html_out.replace("@@FAZHAO_IMG_COUNT@@", str(_fazhao_n))
     print("瞻法照图片数: %d" % _fazhao_n)
+    print("瞻法照分类计数:", {k: v for k, v in sorted(_fazhao_counts.items())})
     html_out = html_out.replace("@@HOME_UPDATE_JSON@@", json.dumps(home_update_html, ensure_ascii=False))
     html_out = html_out.replace("@@HOME_UPDATE_DATE@@", home_update_date)
     html_out = html_out.replace("@@SITE_TITLE@@", site_title)
@@ -6140,10 +6175,58 @@ def main():
         print("管理后台已复制: dist/admin/index.html")
 
     print("已生成: %s" % out_path)
-    print("文章数: %d" % len(pages))
-    print("本地音频复制: %d 个" % copied)
-    print("图片复制: %d 个" % img_copied)
-    print("HTML 大小: %.1f KB" % (os.path.getsize(out_path) / 1024.0))
+    # ---- 破缓存自动化（2026-09-18，硬约束 14 固化进构建）----
+    # 本站 SW 对图片/音频 cache-first 且键＝完整 URL，同名 URL 换文件对回头客永远无效
+    # （cd3596a 故障根因）。构建收尾统一处理：对 dist 全部文本产物，把 `assets/**` 与
+    # `audio/**` 的字面路径引用追加 `?v=<sha256前8>`（内容哈希：内容不变则版本不变，避免
+    # 全站缓存整体失效）。音频 src 多为运行时由 JSON 数据拼出（非字面路径），改音频仍须
+    # 换名或手动 bump（AGENTS.md 硬约束 14）。版本哈希仅作缓存塌陷消除，不承担安全职责。
+    import re as _re_bust
+    _BUST_EXTS = r"(?:webp|png|jpe?g|gif|ico|mp3|wav|ogg|m4a|aac|flac)"
+    _re_asset = re.compile(
+        r'(?P<pre>["\'(=])(?P<path>(?:assets|audio)/[^"\'\\\s<>()]+?\.' + _BUST_EXTS + r')(?P<post>["\')\s\\])'
+    )
+    DIST_ROOT_REAL = os.path.realpath(DIST_DIR)
+    def _path_hash(relpath):
+        # 仅接受 DIST_DIR 内的安全相对路径（防路径穿越）：展开后必须仍在根下
+        rel = os.path.normpath(relpath.replace("/", os.sep))
+        if rel.startswith(os.sep) or rel.startswith(".."):
+            return None
+        fp = os.path.realpath(os.path.join(DIST_ROOT_REAL, rel))
+        if os.path.commonpath([DIST_ROOT_REAL, fp]) != DIST_ROOT_REAL:
+            return None
+        try:
+            with open(fp, "rb") as fh:
+                import hashlib as _hashlib
+                return _hashlib.sha256(fh.read()).hexdigest()[:8]
+        except OSError:
+            return None
+    def _bust_text(text):
+        def _rep(m):
+            ver = _path_hash(m.group("path"))
+            if not ver:
+                return m.group(0)
+            return m.group("pre") + m.group("path") + "?v=" + ver + m.group("post")
+        return _re_asset.sub(_rep, text)
+    _text_targets = [os.path.join(DIST_DIR, "index.html"),
+                     os.path.join(DIST_DIR, "sw.js"),
+                     os.path.join(DIST_DIR, "manifest.json")]
+    _pages_dir_ = os.path.join(DIST_DIR, "pages")
+    if os.path.isdir(_pages_dir_):
+        _text_targets += [os.path.join(_pages_dir_, f) for f in os.listdir(_pages_dir_) if f.endswith(".json")]
+    for _tf in _text_targets:
+        if not os.path.exists(_tf):
+            continue
+        with open(_tf, "r", encoding="utf-8") as fh:
+            _body = fh.read()
+        _new = _bust_text(_body)
+        if _new != _body:
+            with open(_tf, "w", encoding="utf-8", newline="") as fh:
+                fh.write(_new)
+    with open(out_path, "r", encoding="utf-8") as f:
+        _probe = f.read()
+    print("破缓存: index.html 内 ?v= 注入 %d 处；处理文本产物 %d 个" % (
+        len(_re_bust.findall(r"\?v=[0-9a-f]{8}", _probe)), len(_text_targets)))
 
 
 # ---- 生成锁屏封面图（纯标准库手写 PNG）：深红底 + 金色同心圆（坛城意象）----
