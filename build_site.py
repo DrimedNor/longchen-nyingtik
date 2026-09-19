@@ -463,9 +463,9 @@ PAGE_TEMPLATE = r"""<!DOCTYPE html>
 <link rel="icon" type="image/png" sizes="64x64" href="assets/favicon-64.png">
 <title>@@SITE_TITLE@@</title>
 <!-- 分享卡片：微信/QQ 及社交平台抓取 -->
-<meta name="description" content="龙钦宁提资料库：知传承、听法音、读开示、阅典籍、瞻法照。">
+<meta name="description" content="龙钦宁提资料库：传承、法音、开示、典籍、法照。">
 <meta property="og:title" content="龙的传人｜Longchen Nyingtik">
-<meta property="og:description" content="龙钦宁提资料库：知传承、听法音、读开示、阅典籍、瞻法照。">
+<meta property="og:description" content="龙钦宁提资料库：传承、法音、开示、典籍、法照。">
 <meta property="og:image" content="https://longchen-nyingtik.wiki/assets/icon-512.png">
 <meta property="og:type" content="website">
 <style>
@@ -1444,7 +1444,7 @@ img{height:auto;max-width:100%}
 
 <!-- AI搜索悬浮按钮（移到topbar外面，避免backdrop-filter导致fixed定位失效） -->
 <button class="fab-search" id="fabSearch" title="点击搜索 / AI 问答，可拖动位置" aria-label="AI搜索">
-  <span class="fab-icon">🔍</span><span>AI 搜索</span>
+  <span class="fab-icon">🔍</span><span>搜索</span>
 </button>
 
 <div class="layout">
@@ -1462,7 +1462,7 @@ img{height:auto;max-width:100%}
 <div class="search-panel" id="searchPanel">
   <div class="search-panel-box">
     <div class="search-panel-header">
-      <div class="search-panel-title">🔍 AI 搜索</div>
+      <div class="search-panel-title">🔍 搜索</div>
       <button class="search-panel-minimize" onclick="minimizeSearchPanel()" style="margin-left:auto;background:none;border:none;font-size:1.1em;cursor:pointer;color:var(--ink-faint);padding:.2rem .5rem;border-radius:4px;" title="最小化">—</button>
       <button class="search-panel-close" onclick="closeSearchPanel()">✕</button>
     </div>
@@ -2129,17 +2129,18 @@ function renderNav(){
   var nav = document.getElementById('nav');
   // 一级目录固定顺序（与首页导览一致）；其余新增目录按名称追加在末尾
   // 简化导航：只显示一级菜单，点击直接进入该目录的 Index 页面（Index 内展示完整目录）
-  // 2026-09-15 板块重组：知传承 / 听法音 / 读开示 / 阅典籍 / 瞻法照 + 关于本站（第六板块）
+  // 2026-09-19 板块显示名两字化（小谦指示）：搜索／藏历／传承／法音／开示／典籍／法照／本站
+  // 目录名（slug）与别名层零改动——显示仅经由 TOP_LABELS
   var TOP_ORDER = ['3. 知传承', '1. 听法音', '2. 读开示', '4. 阅典籍', '5. 瞻法照', '9. 关于本站'];
-  // 一级导航显示名：目录名保持稳定（含序号，便于 Obsidian 排序），仅显示层去序号
-  var TOP_LABELS = {'3. 知传承':'知传承', '1. 听法音':'听法音', '2. 读开示':'读开示', '4. 阅典籍':'阅典籍', '5. 瞻法照':'瞻法照', '9. 关于本站':'关于本站'};
+  // 一级导航显示名：目录名保持稳定（含序号，便于 Obsidian 排序），仅显示层映射
+  var TOP_LABELS = {'3. 知传承':'传承', '1. 听法音':'法音', '2. 读开示':'开示', '4. 阅典籍':'典籍', '5. 瞻法照':'法照', '9. 关于本站':'本站'};
   function topKey(name){ var i = TOP_ORDER.indexOf(name); return i < 0 ? 1000 : i; }
   var html = '';
-  // AI 搜索入口（放在最上面，用分隔线隔开）
+  // 搜索入口（2026-09-19 显示名两字化：AI 搜索→搜索；清浮钮与面板标题统一）
   html += '<div class="nav-sec nav-ai-ask" data-depth="0">'
     + '<div class="nav-sec-head" onclick="openSearchPanel()">'
     + '<span class="nav-chev nav-chev-none">🔍</span>'
-    + '<span class="dir-label">AI 搜索</span></div></div>';
+    + '<span class="dir-label">搜索</span></div></div>';
   // 藏历入口（2026-09-18 新增功能页，与 AI 搜索同为工具入口）
   html += '<div class="nav-sec" data-depth="0">'
     + '<div class="nav-sec-head" onclick="go(\'__zangli\'); if (window.innerWidth <= 760) closeSidebar();">'
@@ -2467,7 +2468,7 @@ function show(slug){
   // 动态更新分享卡片meta标签（文章页提取标题+前100字正文）
   try {
     var shareTitle = p.is_index ? (SITE_TITLE + '｜龙钦宁提资料库') : (p.title + '｜' + SITE_TITLE);
-    var shareDesc = '龙钦宁提资料库：知传承、听法音、读开示、阅典籍、瞻法照。';
+    var shareDesc = '龙钦宁提资料库：传承、法音、开示、典籍、法照。';
     if (!p.is_index && p.html) {
       var plainText = p.html.replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim();
       if (plainText.length > 0) {
@@ -3350,25 +3351,25 @@ function renderHomeCards(){
   // 2026-09-15 板块重组：知传承 / 听法音 / 读开示 / 阅典籍 / 瞻法照
   if (bySlug['3. 知传承/index']){
     var nZc = hcCountUnder('3. 知传承');
-    items.push({icon:'🐉', title:'知传承', desc:'先认识上师，看这个法怎么传下来的', slug:'3. 知传承/index', count:(nZc > 0 ? nZc + ' 篇' : '')});
+    items.push({icon:'🐉', title:'传承', desc:'先认识上师，看这个法怎么传下来的', slug:'3. 知传承/index', count:(nZc > 0 ? nZc + ' 篇' : '')});
   }
   if (bySlug['1. 听法音/index'] && AUDIO_TRACKS.length > 0){
-    items.push({icon:'🎧', title:'听法音', desc:'路上、干活的时候，点开就能听', slug:'1. 听法音/index', count:AUDIO_TRACKS.length + ' 条'});
+    items.push({icon:'🎧', title:'法音', desc:'路上、干活的时候，点开就能听', slug:'1. 听法音/index', count:AUDIO_TRACKS.length + ' 条'});
   }
   if (bySlug['2. 读开示/index']){
     var nTalk = hcCountUnder('2. 读开示');
     if (nTalk > 0){
-      items.push({icon:'📖', title:'读开示', desc:'不知道从哪开始？从第 1 篇顺着读', slug:'2. 读开示/index', count:nTalk + ' 篇'});
+      items.push({icon:'📖', title:'开示', desc:'不知道从哪开始？从第 1 篇顺着读', slug:'2. 读开示/index', count:nTalk + ' 篇'});
     }
   }
   if (bySlug['4. 阅典籍/index']){
     var nBook = hcCountUnder('4. 阅典籍');
     if (nBook > 0){
-      items.push({icon:'📚', title:'阅典籍', desc:'找某本书、某个推荐书目', slug:'4. 阅典籍/index', count:nBook + ' 种'});
+      items.push({icon:'📚', title:'典籍', desc:'找某本书、某个推荐书目', slug:'4. 阅典籍/index', count:nBook + ' 种'});
     }
   }
   if (bySlug['5. 瞻法照/index']){
-    items.push({icon:'🪷', title:'瞻法照', desc:'上师尊容、历代祖师与圣像法物', slug:'5. 瞻法照/index', count:(FAZHAO_IMG_COUNT > 0 ? FAZHAO_IMG_COUNT + ' 张' : '')});
+    items.push({icon:'🪷', title:'法照', desc:'上师尊容、历代祖师与圣像法物', slug:'5. 瞻法照/index', count:(FAZHAO_IMG_COUNT > 0 ? FAZHAO_IMG_COUNT + ' 张' : '')});
   }
   // 藏历（2026-09-19 小谦指示：卡片顺序调到最后，瞻法照之后）
   items.push({icon:'📅', title:'藏历', desc:'公历藏历对照与佛教节日', slug:'__zangli', count:''});
@@ -3392,12 +3393,12 @@ function renderHomeNav(){
   var html = [];
   // 每个顶层目录板块的定制元信息（未配置的目录使用默认图标/说明）
   var META = {
-    '3. 知传承': {icon:'🐉', title:'知传承', desc:'龙钦宁提传承源流与历代祖师传记，点击进入查看。'},
-    '1. 听法音': {icon:'🎧', title:'听法音', desc:'', audio:true, note:true},
-    '2. 读开示': {icon:'📖', title:'读开示', desc:'', tips:true},
-    '4. 阅典籍': {icon:'📚', title:'阅典籍', desc:'精选读物与参考资料，点击进入查看。'},
-    '5. 瞻法照': {icon:'🪷', title:'瞻法照', desc:'上师尊容、历代祖师画像与圣像法物，见像如面。'},
-    '9. 关于本站': {icon:'ℹ️', title:'关于本站', desc:'本站缘起、新手指南与更新日志。'}
+    '3. 知传承': {icon:'🐉', title:'传承', desc:'龙钦宁提传承源流与历代祖师传记，点击进入查看。'},
+    '1. 听法音': {icon:'🎧', title:'法音', desc:'', audio:true, note:true},
+    '2. 读开示': {icon:'📖', title:'开示', desc:'', tips:true},
+    '4. 阅典籍': {icon:'📚', title:'典籍', desc:'精选读物与参考资料，点击进入查看。'},
+    '5. 瞻法照': {icon:'🪷', title:'法照', desc:'上师尊容、历代祖师画像与圣像法物，见像如面。'},
+    '9. 关于本站': {icon:'ℹ️', title:'本站', desc:'本站缘起、新手指南与更新日志。'}
   };
   // 固定首页板块顺序（2026-09-15 板块重组）：知传承 → 听法音 → 读开示 → 阅典籍 → 瞻法照 → 关于本站
   var ORDER = ['3. 知传承', '1. 听法音', '2. 读开示', '4. 阅典籍', '5. 瞻法照', '9. 关于本站'];
@@ -3425,7 +3426,7 @@ function renderHomeNav(){
       // 工具栏：展开/折叠全部 + AI搜索
       html.push('<div class="dir-toolbar" style="display:flex;gap:.5rem;margin:.5rem 0 1rem;flex-wrap:wrap;">'
         + '<button class="dir-toggle-all-btn" onclick="toggleAllDirGroups(this)" style="padding:.35rem .8rem;font-size:.85em;border:1px solid var(--gold-deep);background:transparent;color:var(--gold-deep);border-radius:4px;cursor:pointer;">展开全部目录</button>'
-        + '<button class="dir-ai-search-btn" onclick="openSearchPanel()" style="padding:.35rem .8rem;font-size:.85em;border:1px solid var(--accent);background:transparent;color:var(--accent);border-radius:4px;cursor:pointer;">🔍 AI 搜索</button>'
+        + '<button class="dir-ai-search-btn" onclick="openSearchPanel()" style="padding:.35rem .8rem;font-size:.85em;border:1px solid var(--accent);background:transparent;color:var(--accent);border-radius:4px;cursor:pointer;">🔍 搜索</button>'
         + '</div>');
     }
     if (meta.audio){
@@ -3434,7 +3435,7 @@ function renderHomeNav(){
       html.push('<div class="dir-toolbar" style="display:flex;gap:.5rem;margin:.5rem 0 1rem;flex-wrap:wrap;">'
         + '<button class="dir-toggle-all-btn" onclick="toggleAllAudioGroups(this)" style="padding:.35rem .8rem;font-size:.85em;border:1px solid var(--gold-deep);background:transparent;color:var(--gold-deep);border-radius:4px;cursor:pointer;">展开全部</button>'
         + '<button class="dir-play-all-btn" onclick="playAllAudio()" style="padding:.35rem .8rem;font-size:.85em;border:1px solid var(--accent);background:transparent;color:var(--accent);border-radius:4px;cursor:pointer;">▶ 播放全部</button>'
-        + '<button class="dir-ai-search-btn" onclick="openSearchPanel()" style="padding:.35rem .8rem;font-size:.85em;border:1px solid var(--accent);background:transparent;color:var(--accent);border-radius:4px;cursor:pointer;">🔍 AI 搜索</button>'
+        + '<button class="dir-ai-search-btn" onclick="openSearchPanel()" style="padding:.35rem .8rem;font-size:.85em;border:1px solid var(--accent);background:transparent;color:var(--accent);border-radius:4px;cursor:pointer;">🔍 搜索</button>'
         + '</div>');
       // 按文件夹分组展示全部音频：位于二级及以上子文件夹的按二级分组，否则按一级
       var _agroups = {};
@@ -3507,7 +3508,7 @@ function renderHomeNav(){
         // 添加工具栏
         html.push('<div class="dir-toolbar" style="display:flex;gap:.5rem;margin:.5rem 0 1rem;flex-wrap:wrap;">'
           + '<button class="dir-toggle-all-btn" onclick="toggleAllDirGroups(this)" style="padding:.35rem .8rem;font-size:.85em;border:1px solid var(--gold-deep);background:transparent;color:var(--gold-deep);border-radius:4px;cursor:pointer;">展开全部目录</button>'
-          + '<button class="dir-ai-search-btn" onclick="openSearchPanel()" style="padding:.35rem .8rem;font-size:.85em;border:1px solid var(--accent);background:transparent;color:var(--accent);border-radius:4px;cursor:pointer;">🔍 AI 搜索</button>'
+          + '<button class="dir-ai-search-btn" onclick="openSearchPanel()" style="padding:.35rem .8rem;font-size:.85em;border:1px solid var(--accent);background:transparent;color:var(--accent);border-radius:4px;cursor:pointer;">🔍 搜索</button>'
           + '</div>');
       }
       walkBlock(node, dirName, 0, '', useCollapsed, introMap).forEach(function(x){ html.push(x); });
@@ -3612,7 +3613,7 @@ function renderFullDirTree(dirSlug){
   if (useCollapsed){
     html += '<div class="dir-toolbar" style="display:flex;gap:.5rem;margin:.5rem 0 1rem;flex-wrap:wrap;">'
       + '<button class="dir-toggle-all-btn" onclick="toggleAllDirGroups(this)" style="padding:.35rem .8rem;font-size:.85em;border:1px solid var(--gold-deep);background:transparent;color:var(--gold-deep);border-radius:4px;cursor:pointer;">展开全部目录</button>'
-      + '<button class="dir-ai-search-btn" onclick="openSearchPanel()" style="padding:.35rem .8rem;font-size:.85em;border:1px solid var(--accent);background:transparent;color:var(--accent);border-radius:4px;cursor:pointer;">🔍 AI 搜索</button>'
+      + '<button class="dir-ai-search-btn" onclick="openSearchPanel()" style="padding:.35rem .8rem;font-size:.85em;border:1px solid var(--accent);background:transparent;color:var(--accent);border-radius:4px;cursor:pointer;">🔍 搜索</button>'
       + '</div>';
   }
   html += '<div class="dir-full-tree">' + arr.join('') + '</div>';
@@ -3712,7 +3713,7 @@ function renderAudioListByFolder(folderKey){
   html += '<div class="dir-toolbar" style="display:flex;gap:.5rem;margin:.5rem 0 1rem;flex-wrap:wrap;">'
     + '<button class="dir-toggle-all-btn" onclick="toggleAllAudioGroups(this)" style="padding:.35rem .8rem;font-size:.85em;border:1px solid var(--gold-deep);background:transparent;color:var(--gold-deep);border-radius:4px;cursor:pointer;">展开全部</button>'
     + '<button class="dir-play-all-btn" onclick="playAllAudio()" style="padding:.35rem .8rem;font-size:.85em;border:1px solid var(--accent);background:transparent;color:var(--accent);border-radius:4px;cursor:pointer;">▶ 播放全部</button>'
-    + '<button class="dir-ai-search-btn" onclick="openSearchPanel()" style="padding:.35rem .8rem;font-size:.85em;border:1px solid var(--accent);background:transparent;color:var(--accent);border-radius:4px;cursor:pointer;">🔍 AI 搜索</button>'
+    + '<button class="dir-ai-search-btn" onclick="openSearchPanel()" style="padding:.35rem .8rem;font-size:.85em;border:1px solid var(--accent);background:transparent;color:var(--accent);border-radius:4px;cursor:pointer;">🔍 搜索</button>'
     + '</div>';
   
   // 按目录路径自然排序，保证与「上师开示」文章目录顺序一致（1→2→…→10）
