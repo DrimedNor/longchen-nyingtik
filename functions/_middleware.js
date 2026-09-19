@@ -34,7 +34,8 @@ function isPublicPath(path) {
   if (path === "/admin" || path === "/admin/" || path.startsWith("/admin/")) return true;
   // 藏历独立页（2026-09-19 小谦指示）：公开——纯节日历表数据，无站内内容、无用户数据；
   // 收藏/分享/扫码直达。noindex 照常由 withNoindex 盖章。
-  if (path === "/zangli.html") return true;
+  //注意：Cloudflare Pages 对 /zangli.html 会做「去扩展名」308 重定向到 /zangli，两种形态都要放行。
+  if (path === "/zangli.html" || path === "/zangli" || path === "/zangli/") return true;
   return false;
 }
 
