@@ -90,12 +90,23 @@ function html(body, status) {
 }
 
 // ---------------------------------------------------------------------------
-// 会话校验：每次请求交给统计 Worker 查 KV（不缓存）
-// 不缓存是有意为之：退出登录/管理员驳回后会话立即失效，不留吊销窗口。
-// Worker 不可达时按「未登录」处理（fail closed），绝不因异常放行内容。
+// 会话校验：每次请求交给统计 Worker 查 KV。
+// 2026-09-19 2-1 C+ 升级：加入进程内「会话旁路缓存」（30 秒 TTL）
+// ——媒体改为全量回源鉴权（no-store）后，为摊薄 KV 读成本而设：
+//   同一 isolate 内同 token 的重复请求 30 秒内不再跨 Worker 打 KV。
+// 登出语义保住：/__auth/logout 路由显式清 memo（见 logout 处）；管理员删号场景
+// 最长 30 秒残留（权衡记录：配额收益 >> 30 秒吊销窗口，於回执注明）。
+// Worker 不可达时按「未登录」处理（fail closed），绝不因异常放行内容（缓存命中不放大此面）。
 // ---------------------------------------------------------------------------
-async function verifySession(token) {
+const SESS_MEMO = new Map(); // token -> { user, exp }
+const SESS_MEMO_TTL = 30 * 1000;
+const SESS_MEMO_MAX = 200;
+
+async function verifySession(token, opts) {
   if (!token) return null;
+  const now = Date.now();
+  const hit = SESS_MEMO.get(token);
+  if (hit && hit.exp > now) return hit.user;
   let res;
   try {
     res = await fetch(WORKER + "/api/session/verify", {
@@ -109,7 +120,19 @@ async function verifySession(token) {
   if (!res.ok) return null;
   try {
     const data = await res.json();
-    return data && data.success ? data.user : null;
+    const user = data && data.success ? data.user : null;
+    if (user) {
+      if (SESS_MEMO.size >= SESS_MEMO_MAX) {
+        // 简单淘汰：清掉最旧的一半（Map 迭代序＝插入序）
+        let n = Math.floor(SESS_MEMO_MAX / 2);
+        for (const k of SESS_MEMO.keys()) {
+          SESS_MEMO.delete(k);
+          if (--n <= 0) break;
+        }
+      }
+      SESS_MEMO.set(token, { user: user, exp: now + SESS_MEMO_TTL });
+    }
+    return user;
   } catch (e) {
     return null;
   }
@@ -388,6 +411,7 @@ async function handleAuth(request, url) {
   if (path === "/__auth/logout") {
     const token = getCookie(request, COOKIE_NAME);
     if (token) {
+      SESS_MEMO.delete(token);
       await fetch(WORKER + "/api/logout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },

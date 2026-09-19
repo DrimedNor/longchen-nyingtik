@@ -17,12 +17,14 @@
   Permissions-Policy: camera=(), microphone=(), geolocation=(), interest-cohort=()
   Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self'; font-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'
 
-# 2) 静态资源（图片、音频、字体等）缓存 1 年，不可变
+# 2) 静态资源缓存策略（2026-09-19 2-1 C+ 实施：媒体全量 no-store——
+#    修复「边缘缓存命中时 Pages Function 不执行」的匿名可读漏洞；代价＝媒体请求全部回源鉴权）。
+#    图标类（icon/manifest 等无内容敏感性）同样 no-store：数量少（约 10 张），统一处理减少规则面。
 /assets/*
-  Cache-Control: public, max-age=31536000, immutable
+  Cache-Control: private, no-store
 
 /audio/*
-  Cache-Control: public, max-age=31536000, immutable
+  Cache-Control: private, no-store
 
 # 3) HTML 页面与首页不缓存（保证门槛与内容更新即时生效）
 /index.html
