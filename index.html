@@ -702,7 +702,6 @@ a:hover{color:var(--accent-soft)}
 .ai-ask-input-row button{padding:.6rem 1.2rem;background:var(--accent);color:#fff;border:none;
   border-radius:8px;cursor:pointer;font-size:.95em}
 </style>
-<script data-goatcounter="https://drimed.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
 </head>
 <body>
 
@@ -1423,12 +1422,8 @@ function show(slug){
   } else {
     window.scrollTo({top:0, behavior:'smooth'});
   }
-  // 页面访问统计（本地记录，不显示；GoatCounter 后台统计真实访问量）
+  // 页面访问统计（本地记录，不显示）
   if (typeof trackPageView === 'function') trackPageView();
-  // GoatCounter SPA 页面切换统计
-  if (window.goatcounter && window.goatcounter.count){
-    try { window.goatcounter.count({path: location.pathname + location.hash}); } catch(e){}
-  }
 }
 
 // ==================== 划线与分享系统 ====================
@@ -3025,7 +3020,7 @@ document.addEventListener('click', function(e){
 });
 // ---- 页面访问次数统计（localStorage 本地计数，每页独立）----
 // 说明：纯静态站无后端，用 localStorage 记录每个页面在本设备的访问次数。
-// 如需跨用户统计，可接入 GoatCounter（免费）等服务。
+// 跨用户统计由自建统计 Worker 承担，不接第三方。
 function trackPageView(){
   try {
     var slug = currentSlug || 'index';

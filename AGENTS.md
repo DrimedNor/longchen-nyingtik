@@ -4,18 +4,18 @@
 
 ## 项目快照
 
-- 自研零依赖 Python 构建器 `build_site.py`（约 6340 行），**无 package.json/node_modules**
+- 自研零依赖 Python 构建器 `build_site.py`（**单文件；行数随功能增长，不写死**），**无 package.json/node_modules**
 - 产物：`dist/index.html`（预渲染）+ `dist/pages/*.json`（按需）+ `knowledge.json`（AI 搜索语料）
 - 后端：Cloudflare Workers（`stats-auth-worker.js` 统计/密码/注册遮罩；`ai-ask-worker.js` AI 问答代理）+ KV
 - 托管：Cloudflare Pages，正式域名 longchen-nyingtik.wiki；**发布＝本地构建 + `npx wrangler pages deploy dist --branch=main`，git push 不触发部署**。⚠️ **生产分支是 main 而非 v5**：不带 `--branch=main` 会部署成 Preview（生产域名不更新）；git 仓库里并没有 main 分支，`--branch=main` 只是部署元数据（2026-09-09 实测踩坑，WorkBuddy）
 - git：工作分支 v5；每次发布必推 GitHub（`git@github.com:DrimedNor/longchen-nyingtik.git`）
-- 统计：GoatCounter + 自建设备统计（10 台密码 610 / 100 台注册审核）
+- 统计：自建设备统计（10 台起需访问密码 / 100 台起注册审核）；第三方 GoatCounter 已于 2026-09-18 移除
 
 ## 必读规范（总持，开工前先读）
 
 位置：`D:\Users\Drime\Documents\Obsidian\龙的传人（网站建设）\规范与盘点\`
 
-1. **项目设计原则与规范.md**——重点：第二章法律合规（不传教不募捐、密码 610、10/100 台阶梯）、第十一章**已确认的固定修改清单（不可随意改动）**
+1. **项目设计原则与规范.md**——重点：第二章法律合规（不传教不募捐、访问密码门禁、10/100 台阶梯）、第十一章**已确认的固定修改清单（不可随意改动）**
 2. **配色方案_藏红主题.md / 藏传佛教主题.md**——颜色只用现有 CSS 变量（--bg/--surface/--ink/--accent 等 12 token）
 3. 历史外包任务书通用约束（AI协作\任务书归档\外包任务书-给其他AI.md）：只改 `build_site.py`、动效只用 transform/opacity、交付写「位置+新旧对比+自测清单」
 

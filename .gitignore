@@ -38,3 +38,6 @@ _archive/
 # 2026-09-13 ZCode: 工具/临时残留不入库
 .playwright-cli/
 _kv_dellist.json
+
+# 2026-09-19 WorkBuddy: 藏历独立项目构建产物（独立 Pages 项目 longchen-zangli，不入主库）
+dist-zangli/

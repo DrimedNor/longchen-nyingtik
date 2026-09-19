@@ -460,6 +460,8 @@ export async function onRequest(context) {
   if (path === "/logout" || path === "/logout/") {
     const token = getCookie(request, COOKIE_NAME);
     if (token) {
+      // 2026-09-19：页面登出同样清会话旁路缓存，否则 30s 内仍可能命中旧 memo
+      SESS_MEMO.delete(token);
       await fetch(WORKER + "/api/logout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
