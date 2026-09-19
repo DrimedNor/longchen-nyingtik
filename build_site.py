@@ -3819,8 +3819,10 @@ var CURRENT_ALBUM = null;  // 当前播放的专辑名称
 
 function playAllAudio(albumName){
   if (!AUDIO_TRACKS.length) return;
-  // 确保连播模式开启
-  if (typeof autoNext !== 'undefined') autoNext = true;
+  // 连播与否由播放模式（顺序/逆序/随机/单曲）决定，具体见 autoNext() 函数；此处不做任何开关赋值。
+  // ⚠️ 2026-09-19 修复：原此处为「autoNext = true」，而 autoNext 是函数名不是开关标志 →
+  // 该赋值把 autoNext 覆盖成布尔值，之后 ended／预加载里调用 autoNext() 抛 TypeError，
+  // 表现为「点过『播放全部』后，播完一集就停、不再自动连播」。此处永久禁止再给 autoNext 赋值。
   
   // 保存原始播放列表（只保存一次）
   if (!ORIGINAL_AUDIO_TRACKS) {
