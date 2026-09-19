@@ -32,6 +32,9 @@ const ROBOTS_HEADER = "noindex, nofollow, noarchive, nosnippet, noimageindex";
 function isPublicPath(path) {
   if (path === "/robots.txt") return true;
   if (path === "/admin" || path === "/admin/" || path.startsWith("/admin/")) return true;
+  // 藏历独立页（2026-09-19 小谦指示）：公开——纯节日历表数据，无站内内容、无用户数据；
+  // 收藏/分享/扫码直达。noindex 照常由 withNoindex 盖章。
+  if (path === "/zangli.html") return true;
   return false;
 }
 
