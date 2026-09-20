@@ -1222,6 +1222,68 @@ export default {
         }
       }
       
+      // 路由：一次性后台登记（把本机设备写入管理员白名单）——2026-09-20 新增
+      // 这是"免密登录"的入口，故【不校验口令】：凭一次性 token 换设备登记。
+      // 安全设计：
+      //   - token 为 32 位十六进制（128 bit），由管理员离线生成后写入 KV（键 magic_<token>）；
+      //   - KV 记录 remaining 次数与 expiresAt，用满即删、到期自然失效（双保险）；
+      //   - 登记结果写 admin_dev_<deviceId>（180 天后自然过期），前端永不持有白名单；
+      //   - deviceId 做字符集/长度校验，防止借该端点写任意 KV 键。
+      if (path === '/api/admin/enroll' && request.method === 'POST') {
+        const body = await request.json().catch(() => ({}));
+        const token = String(body.token || '').trim();
+        const did = String(body.deviceId || '').trim();
+        const bad = (msg, status) => new Response(JSON.stringify({ success: false, message: msg }), {
+          status, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+
+        if (!token || !did) return bad('缺少 token 或设备标识', 400);
+        if (!/^[A-Za-z0-9_-]{6,80}$/.test(did)) return bad('设备标识格式不合法', 400);
+        if (!/^[a-f0-9]{32}$/.test(token)) return bad('链接无效', 410);
+
+        const key = 'magic_' + token;
+        let rec = null;
+        try { rec = await env.STATS_KV.get(key, 'json'); } catch (e) { rec = null; }
+        if (!rec) return bad('链接已失效：已用满次数或已过期', 410);
+
+        if (rec.expiresAt && Date.now() > rec.expiresAt) {
+          await env.STATS_KV.delete(key).catch(() => {});
+          return bad('链接已过期', 410);
+        }
+        const remaining = (typeof rec.remaining === 'number') ? rec.remaining : 0;
+        if (remaining <= 0) {
+          await env.STATS_KV.delete(key).catch(() => {});
+          return bad('链接已失效：已用满次数', 410);
+        }
+
+        // 1) 登记设备（180 天）。写失败必须报错且【不消耗】次数，否则用户白跑一趟
+        try {
+          await env.STATS_KV.put('admin_dev_' + did, JSON.stringify({
+            deviceId: did,
+            enrolledAt: Date.now(),
+            via: 'magic-link',
+          }), { expirationTtl: 180 * 24 * 60 * 60 });
+        } catch (e) {
+          return bad('登记写入失败，请稍后重试', 500);
+        }
+
+        // 2) 消耗一次；用满即删除
+        const left = remaining - 1;
+        const ttl = rec.expiresAt ? Math.max(60, Math.floor((rec.expiresAt - Date.now()) / 1000)) : 7200;
+        if (left <= 0) {
+          await env.STATS_KV.delete(key).catch(() => {});
+        } else {
+          await env.STATS_KV.put(key, JSON.stringify({ ...rec, remaining: left }), { expirationTtl: ttl }).catch(() => {});
+        }
+
+        return new Response(JSON.stringify({
+          success: true,
+          message: '本机已登记为管理员设备',
+          deviceId: did,
+          remaining: left,
+        }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+
       // 路由：AI问答统计（2026-09-06 收紧：仅管理员可访问，防止访客提问内容泄露）
       if (path === '/api/stats/ai-ask' || path === '/stats/ai-ask') {
         const auth = await checkAdminAuth(request, env, url);
@@ -1475,8 +1537,16 @@ async function checkAdminAuth(request, env, url) {
   //    设备 ID 为 20+ 位随机串（持有型凭证），仅已绑定设备可命中。
   //    免密路径不消耗口令防爆破额度，也不受 IP 锁定影响。
   const reqDeviceId = request.headers.get('X-Device-ID') || url.searchParams.get('device') || '';
-  if (reqDeviceId && isAdminDevice(reqDeviceId, env)) {
-    return { ok: true, viaDevice: true };
+  if (reqDeviceId) {
+    if (isAdminDevice(reqDeviceId, env)) {
+      return { ok: true, viaDevice: true };
+    }
+    // 0b. 一次性登记链接登记过的设备（2026-09-20 新增）：KV 键 admin_dev_<deviceId>，
+    //     由 /api/admin/enroll 写入、180 天自然过期；读失败不阻断，回落口令路径。
+    try {
+      const enrolled = await env.STATS_KV.get('admin_dev_' + reqDeviceId);
+      if (enrolled) return { ok: true, viaDevice: true, viaEnroll: true };
+    } catch (e) { /* 保底：回落口令校验 */ }
   }
 
   const inputPass = request.headers.get('X-Admin-Token') || url.searchParams.get('admin') || '';

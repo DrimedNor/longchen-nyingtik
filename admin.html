@@ -440,7 +440,7 @@
 
 <script>
 const API_BASE = 'https://stats.longchen-nyingtik.wiki';
-const ADMIN_PAGE_VERSION = 'v2026-09-20b';
+const ADMIN_PAGE_VERSION = 'v2026-09-20c';
 // ⚠️ 2026-09-20：管理员设备 ID 列表已从本页移除（本页公开可读，硬编码等于泄露白名单）。
 // 设备白名单仅存于 Worker 环境变量 env.ADMIN_DEVICE_IDS，前端只上报自身设备 ID 由后端判定。
 let adminPassword = '';
@@ -488,6 +488,41 @@ function checkLogin() {
       else { showLogin(); }
     })
     .catch(function () { showLogin(); });
+}
+
+// —— 一次性登记链接：/admin/?enroll=<token>（2026-09-20 新增）——
+// 在待登记的设备上打开该链接 → 本机设备 ID 写入服务端白名单（KV）→ 之后本机长期免密。
+// 链接为一次性凭证：用满约定次数或到期即失效（服务端判定），且 token 只出现在地址栏；
+// 登记成功后立刻从地址栏抹除，避免留在浏览历史或被复制带出。
+function enrollFromLink(token) {
+  showLogin();
+  const le = document.getElementById('loginError');
+  const did = getDeviceId();
+  if (!did) {
+    if (le) le.textContent = '本机设备标识尚未生成：请先打开主站任意页面一次，再回来点这个链接。';
+    return;
+  }
+  if (le) le.textContent = '正在把本机登记为管理员设备…';
+  fetch(API_BASE + '/api/admin/enroll', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ token: token, deviceId: did })
+  })
+    .then(function (r) { return r.json().then(function (d) { return { status: r.status, data: d || {} }; }); })
+    .then(function (res) {
+      const d = res.data || {};
+      if (d.success) {
+        try { history.replaceState(null, '', location.pathname); } catch (e) { /* 保底 */ }
+        adminPassword = '';
+        showAdmin();
+        loadAll();
+      } else {
+        if (le) le.textContent = d.message || ('登记失败（HTTP ' + res.status + '）');
+      }
+    })
+    .catch(function (err) {
+      if (le) le.textContent = '网络错误：' + err.message;
+    });
 }
 
 function showLogin() {
@@ -1229,8 +1264,12 @@ document.getElementById('adminPassword').addEventListener('keydown', function(e)
   if (e.key === 'Enter') login();
 });
 
-// 初始化
-checkLogin();
+// 初始化：优先处理一次性登记链接（?enroll=），否则走常规登录判定
+(function () {
+  let et = '';
+  try { et = new URLSearchParams(location.search).get('enroll') || ''; } catch (e) { /* 保底 */ }
+  if (et) { enrollFromLink(et); } else { checkLogin(); }
+})();
 
 
 // ========== AI问答统计 ==========
