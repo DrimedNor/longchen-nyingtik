@@ -240,6 +240,10 @@
   <input type="password" id="adminPassword" placeholder="请输入管理员密码" />
   <button onclick="login()">登录</button>
   <div id="loginError" class="login-error"></div>
+  <div style="margin-top:.9rem;font-size:.72rem;color:#8a8a8a;line-height:1.7;">
+    页面版本 <span id="pageVer">-</span> ｜ 本机设备 <span id="devIdHint">读取中…</span><br>
+    管理员设备（已绑定）免密自动进入；其他设备需输入口令。若本机设备 ID 显示为空，请先在主站任意页面打开一次以生成设备标识。
+  </div>
 </div>
 
 <!-- 管理后台界面 -->
@@ -436,25 +440,66 @@
 
 <script>
 const API_BASE = 'https://stats.longchen-nyingtik.wiki';
-// 管理员设备ID列表（这些设备的访问不计入全站统计）
-const ADMIN_DEVICE_IDS = ['dev_1788402850264_bbqjsio7d', 'dev_1788406478720_6fhwoodmy'];
+const ADMIN_PAGE_VERSION = 'v2026-09-20b';
+// ⚠️ 2026-09-20：管理员设备 ID 列表已从本页移除（本页公开可读，硬编码等于泄露白名单）。
+// 设备白名单仅存于 Worker 环境变量 env.ADMIN_DEVICE_IDS，前端只上报自身设备 ID 由后端判定。
 let adminPassword = '';
 
-// 检查是否已登录
+// —— 设备 ID（与主站同源同键，主站生成后本页直接复用）——
+const DEVICE_KEY = 'longchen-device-id';
+function getDeviceId() {
+  try { return localStorage.getItem(DEVICE_KEY) || ''; } catch (e) { return ''; }
+}
+
+// —— 所有 /api/admin/* 请求自动附带 X-Device-ID（Worker 端据此对管理员设备放行）——
+(function () {
+  const _origFetch = window.fetch.bind(window);
+  window.fetch = function (input, init) {
+    try {
+      const url = (typeof input === 'string') ? input : ((input && input.url) || '');
+      if (url.indexOf('/api/admin') >= 0) {
+        init = init || {};
+        const h = Object.assign({}, init.headers || {});
+        const did = getDeviceId();
+        if (did) h['X-Device-ID'] = did;
+        init.headers = h;
+      }
+    } catch (e) { /* 保底：不阻断请求 */ }
+    return _origFetch(input, init);
+  };
+})();
+
+// 检查是否已登录：口令会话 → 管理员设备免密 → 登录页
 function checkLogin() {
   const saved = sessionStorage.getItem('adminPassword');
   if (saved) {
     adminPassword = saved;
     showAdmin();
     loadAll();
-  } else {
-    showLogin();
+    return;
   }
+  const did = getDeviceId();
+  if (!did) { showLogin(); return; }
+  // 用最小接口探测本机是否为管理员设备（白名单在服务端）
+  fetch(API_BASE + '/api/admin/pending', { headers: { 'X-Device-ID': did } })
+    .then(function (r) { return r.json(); })
+    .then(function (d) {
+      if (d && d.success) { adminPassword = ''; showAdmin(); loadAll(); }
+      else { showLogin(); }
+    })
+    .catch(function () { showLogin(); });
 }
 
 function showLogin() {
   document.getElementById('loginView').style.display = 'block';
   document.getElementById('adminView').style.display = 'none';
+  // 页脚诊断信息：版本 + 本机设备 ID（排查缓存/白名单用）
+  try {
+    const pv = document.getElementById('pageVer');
+    if (pv) pv.textContent = ADMIN_PAGE_VERSION;
+    const dh = document.getElementById('devIdHint');
+    if (dh) dh.textContent = getDeviceId() || '（空）';
+  } catch (e) { /* 保底 */ }
 }
 
 function showAdmin() {

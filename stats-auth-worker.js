@@ -1470,6 +1470,15 @@ async function checkAdminAuth(request, env, url) {
     },
   });
 
+  // 0. 管理员设备免密放行（2026-09-20 新增，按"把我的设备设为管理员设备并自动放行"需求）
+  //    白名单只存于 env.ADMIN_DEVICE_IDS（服务端），前端 admin.html 不含设备 ID 列表；
+  //    设备 ID 为 20+ 位随机串（持有型凭证），仅已绑定设备可命中。
+  //    免密路径不消耗口令防爆破额度，也不受 IP 锁定影响。
+  const reqDeviceId = request.headers.get('X-Device-ID') || url.searchParams.get('device') || '';
+  if (reqDeviceId && isAdminDevice(reqDeviceId, env)) {
+    return { ok: true, viaDevice: true };
+  }
+
   const inputPass = request.headers.get('X-Admin-Token') || url.searchParams.get('admin') || '';
   // 2026-09-18：移除内置兜底（旧口令已入 git 历史视同泄露）。未配置 ADMIN_PASSWORD 时
   // 明确失败（500），绝不静默放行或落到仓库明文——口令只存 Cloudflare Secret
