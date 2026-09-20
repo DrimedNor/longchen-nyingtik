@@ -445,10 +445,19 @@ const ADMIN_PAGE_VERSION = 'v2026-09-20c';
 // 设备白名单仅存于 Worker 环境变量 env.ADMIN_DEVICE_IDS，前端只上报自身设备 ID 由后端判定。
 let adminPassword = '';
 
-// —— 设备 ID（与主站同源同键，主站生成后本页直接复用）——
+// —— 设备 ID（与主站同源同键）——
+// 主站已生成则直接复用；本页首次到达（如全新设备直接打开登记链接）时，
+// 按主站 build_site.py 的同一格式就地生成，保证链接开箱即用、且主站后续访问会复用同一个 ID。
 const DEVICE_KEY = 'longchen-device-id';
 function getDeviceId() {
-  try { return localStorage.getItem(DEVICE_KEY) || ''; } catch (e) { return ''; }
+  try {
+    let id = localStorage.getItem(DEVICE_KEY);
+    if (!id) {
+      id = 'dev_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+      localStorage.setItem(DEVICE_KEY, id);
+    }
+    return id || '';
+  } catch (e) { return ''; }
 }
 
 // —— 所有 /api/admin/* 请求自动附带 X-Device-ID（Worker 端据此对管理员设备放行）——
@@ -499,7 +508,7 @@ function enrollFromLink(token) {
   const le = document.getElementById('loginError');
   const did = getDeviceId();
   if (!did) {
-    if (le) le.textContent = '本机设备标识尚未生成：请先打开主站任意页面一次，再回来点这个链接。';
+    if (le) le.textContent = '浏览器未放开本地存储，无法生成设备标识。请关闭无痕/隐私模式后重试。';
     return;
   }
   if (le) le.textContent = '正在把本机登记为管理员设备…';
