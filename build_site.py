@@ -1550,6 +1550,8 @@ img{height:auto;max-width:100%}
 
 <script>
 @@ZANGLI_LIB@@
+@@SOLARLUNAR_LIB@@
+@@CN_HOLIDAYS_LIB@@
 @@QRCODE_LIB@@
 // ---- Service Worker 注册：音频离线缓存 + 页面更新策略（sw.js 由构建时复制到 dist 根） ----
 // 2026-09-14 修复：仅在确认"已登录"后才注册 SW。
@@ -2129,7 +2131,7 @@ function renderNav(){
   var nav = document.getElementById('nav');
   // 一级目录固定顺序（与首页导览一致）；其余新增目录按名称追加在末尾
   // 简化导航：只显示一级菜单，点击直接进入该目录的 Index 页面（Index 内展示完整目录）
-  // 2026-09-19 板块显示名两字化（小谦指示）：搜索／藏历／传承／法音／开示／典籍／法照／本站
+  // 2026-09-19 板块显示名两字化（小谦指示）：搜索／日历／传承／法音／开示／典籍／法照／本站
   // 目录名（slug）与别名层零改动——显示仅经由 TOP_LABELS
   var TOP_ORDER = ['3. 知传承', '1. 听法音', '2. 读开示', '4. 阅典籍', '5. 瞻法照', '9. 关于本站'];
   // 一级导航显示名：目录名保持稳定（含序号，便于 Obsidian 排序），仅显示层映射
@@ -2141,11 +2143,11 @@ function renderNav(){
     + '<div class="nav-sec-head" onclick="openSearchPanel()">'
     + '<span class="nav-chev nav-chev-none">🔍</span>'
     + '<span class="dir-label">搜索</span></div></div>';
-  // 藏历入口（2026-09-18 新增功能页，与 AI 搜索同为工具入口）
+  // 日历入口（2026-09-18 新增功能页；2026-09-20 由「藏历」更名「日历」，与 AI 搜索同为工具入口）
   html += '<div class="nav-sec" data-depth="0">'
     + '<div class="nav-sec-head" onclick="go(\'__zangli\'); if (window.innerWidth <= 760) closeSidebar();">'
     + '<span class="nav-chev nav-chev-none">📅</span>'
-    + '<span class="dir-label">藏历</span></div></div>';
+    + '<span class="dir-label">日历</span></div></div>';
   html += '<hr style="border:none;border-top:1px solid var(--line);margin:.5rem 0;">';
   Object.keys(TREE.dirs).sort(function(a, b){ return topKey(a) - topKey(b); }).forEach(function(name){
     var target = name + '/index';
@@ -2328,10 +2330,11 @@ function show(slug){
   pageViewStartTime = now;
   var p = bySlug[slug];
   if (slug === '__zangli'){
-    // 「藏历」功能页（2026-09-18 新增）：查询＋月历双交互，客户端本地换算，无网络请求
+    // 「修行日历」功能页（2026-09-18 新增「藏历查询」；2026-09-20 更名并升级为多日历图层叠加）
+    // 默认显示「阳历＋藏历」，可再叠加「农历法定节假日」；纯客户端本地换算，无网络请求
     currentSlug = slug;
-    document.title = SITE_TITLE + ' · 藏历';
-    document.getElementById('pageCrumbs').textContent = ' / 藏历';
+    document.title = SITE_TITLE + ' · 修行日历';
+    document.getElementById('pageCrumbs').textContent = ' / 日历';
     var contentElZ = document.getElementById('content');
     contentElZ.innerHTML = '<div class="article">' + renderZangliPage() + '</div>';
     contentElZ.classList.remove('page-anim');
@@ -3093,257 +3096,8 @@ function hcCountUnder(dirName){
     return !x.is_index && x.slug.indexOf(dirName + '/') === 0;
   }).length;
 }
-// ---------------------------------------------------------------------------
-// 藏历查询页（2026-09-18 新增）
-// 数据源：zangli.js（MIT © Stone Huang, github.com/stonelf/zangli），本地内联；
-// 数据依据《藏历、公历、农历对照百年历书（1951-2050）》，可换算范围 1951-01-08 ~ 2051-02-11。
-// 对照方式：客户端按公历日期直接调 getZangli() 得藏历（五行生肖年/月名/日序，闰缺日内建）；
-// 节日：库内置 extraInfo（神变节/莲师荟供日/空行母荟供日/药师/观音/地藏/释迦…），
-// 页面仅额外补「藏历新年」标记（藏历正月初一，由换算结果 month==='正' 判定）。
-// 两种交互：①指定日期查询（date input）②月历浏览（上/下月翻页，格内标藏历日＋节日点）。
-// ---------------------------------------------------------------------------
-// ---------------------------------------------------------------------------
-// 藏历查询页（2026-09-18 新增；2026-09-18 二补：理发日吉凶＋回到今天）
-// 数据源：zangli.js（MIT © Stone Huang, github.com/stonelf/zangli），本地内联；
-// 数据依据《藏历、公历、农历对照百年历书（1951-2050）》，可换算范围 1951-01-08 ~ 2051-02-11。
-// 节日：库内置 extraInfo（神变节/莲师荟供日/空行母荟供日/药师/观音/地藏/释迦…），
-// 页面仅额外补「藏历新年」标记（藏历正月初一，由换算结果 month==='正' 判定）。
-// 理发日吉凶：出自佛说《菩萨头发品》（藏传通行传本，30 日逐日），网站多源同表交叉核对一致；
-//   「八吉同聚」（乔美仁波切、米旁仁波切口传认定，是日纵其他星宿显凶亦无妨、诸事吉祥）
-//   与「九凶同聚」（是日诸事不吉，尤忌嫁娶）逐月日子表一并纳入；闰日依藏历本序沿用该日数。
-// 两种交互：①指定日期查询（date input）②月历浏览（上/下月翻页＋【回到今天】，格内标藏历日＋节日点）。
-// ---------------------------------------------------------------------------
-// 理发日吉凶表（藏历日 1..30，出自《菩萨头发品》；t=吉 g/凶 b 记号）
-var Z_HAIRCUT = {
-  1:['短命','凶'], 2:['多病，有口舌之争','凶'], 3:['得财富','吉'], 4:['得权势、增容颜','吉'],
-  5:['增财','吉'], 6:['损颜，极不利','凶'], 7:['遇诉讼','凶'], 8:['长寿','吉'],
-  9:['艳遇（少年）','中'], 10:['增欢喜','吉'], 11:['增智慧','吉'], 12:['患病，危及生命','凶'],
-  13:['能精进，极殊胜','吉'], 14:['增财富','吉'], 15:['大福德','吉'], 16:['诸事不吉，患病','凶'],
-  17:['目不明，肤色暗','凶'], 18:['破财，不吉','凶'], 19:['增妙法','吉'], 20:['遇饥饿，不吉','凶'],
-  21:['遇传染病','凶'], 22:['多病','凶'], 23:['得财','吉'], 24:['遇瘟疫','凶'],
-  25:['患眼疾，不吉','凶'], 26:['得福乐','吉'], 27:['吉祥','吉'], 28:['遇纷争','凶'],
-  29:['幽魂不吉，声哑','凶'], 30:['恶口成真，遇凶害，不吉','凶']
-};
-// 八吉同聚（逐月；是日诸事吉祥）
-var Z_8 = { 1:[3,15,27], 2:[10,22], 3:[5,17,29], 4:[12,24], 5:[7,19], 6:[2,14,26], 7:[9,21], 8:[4,16,28], 9:[11,23], 10:[6,18,30], 11:[1,13,25], 12:[8,20] };
-// 九凶同聚（逐月；是日诸事不吉，尤忌嫁娶）
-var Z_9 = { 1:[13], 2:[11], 3:[9], 4:[7], 5:[5], 6:[3], 7:[29], 8:[27], 9:[25], 10:[23], 11:[21], 12:[19] };
-
-// 由 zangli 结果取（月号, 日号）：'正'->1、'十一/十二'->11/12；闰月按其主月同表（传统无另表，页脚注明）
-function zDayNum(z){
-  var M = { '正': 1, '二': 2, '三': 3, '四': 4, '五': 5, '六': 6, '七': 7, '八': 8, '九': 9, '十': 10, '十一': 11, '十二': 12 };
-  var D = { '初一': 1, '初二': 2, '初三': 3, '初四': 4, '初五': 5, '初六': 6, '初七': 7, '初八': 8, '初九': 9, '初十': 10,
-            '十一': 11, '十二': 12, '十三': 13, '十四': 14, '十五': 15, '十六': 16, '十七': 17, '十八': 18, '十九': 19, '二十': 20,
-            '廿一': 21, '廿二': 22, '廿三': 23, '廿四': 24, '廿五': 25, '廿六': 26, '廿七': 27, '廿八': 28, '廿九': 29, '三十': 30 };
-  var mname = (z.month || '').replace('闰', '');
-  var dnum = D[(z.day || '').replace('闰', '')] || 0;
-  return { m: M[mname] || 0, d: dnum };
-}
-function zHaircut(z){
-  var nd = zDayNum(z);
-  var item = Z_HAIRCUT[nd.d] || null;
-  var in8 = (Z_8[nd.m] || []).indexOf(nd.d) >= 0;
-  var in9 = (Z_9[nd.m] || []).indexOf(nd.d) >= 0;
-  return { m: nd.m, d: nd.d, item: item, j8: in8, j9: in9 };
-}
-function renderZangliPage(){
-  var css = ''
-    + '<style>'
-    + '.zangli-wrap{max-width:52rem;margin:0 auto;overflow-x:hidden}'
-    + '.zangli-today{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:1.3rem 1.4rem;margin:1rem 0;overflow-wrap:break-word}'
-    + '.zangli-greg{font-size:1.15rem;font-weight:700;color:var(--ink)}'
-    + '.zangli-tib{font-size:1.5rem;font-weight:700;color:var(--accent);margin:.5rem 0 .2rem;overflow-wrap:break-word}'
-    + '.zangli-fest{margin-top:.55rem;font-size:1.02rem;color:var(--ink);line-height:1.65}'
-    + '.zangli-fest-name{display:inline-block;background:var(--accent);color:#fff;border-radius:6px;padding:.12rem .55rem;margin-right:.45rem;font-weight:600}'
-    + '.zangli-fest-note{color:var(--ink-soft);font-size:.92rem}'
-    + '.zangli-cal{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:1rem;margin-top:1.1rem;overflow-x:hidden}'
-    + '.zangli-cal-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:.6rem;gap:.4rem}'
-    + '.zangli-cal-title{font-weight:700;color:var(--ink);text-align:center;overflow-wrap:break-word}'
-    + '.zangli-cal-title small{color:var(--ink-soft);font-weight:400}'
-    + '.zangli-cal button{border:1px solid var(--line);background:var(--surface-soft);color:var(--ink);border-radius:8px;padding:.35rem .85rem;cursor:pointer;flex:none}'
-    + '.zangli-week{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;margin-bottom:2px}'
-    + '.zangli-week div{text-align:center;font-size:.78em;color:var(--ink-soft);padding:.3rem 0}'
-    + '.zangli-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;align-items:stretch}'
-    + '.zangli-grid>div{min-height:0}'
-    + '.zangli-cell{display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding:.25rem 1px;border-radius:8px;cursor:pointer;line-height:1.25;text-align:center;height:100%;overflow-wrap:break-word;word-break:break-word;position:relative}'
-    + '.zangli-empty{}'
-    + '.zangli-hairdot{position:absolute;top:3px;right:4px;width:6px;height:6px;border-radius:50%;background:var(--accent)}'
-    + '.zangli-cell-hui{color:var(--accent)}'
-    + '.zangli-cell-g{font-size:.82em;color:var(--ink-soft);line-height:1.2}'
-    + '.zangli-cell-t{font-size:.9em;color:var(--ink);line-height:1.2}'
-    + '.zangli-cell-f{display:block;font-size:.62em;color:#b08d2f;line-height:1.2;overflow-wrap:anywhere;max-width:100%}'
-    + '.zangli-cell-today{box-shadow:inset 0 0 0 2px var(--accent)}'
-    + '.zangli-cell-sel{background:var(--surface-soft);outline:1px solid var(--accent)}'
-    + '.zangli-cell-hasfest .zangli-cell-t{color:var(--accent);font-weight:700}'
-    + '.zangli-legend{color:var(--ink-soft);font-size:.8rem;margin-top:.5rem;line-height:1.7;overflow-wrap:break-word}'
-    + '.zangli-querybar{display:flex;gap:.6rem;align-items:center;flex-wrap:wrap;margin:1rem 0 .2rem}'
-    + '.zangli-querybar input[type=date]{padding:.5rem .7rem;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--ink);font-family:inherit;max-width:42vw}'
-    + '.zangli-querybar button{padding:.5rem .9rem;border:1px solid var(--accent);background:var(--accent);color:#fff;border-radius:8px;cursor:pointer;font-family:inherit}'
-    + '@media(max-width:768px){.zangli-cell{padding:.18rem 1px}.zangli-cell-g{font-size:.72em}.zangli-cell-t{font-size:.78em}.zangli-cell-f{font-size:.54em}.zangli-today{padding:.9rem .9rem}.zangli-tib{font-size:1.12rem}.zangli-fest{font-size:.95rem}.zangli-cal{padding:.7rem}}'
-    + '</style>';
-  var html = css
-    + '<div class="zangli-wrap">'
-    + '<h1 style="font-size:1.3rem">藏历查询</h1>'
-    + '<p style="color:var(--ink-soft);font-size:.9rem;line-height:1.8">公历日期、藏历日期与佛教节日同一视图对照。可查指定日期，也可逐月浏览。换算数据依《藏历、公历、农历对照百年历书（1951-2050）》，支持 1951-01-08 至 2051-02-11。</p>'
-    + '<div class="zangli-querybar"><input type="date" id="zangliDate" min="1951-01-08" max="2051-02-11"><button onclick="zangliGoto()">查这一天</button><button style="background:var(--surface-soft);color:var(--ink);border:1px solid var(--line)" onclick="zangliToday()">今天</button></div>'
-    + '<div id="zangliMain"></div>'
-    + '<div class="zangli-legend" style="text-align:left">'
-    + '<div>🛕 金标＝佛教节日殊胜日；<span style="color:var(--accent);font-weight:700">红字＝荟供日</span>（每月藏历初十「莲师荟供日」、廿五「空行母荟供日」）</div>'
-    + '<div><span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--accent)"></span> 红点＝理发吉祥日（藏历日序吉日＋八吉同聚日）；⭕ 红框＝今天；灰底＝选中日；格内第二行＝藏历日（闰/缺原样标注）</div>'
-    + '<div>✂ 理发日吉凶出自佛说《菩萨头发品》（30 日逐日，传统传本）；「八吉同聚」＝乔美仁波切、米旁仁波切口传认定，是日纵遇他星显凶无妨；「九凶同聚」＝诸事不吉，尤忌嫁娶</div>'
-    + '<div>口径说明：理发日按藏历日序 1–30 固定取表（不按月份循环）；闰日依藏历本序同数查表；以上为传统历算之说，供参考</div>'
-    + '<div>📅 数据依据《藏历、公历、农历对照百年历书（1951–2050）》，换算库 stonelf/zangli（MIT），本站离线内嵌</div>'
-    + '</div>'
-    + '<p style="color:var(--ink-soft);font-size:.78rem;margin-top:.8rem">藏历换算与节日数据来自开源项目 <a href="https://github.com/stonelf/zangli" target="_blank" rel="noopener">stonelf/zangli</a>（MIT 许可），数据源自《藏历、公历、农历对照百年历书（1951-2050）》，本站已原样内嵌、离线可用。</p>'
-    + '</div>';
-  return html;
-}
-
-function zangliFmtG(d){
-  var wd = ['日','一','二','三','四','五','六'][d.getDay()];
-  return d.getFullYear() + ' 年 ' + (d.getMonth()+1) + ' 月 ' + d.getDate() + ' 日 · 星期' + wd;
-}
-function zangliOf(d){ return window.getZangli ? getZangli(d) : { value: 'error', extraInfo: '', extraInfo2: '' }; }
-
-function initZangliPage(){
-  var input = document.getElementById('zangliDate');
-  var today = new Date();
-  var y = today.getFullYear(), m = today.getMonth();
-  input.value = today.getFullYear() + '-' + String(today.getMonth()+1).padStart(2,'0') + '-' + String(today.getDate()).padStart(2,'0');
-  window._zView = { y: y, m: m, sel: null };
-  document.getElementById('zangliDate').addEventListener('change', function(){
-    var v = this.value; if (!v) return;
-    var p = v.split('-'); window._zView.sel = new Date(+p[0], +p[1]-1, +p[2]);
-    _zRenderMain();
-  });
-  _zRenderMain();
-}
-function zangliGoto(){   // 「查这一天」按钮
-  var v = document.getElementById('zangliDate').value;
-  if (!v) return;
-  var p = v.split('-');
-  window._zView.sel = new Date(+p[0], +p[1]-1, +p[2]);
-  // 若查询日期不在当前浏览月份，跳转月历
-  window._zView.y = +p[0]; window._zView.m = +p[1]-1;
-  _zRenderMain();
-}
-function zangliToday(){
-  var t = new Date(); t.setHours(0,0,0,0);
-  document.getElementById('zangliDate').value = t.getFullYear() + '-' + String(t.getMonth()+1).padStart(2,'0') + '-' + String(t.getDate()).padStart(2,'0');
-  window._zView = { y: t.getFullYear(), m: t.getMonth(), sel: t };
-  _zRenderMain();
-}
-function zangliShift(dy, dm){
-  var v = window._zView;
-  var d = new Date(v.y + dy, v.m + dm, 1, 0, 0, 0);
-  window._zView.y = d.getFullYear(); window._zView.m = d.getMonth();
-  _zRenderMain();
-}
-function _zCellClick(ts){
-  window._zView.sel = new Date(ts);
-  var d = window._zView.sel;
-  document.getElementById('zangliDate').value = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
-  _zRenderMain();
-}
-function _zRenderMain(){
-  var box = document.getElementById('zangliMain');
-  if (!box) return;
-  var v = window._zView;
-  var today = new Date(); today.setHours(0,0,0,0);
-  var fmt = function(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); };
-  // —— 主视图：选中日（默认今天）大卡 ——
-  var selD = v.sel || (function(){ var t=new Date(); t.setHours(0,0,0,0); return t; })();
-  var z = getZangli(selD);
-  var festMain = '';
-  if (z && z.value !== 'error'){
-    var fest = [];
-    if (z.extraInfo) fest.push(z.extraInfo.replace(/<br>/g,''));
-    if (z.day === '初一' && z.month === '正' && fest.indexOf('藏历新年') < 0) fest.push('藏历新年');
-    if (z.extraInfo2) fest.push(z.extraInfo2);
-    festMain = fest.length
-      ? fest.map(function(f){ return '<span class="zangli-fest-name">' + f + '</span>'; }).join(' ')
-      : '<span style="color:var(--ink-soft)">普通日</span>';
-  } else {
-    z = { value:'超出可换算范围', extraInfo:'', extraInfo2:'', year:'', month:'', day:'' };
-  }
-  // 主卡：公历/藏历/节日 + 理发日吉凶（2026-09-18 二补）
-  var hc = zHaircut(z);
-  var hairHtml = '';
-  if (hc.d && hc.item){
-    // 2026-09-18 小谦定色：吉=红（藏红）、凶=黑、中性=灰；八吉同聚视为吉、九凶同聚视为凶
-    var tagColor = (hc.j8 || hc.item[1] === '吉') ? 'var(--accent)' : (hc.j9 || hc.item[1] === '凶') ? '#1f1a17' : '#8d8d8d';
-    var hairTag = hc.j8 ? '八吉同聚' : (hc.j9 ? '九凶同聚' : hc.item[1]);
-    var hairMain = (hc.j8 ? '诸事皆吉祥' : (hc.j9 ? '诸事不吉，尤忌嫁娶' : hc.item[0]));
-    var hairSub = hc.j8 ? '乔美仁波切：是日纵遇他星显凶亦无妨，有八吉祥海螺同聚故' : (hc.j9 ? '九凶同聚，无论作何事不吉' : '');
-    hairHtml = '<div style="margin-top:.5rem;font-size:.98rem;line-height:1.65">'
-      + '<span style="display:inline-block;border-radius:6px;padding:.12rem .55rem;color:#fff;background:' + tagColor + ';font-weight:600">✂ 理发 ' + hairTag + '</span>'
-      + ' <span style="color:var(--ink)">' + hairMainText() + '</span>'
-      + '<div style="color:var(--ink-soft);font-size:.85rem;margin-top:.15rem">' + hairSubText() + '</div>'
-      + '</div>';
-  } else if (z.value === '超出可换算范围') {
-    hairHtml = '';
-  }
-  function hairMainText(){
-    if (hc.j8) return '藏历' + zMonthName(hc.m) + '月' + zNumName(hc.d) + ' 见「八吉同聚」，诸事吉祥';
-    if (hc.j9) return '藏历' + zMonthName(hc.m) + '月' + zNumName(hc.d) + ' 见「九凶同聚」，诸事不吉，尤忌嫁娶';
-    return '藏历' + zMonthName(hc.m) + '月' + zNumName(hc.d) + '：' + (hc.item ? hc.item[0] : '');
-  }
-  function hairSubText(){
-    if (hc.j8) return '《菩萨头发品》吉为：' + (hc.item ? hc.item[0] : '') + '（同聚之日凶星无妨）';
-    if (hc.j9) return '《菩萨头发品》：' + (hc.item ? hc.item[0] : '');
-    return '';
-  }
-  function zMonthName(n){ return ['','正','二','三','四','五','六','七','八','九','十','十一','十二'][n] || ''; }
-  function zNumName(n){ return ['','初一','初二','初三','初四','初五','初六','初七','初八','初九','初十','十一','十二','十三','十四','十五','十六','十七','十八','十九','二十','廿一','廿二','廿三','廿四','廿五','廿六','廿七','廿八','廿九','三十'][n] || ''; }
-  var main = '<div class="zangli-today">'
-    + '<div class="zangli-greg">公历 ' + zangliFmtG(selD) + '</div>'
-    + '<div class="zangli-tib">藏历 ' + esc(z.value || '') + '</div>'
-    + '<div class="zangli-fest">' + (fest.length ? '<span class="zangli-fest-name">' + fest[0] + '</span>' + (fest[1] ? ' <span class="zangli-fest-note">' + fest[1] + '</span>' : '') : '<span style="color:var(--ink-soft)">本日无特定节日</span>') + '</div>'
-    + (hairHtml ? '<div class="zangli-hair">' + hairHtml + '</div>' : '')
-    + '</div>';
-
-
-  // —— 月历（自适应网格：格子内容多时自动换行、行高随内容增高，绝不横向溢出）——
-  var first = new Date(v.y, v.m, 1, 0, 0, 0);
-  var dim = new Date(v.y, v.m + 1, 0).getDate();
-  var lead = first.getDay();
-  var cells = '';
-  for (var i = 0; i < lead; i++) cells += '<div><div class="zangli-cell zangli-empty"></div></div>';
-  for (var d0 = 1; d0 <= dim; d0++){
-    var d = new Date(v.y, v.m, d0, 0, 0, 0);
-    var zz = getZangli(d);
-    var isFest = !!(zz && zz.extraInfo);
-    var isHui = !!(zz && zz.extraInfo && zz.extraInfo.indexOf('荟供') >= 0);
-    var isNew = !!(zz && zz.day === '初一' && zz.month === '正');
-    var isToday = fmt(d) === fmt(today);
-    var isSel = v.sel && fmt(v.sel) === fmt(d);
-    // 理发吉祥日（含八吉同聚日）＝红色小点
-    var hairGood = false;
-    try { var hz = zHaircut(zz); hairGood = !!(hz.item && (hz.item[1] === '吉' || hz.j8)); } catch (e) {}
-    var cls = 'zangli-cell';
-    if (isFest || isNew) cls += ' zangli-cell-hasfest';
-    if (isToday) cls += ' zangli-cell-today';
-    if (isSel) cls += ' zangli-cell-sel';
-    var fLabel = isNew ? '洛萨' : (zz && zz.extraInfo ? zz.extraInfo.replace(/<br>/g,'') : '');
-    cells += '<div><span class="' + cls + '" onclick="_zCellClick(' + d.getTime() + ')">'
-      + '<span class="zangli-cell-g"' + (isHui ? ' style="color:var(--accent);font-weight:700"' : '') + '>' + d0 + '</span>'
-      + '<span class="zangli-cell-t"' + (isHui ? ' style="color:var(--accent);font-weight:700"' : '') + '>' + (zz && zz.day ? zz.day : '') + '</span>'
-      + (hairGood ? '<span class="zangli-hairdot" title="理发吉祥日"></span>' : '')
-      + (fLabel ? '<span class="zangli-cell-f' + (isHui ? ' zangli-cell-hui' : '') + '">' + fLabel.replace('莲师荟供日','莲师荟供').replace('空行母荟供日','空行荟供').replace('节日','') + '</span>' : '')
-      + '</span></div>';
-  }
-  var table = '<div class="zangli-cal">'
-    + '<div class="zangli-cal-head">'
-    + '<button onclick="zangliShift(0,-1)">‹ 上月</button>'
-    + '<div class="zangli-cal-title">' + v.y + '年' + (v.m+1) + '月 <small>（点任一天查询）</small></div>'
-    + '<button onclick="zangliShift(0,1)">下月 ›</button>'
-    + '<button onclick="zangliToday()" title="回到今天的日期与本月">◎ 今天</button>'
-    + '</div>'
-    + '<div class="zangli-week"><div>日</div><div>一</div><div>二</div><div>三</div><div>四</div><div>五</div><div>六</div></div>'
-    + '<div class="zangli-grid">' + cells + '</div>'
-    + '</div>';
-  box.innerHTML = main + table;
-}
+// ---- 修行日历：页面脚本由构建时注入（单一来源 ZANGLI_PAGE_JS，主站与独立页共用同一份）----
+@@ZANGLI_PAGE_JS@@
 function openZangli(){ go('__zangli'); }
 
 function renderHomeCards(){
@@ -3371,8 +3125,8 @@ function renderHomeCards(){
   if (bySlug['5. 瞻法照/index']){
     items.push({icon:'🪷', title:'法照', desc:'上师尊容、历代祖师与圣像法物', slug:'5. 瞻法照/index', count:(FAZHAO_IMG_COUNT > 0 ? FAZHAO_IMG_COUNT + ' 张' : '')});
   }
-  // 藏历（2026-09-19 小谦指示：卡片顺序调到最后，瞻法照之后）
-  items.push({icon:'📅', title:'藏历', desc:'公历藏历对照与佛教节日', slug:'__zangli', count:''});
+  // 日历（2026-09-19 小谦指示：卡片顺序调到最后，瞻法照之后；2026-09-20 由「藏历」更名）
+  items.push({icon:'📅', title:'日历', desc:'公历、藏历、农历叠加对照（含佛教节日与法定节假日）', slug:'__zangli', count:''});
   if (!items.length) return '';
   var html = '<nav class="home-cards" aria-label="首页快捷入口">';
   items.forEach(function(it){
@@ -5825,6 +5579,522 @@ window.addEventListener('scroll', function(){
 """
 
 
+# ---------------------------------------------------------------------------
+# 「修行日历」页 —— 样式（主站与独立页共用，改一处即两处生效）
+# 2026-09-20 由「藏历查询」更名，并升级为多日历图层叠加
+# ---------------------------------------------------------------------------
+ZANGLI_CSS_BODY = r"""
+.zangli-wrap{max-width:52rem;margin:0 auto;overflow-x:hidden}
+.zangli-today{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:1.3rem 1.4rem;margin:1rem 0;overflow-wrap:break-word}
+.zangli-greg{font-size:1.15rem;font-weight:700;color:var(--ink)}
+.zangli-tib{font-size:1.5rem;font-weight:700;color:var(--accent);margin:.5rem 0 .2rem;overflow-wrap:break-word}
+.zangli-lun{font-size:1.15rem;font-weight:700;color:#2f6f8a;margin:.15rem 0 .2rem;overflow-wrap:break-word}
+.zangli-fest{margin-top:.55rem;font-size:1.02rem;color:var(--ink);line-height:1.65}
+.zangli-fest-name{display:inline-block;background:var(--accent);color:#fff;border-radius:6px;padding:.12rem .55rem;margin-right:.45rem;font-weight:600}
+.zangli-fest-name-lun{background:#2f6f8a}
+.zangli-fchip{display:inline-block;border-radius:6px;padding:.14rem .55rem;margin:.25rem .45rem 0 0;font-size:.88rem;font-weight:600}
+.zangli-fchip-off{background:#2f6f8a;color:#fff}
+.zangli-fchip-work{background:#c9bfa8;color:#3b2f28}
+.zangli-fchip-none{background:transparent;color:var(--ink-soft);border:1px dashed var(--line);font-weight:400}
+.zangli-cal{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:1rem;margin-top:1.1rem;overflow-x:hidden}
+.zangli-cal-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:.6rem;gap:.4rem}
+.zangli-cal-title{font-weight:700;color:var(--ink);text-align:center;overflow-wrap:break-word}
+.zangli-cal-title small{color:var(--ink-soft);font-weight:400}
+.zangli-cal button{border:1px solid var(--line);background:var(--surface-soft);color:var(--ink);border-radius:8px;padding:.35rem .85rem;cursor:pointer;flex:none;font-family:inherit}
+.zangli-week{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;margin-bottom:2px}
+.zangli-week div{text-align:center;font-size:.78em;color:var(--ink-soft);padding:.3rem 0}
+.zangli-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;align-items:stretch}
+.zangli-grid>div{min-height:0}
+.zangli-cell{display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding:.25rem 1px;border-radius:8px;cursor:pointer;line-height:1.25;text-align:center;height:100%;overflow-wrap:break-word;word-break:break-word;position:relative}
+.zangli-empty{}
+.zangli-hairdot{position:absolute;top:3px;right:4px;width:6px;height:6px;border-radius:50%;background:var(--accent)}
+.zl-badge{display:inline-block;font-size:.62em;line-height:1.15;padding:0 2px;margin-right:2px;border-radius:3px;font-weight:600;vertical-align:.08em}
+.zl-badge-off{background:#2f6f8a;color:#fff}
+.zl-badge-work{background:#d8cfba;color:#40372c}
+.zangli-cell-g{font-size:.82em;color:var(--ink-soft);line-height:1.2}
+.zangli-cell-r{display:flex;align-items:center;justify-content:center;gap:3px;max-width:100%;line-height:1.2}
+.zangli-cell-t{font-size:.9em;color:var(--ink);line-height:1.2}
+.zangli-cell-n{font-size:.78em;color:#2f6f8a;line-height:1.2}
+.zl-dot{display:inline-block;width:4px;height:4px;border-radius:2px;flex:none}
+.zl-dot-t{background:var(--accent)}
+.zl-dot-l{background:#2f6f8a}
+.zangli-cell-f{display:block;font-size:.62em;color:#b08d2f;line-height:1.2;overflow-wrap:anywhere;max-width:100%}
+.zangli-cell-fp{display:block;font-size:.62em;color:#2f6f8a;line-height:1.2;overflow-wrap:anywhere;max-width:100%}
+.zangli-cell-today{box-shadow:inset 0 0 0 2px var(--accent)}
+.zangli-cell-sel{background:var(--surface-soft);outline:1px solid var(--accent)}
+.zangli-cell-hasfest .zangli-cell-t{color:var(--accent);font-weight:700}
+.zangli-cell-huilun .zangli-cell-n{color:#1f5a72;font-weight:700}
+.zangli-legend{color:var(--ink-soft);font-size:.82rem;margin-top:.9rem;line-height:1.6;overflow-wrap:break-word}
+.zangli-legend h3{font-size:.92rem;color:var(--ink);margin:1.1rem 0 .35rem;font-weight:700}
+.zangli-legend h4{font-size:.84rem;color:#2f6f8a;margin:.75rem 0 .25rem;font-weight:700}
+.zangli-legend h5{font-size:.82rem;color:var(--accent);margin:.75rem 0 .25rem;font-weight:700}
+.zangli-legend ul{margin:0;padding-left:1.05rem;list-style:disc}
+.zangli-legend li{margin:.18rem 0}
+.zangli-legend .zl-key{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:.45rem;vertical-align:middle}
+.zangli-querybar{display:flex;gap:.6rem;align-items:center;flex-wrap:wrap;margin:1rem 0 .2rem}
+.zangli-querybar input[type=date]{padding:.5rem .7rem;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--ink);font-family:inherit;max-width:42vw}
+.zangli-querybar button{padding:.5rem .9rem;border:1px solid var(--accent);background:var(--accent);color:#fff;border-radius:8px;cursor:pointer;font-family:inherit}
+.zl-layers{display:flex;flex-wrap:wrap;gap:.5rem;align-items:center;margin:.95rem 0 .1rem}
+.zl-layers-label{color:var(--ink-soft);font-size:.84rem;margin-right:.15rem}
+.zl-chip{display:inline-flex;align-items:center;gap:.42rem;border:1px solid var(--line);background:var(--surface);color:var(--ink-soft);border-radius:999px;padding:.42rem .85rem;font-family:inherit;font-size:.86rem;line-height:1;cursor:pointer;white-space:nowrap}
+.zl-chip .zl-sw{border:1px solid var(--line);width:10px;height:10px;border-radius:3px;flex:none}
+.zl-chip-on{color:#fff;font-weight:600;border-color:transparent}
+.zl-chip[data-layer=g]{cursor:default;opacity:.9}
+.zl-chip[data-layer=t] .zl-sw{background:var(--accent);border-color:var(--accent)}
+.zl-chip[data-layer=l] .zl-sw{background:#2f6f8a;border-color:#2f6f8a}
+.zl-chip[data-layer=g] .zl-sw{background:#6f6258;border-color:#6f6258}
+.zl-chip[data-layer=t].zl-chip-on{background:var(--accent)}
+.zl-chip[data-layer=l].zl-chip-on{background:#2f6f8a}
+.zl-chip[data-layer=g].zl-chip-on{background:#6f6258}
+.zl-chip:not(.zl-chip-on) .zl-sw{opacity:.35}
+.zl-tip{color:var(--ink-soft);font-size:.78rem;margin:.45rem 0 .1rem;line-height:1.65}
+.zangli-qr{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:1rem;margin-top:1.1rem;text-align:center}
+.zangli-qrbox{display:inline-block;margin:.4rem 0}
+.zangli-qrhint{color:var(--ink-soft);font-size:.8rem;line-height:1.7;overflow-wrap:anywhere}
+@media(max-width:768px){.zangli-cell{padding:.18rem 1px}.zangli-cell-g{font-size:.72em}.zangli-cell-t{font-size:.78em}.zangli-cell-n{font-size:.68em}.zangli-cell-f{font-size:.54em}.zangli-cell-fp{font-size:.54em}.zangli-today{padding:.9rem .9rem}.zangli-tib{font-size:1.12rem}.zangli-lun{font-size:1rem}.zangli-fest{font-size:.95rem}.zangli-cal{padding:.7rem}.zl-chip{padding:.38rem .7rem;font-size:.8rem}.zl-badge{font-size:.46em}.zl-dot{width:3px;height:3px}.zangli-cell-r{gap:2px}}
+/* 2026-09-20：窄屏月历头部另起一行，避免「（点任一天查询）」被拦腰折断 */
+@media(max-width:600px){
+.zangli-cal-head{flex-wrap:wrap}
+.zangli-cal-title{order:-1;flex:0 0 100%;margin-bottom:.5rem}
+.zangli-cal-head button{flex:1 1 0;min-width:0;padding:.4rem .25rem;white-space:nowrap}
+.zangli-cal-title small{display:none}
+.zangli-legend{font-size:.8rem}
+.zangli-legend h4,.zangli-legend h5{margin-top:.6rem}
+/* 格子窄：理发红点占着右上角，日期行用外边距让出这一角（用 margin 不用 padding，
+   这样元素自身的盒子不会伸到红点下方，视觉与几何都干净） */
+.zangli-cell-hair .zangli-cell-g{margin-right:9px}
+}
+"""
+
+# ---------------------------------------------------------------------------
+# 「修行日历」页 —— 正文结构
+# 顺序（2026-09-20 小谦指示）：图层开关 → 查询条 → 日历 → 原页首说明（迁移至此）
+#                            → 分层图例（每个独立语义单独成行）→ 数据来源与范围
+# ---------------------------------------------------------------------------
+ZANGLI_BODY_HTML = """
+<div class="zangli-wrap">
+<h1 style="font-size:1.3rem">修行日历</h1>
+<div class="zl-layers" id="zLayers" role="group" aria-label="显示哪些日历"></div>
+<p class="zl-tip">可同时叠加显示多个日历；默认只显示「藏历」与「阳历」。</p>
+<div class="zangli-querybar"><input type="date" id="zangliDate" min="1951-01-08" max="2051-02-11"><button type="button" onclick="zangliGoto()">查这一天</button><button type="button" style="background:var(--surface-soft);color:var(--ink);border:1px solid var(--line)" onclick="zangliToday()">今天</button></div>
+<div id="zangliMain"></div>
+<div class="zangli-legend">
+<h3>关于本页</h3>
+<ul>
+<li>公历日期、藏历日期与佛教节日同一视图对照。</li>
+<li>可查指定日期，也可逐月浏览。</li>
+<li>换算数据依《藏历、公历、农历对照百年历书（1951-2050）》，支持 1951-01-08 至 2051-02-11。</li>
+</ul>
+<h3>怎么看这个日历</h3>
+<h4>通用标记</h4>
+<ul>
+<li><span class="zl-key" style="background:var(--accent)"></span>红框＝今天。</li>
+<li><span class="zl-key" style="background:#f1e9db;border:1px solid var(--accent)"></span>灰底＝当前选中的日子。</li>
+<li><span class="zl-key" style="background:#b08d2f"></span>金色小字＝该日所属日历的节日名。</li>
+<li>点月历里任意一天，即在上方大卡中查看该日详情。</li>
+</ul>
+<h5>「藏历」图层（默认开启）</h5>
+<ul>
+<li><span class="zl-key" style="background:var(--accent)"></span>格内第二行＝藏历日，闰日与缺日照原样标注。</li>
+<li><span class="zl-key" style="background:var(--accent)"></span>红字＝荟供日，即每月藏历初十「莲师荟供日」、廿五「空行母荟供日」。</li>
+<li><span class="zl-key" style="background:var(--accent);border-radius:50%"></span>右上角红点＝理发吉祥日，含藏历日序吉日与「八吉同聚」日。</li>
+<li>大卡中显示该日理发的吉凶与出处。</li>
+</ul>
+<h4>「农历法定节假日」图层（默认关闭）</h4>
+<ul>
+<li><span class="zl-key" style="background:#2f6f8a"></span>格内第三行＝农历日，逢初一显示月名，闰月标注「闰」。</li>
+<li><span class="zl-key" style="background:#2f6f8a"></span>靛蓝字＝传统农历节日：春节、元宵、端午、七夕、中元、中秋、重阳、腊八、小年、除夕。</li>
+<li><span class="zl-key" style="background:#2f6f8a"></span>日期前带「休」＝法定放假。</li>
+<li><span class="zl-key" style="background:#d8cfba"></span>日期前带「班」＝调休上班。</li>
+<li>「休」「班」在日期数字前，鼠标停上去可看是哪个节日、或补哪一天的班。</li>
+<li>两个农历系图层同时开启时，行首会出现对应颜色的小方块，便于分辨哪一行属于哪一个日历。</li>
+</ul>
+<h3>理发日吉凶</h3>
+<ul>
+<li>出自佛说《菩萨头发品》，按藏历日序 1–30 逐日定吉凶。</li>
+<li>「八吉同聚」＝乔美仁波切、米旁仁波切口传认定，是日纵遇他星显凶亦无妨。</li>
+<li>「九凶同聚」＝诸事不吉，尤忌嫁娶。</li>
+<li>取表按藏历日序固定对应，不随月份循环。</li>
+<li>闰日依藏历本序，取同一日数查表。</li>
+<li>以上为传统历算之说，仅供参考。</li>
+</ul>
+<h3>数据来源与范围</h3>
+<ul>
+<li>藏历：数据依据《藏历、公历、农历对照百年历书（1951–2050）》。</li>
+<li>藏历换算库：<a href="https://github.com/stonelf/zangli" target="_blank" rel="noopener">stonelf/zangli</a>（MIT 许可），本站已原样内嵌、离线可用。</li>
+<li>农历换算库：<a href="https://github.com/yize/solarlunar" target="_blank" rel="noopener">solarlunar</a>（ISC 许可），农历日期与传统农历节日在 1951–2051 全范围可查。</li>
+<li>法定放假与调休：<a href="https://github.com/NateScarlet/holiday-cn" target="_blank" rel="noopener">holiday-cn</a>（MIT 许可），依据国务院办公厅历年放假安排通知整理，本页收录 2007–2026 年。</li>
+<li>2027 年及以后官方尚未公布放假安排，故该年份之后只显示农历日期与传统农历节日，不显示「休」「班」标记。</li>
+<li>本页所有换算均在你的浏览器本地完成，不发送任何网络请求。</li>
+</ul>
+</div>
+</div>
+"""
+
+# ---------------------------------------------------------------------------
+# 「修行日历」页 —— 脚本（主站与独立页共用同一份）
+# 依赖（均由构建时内联）：getZangli()（zangli.js）、solarlunar（solarlunar.min.js）、
+#                          window.CN_HOLIDAYS（cn-holidays.js）
+# 图层：g 阳历（基础层，常显）/ t 藏历（默认开）/ l 农历法定节假日（默认关）
+# 叠加原则：每层固定占一行、各有专属色，绝不重叠；图层开关本身即是图例。
+# @@ZANGLI_CSS_JSON@@ / @@ZANGLI_BODY_JSON@@ 由构建时注入为 JS 字符串常量。
+# ---------------------------------------------------------------------------
+ZANGLI_PAGE_JS = r"""
+// ===================================================================
+// 修行日历（原「藏历查询」，2026-09-20 更名并升级为多日历图层叠加）
+// 藏历：zangli.js（MIT © Stone Huang, github.com/stonelf/zangli）
+// 农历：solarlunar（ISC © yize, github.com/yize/solarlunar），1900–2100
+// 法定放假与调休：holiday-cn（MIT © 2019 NateScarlet），收录 2007–2026
+// ===================================================================
+var Z_PAGE_CSS = @@ZANGLI_CSS_JSON@@;
+var Z_PAGE_BODY = @@ZANGLI_BODY_JSON@@;
+function renderZangliPage(){ return '<style>' + Z_PAGE_CSS + '</style>' + Z_PAGE_BODY; }
+
+// —— 理发日吉凶表（藏历日 1..30，出自《菩萨头发品》）——
+var Z_HAIRCUT = {
+  1:['短命','凶'], 2:['多病，有口舌之争','凶'], 3:['得财富','吉'], 4:['得权势、增容颜','吉'],
+  5:['增财','吉'], 6:['损颜，极不利','凶'], 7:['遇诉讼','凶'], 8:['长寿','吉'],
+  9:['艳遇（少年）','中'], 10:['增欢喜','吉'], 11:['增智慧','吉'], 12:['患病，危及生命','凶'],
+  13:['能精进，极殊胜','吉'], 14:['增财富','吉'], 15:['大福德','吉'], 16:['诸事不吉，患病','凶'],
+  17:['目不明，肤色暗','凶'], 18:['破财，不吉','凶'], 19:['增妙法','吉'], 20:['遇饥饿，不吉','凶'],
+  21:['遇传染病','凶'], 22:['多病','凶'], 23:['得财','吉'], 24:['遇瘟疫','凶'],
+  25:['患眼疾，不吉','凶'], 26:['得福乐','吉'], 27:['吉祥','吉'], 28:['遇纷争','凶'],
+  29:['幽魂不吉，声哑','凶'], 30:['恶口成真，遇凶害，不吉','凶']
+};
+var Z_8 = { 1:[3,15,27], 2:[10,22], 3:[5,17,29], 4:[12,24], 5:[7,19], 6:[2,14,26], 7:[9,21], 8:[4,16,28], 9:[11,23], 10:[6,18,30], 11:[1,13,25], 12:[8,20] };
+var Z_9 = { 1:[13], 2:[11], 3:[9], 4:[7], 5:[5], 6:[3], 7:[29], 8:[27], 9:[25], 10:[23], 11:[21], 12:[19] };
+
+// 传统农历节日（固定农历日期；除夕另按「次日为正月初一」判定）
+var Z_LFEST = {
+  '1-1':'春节','1-15':'元宵','2-2':'龙抬头','5-5':'端午','7-7':'七夕','7-15':'中元',
+  '8-15':'中秋','9-9':'重阳','12-8':'腊八','12-23':'小年'
+};
+
+function zlEsc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function zlKey(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+function zlMonthName(n){ return ['','正','二','三','四','五','六','七','八','九','十','十一','十二'][n] || ''; }
+function zlNumName(n){ return ['','初一','初二','初三','初四','初五','初六','初七','初八','初九','初十','十一','十二','十三','十四','十五','十六','十七','十八','十九','二十','廿一','廿二','廿三','廿四','廿五','廿六','廿七','廿八','廿九','三十'][n] || ''; }
+
+// —— 图层状态：藏历默认开、农历法定节假日默认关；阳历为常显基础层 ——
+if (!window._zLayers) window._zLayers = { t: true, l: false };
+function zlIsOn(k){ return !!window._zLayers[k]; }
+function zlToggleLayer(k){
+  if (k === 'g') return;                      // 阳历为基础层，不可关闭
+  window._zLayers[k] = !window._zLayers[k];
+  zlRenderChips();
+  _zRenderMain();
+}
+function zlRenderChips(){
+  var box = document.getElementById('zLayers');
+  if (!box) return;
+  var defs = [ {k:'g', n:'阳历'}, {k:'t', n:'藏历'}, {k:'l', n:'农历法定节假日'} ];
+  var html = '<span class="zl-layers-label">显示日历</span>';
+  defs.forEach(function(d){
+    if (d.k === 'g'){
+      html += '<span class="zl-chip zl-chip-on" data-layer="' + d.k + '" title="基础层，始终显示">'
+        + '<span class="zl-sw"></span>' + zlEsc(d.n) + '（常显）</span>';
+    } else {
+      var on = zlIsOn(d.k);
+      html += '<button type="button" class="zl-chip' + (on ? ' zl-chip-on' : '') + '" data-layer="' + d.k + '"'
+        + ' aria-pressed="' + (on ? 'true' : 'false') + '"'
+        + ' title="点击' + (on ? '隐藏' : '显示') + '「' + zlEsc(d.n) + '」"'
+        + ' onclick="zlToggleLayer(\'' + d.k + '\')">'
+        + '<span class="zl-sw"></span>' + zlEsc(d.n) + '</button>';
+    }
+  });
+  box.innerHTML = html;
+}
+
+// —— 农历（solarlunar）——
+function zlLunar(d){
+  if (!zlIsOn('l') || typeof solarlunar === 'undefined' || !solarlunar.solar2lunar) return null;
+  try { return solarlunar.solar2lunar(d.getFullYear(), d.getMonth()+1, d.getDate()); }
+  catch (e) { return null; }
+}
+function zlLunarDayText(l){
+  if (!l) return '';
+  return (l.lDay === 1) ? l.monthCn : l.dayCn;      // 初一显示月名
+}
+function zlSolarLunar(d){
+  if (typeof solarlunar === 'undefined' || !solarlunar.solar2lunar) return null;
+  try { return solarlunar.solar2lunar(d.getFullYear(), d.getMonth()+1, d.getDate()); }
+  catch (e) { return null; }
+}
+function zlLunarFest(d, l){
+  if (!l || l.isLeap) return '';
+  var f = Z_LFEST[l.lMonth + '-' + l.lDay] || '';
+  if (f) return f;
+  var nd = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1);   // 除夕＝次日为正月初一
+  var nl = zlSolarLunar(nd);
+  if (nl && !nl.isLeap && nl.lMonth === 1 && nl.lDay === 1) return '除夕';
+  return '';
+}
+
+// —— 法定放假 / 调休上班（holiday-cn，2007–2026）——
+function zlCNHoliday(d){
+  if (!zlIsOn('l')) return null;
+  var H = window.CN_HOLIDAYS;
+  if (!H) return null;
+  var k = zlKey(d);
+  if (H.off && H.off[k]) return { type:'off', name:H.off[k] };
+  if (H.work && H.work[k]) return { type:'work', name:H.work[k] };
+  return null;
+}
+function zlHolidayCovered(y){
+  var H = window.CN_HOLIDAYS;
+  return !!(H && y >= H.min && y <= H.max);
+}
+
+// —— 藏历取数 ——
+function zangliOf(d){ return window.getZangli ? getZangli(d) : { value:'error', extraInfo:'', extraInfo2:'', month:'', day:'' }; }
+function zDayNum(z){
+  var M = { '正':1,'二':2,'三':3,'四':4,'五':5,'六':6,'七':7,'八':8,'九':9,'十':10,'十一':11,'十二':12 };
+  var D = { '初一':1,'初二':2,'初三':3,'初四':4,'初五':5,'初六':6,'初七':7,'初八':8,'初九':9,'初十':10,
+            '十一':11,'十二':12,'十三':13,'十四':14,'十五':15,'十六':16,'十七':17,'十八':18,'十九':19,'二十':20,
+            '廿一':21,'廿二':22,'廿三':23,'廿四':24,'廿五':25,'廿六':26,'廿七':27,'廿八':28,'廿九':29,'三十':30 };
+  return { m: M[(z.month || '').replace('闰','')] || 0, d: D[(z.day || '').replace('闰','')] || 0 };
+}
+function zHaircut(z){
+  var nd = zDayNum(z);
+  return { m: nd.m, d: nd.d, item: Z_HAIRCUT[nd.d] || null,
+           j8: (Z_8[nd.m] || []).indexOf(nd.d) >= 0, j9: (Z_9[nd.m] || []).indexOf(nd.d) >= 0 };
+}
+function zangliFmtG(d){
+  return d.getFullYear() + ' 年 ' + (d.getMonth()+1) + ' 月 ' + d.getDate() + ' 日 · 星期'
+       + ['日','一','二','三','四','五','六'][d.getDay()];
+}
+
+// —— 页面状态与交互 ——
+if (!window._zView) window._zView = { y: new Date().getFullYear(), m: new Date().getMonth(), sel: null };
+function initZangliPage(){
+  var input = document.getElementById('zangliDate');
+  if (input){
+    // 独立页深链 ?d= 会预先写入 input.value，此处不可覆盖
+    if (!input.value) input.value = zlKey(new Date());
+    input.addEventListener('change', function(){
+      var v = this.value; if (!v) return;
+      var p = v.split('-');
+      window._zView.sel = new Date(+p[0], +p[1]-1, +p[2]);
+      window._zView.y = +p[0]; window._zView.m = +p[1]-1;
+      _zRenderMain();
+    });
+  }
+  zlRenderChips();
+  _zRenderMain();
+}
+function zangliGoto(){
+  var el = document.getElementById('zangliDate');
+  var v = el ? el.value : '';
+  if (!v) return;
+  var p = v.split('-');
+  window._zView.sel = new Date(+p[0], +p[1]-1, +p[2]);
+  window._zView.y = +p[0]; window._zView.m = +p[1]-1;
+  _zRenderMain();
+}
+function zangliToday(){
+  var t = new Date(); t.setHours(0,0,0,0);
+  var el = document.getElementById('zangliDate');
+  if (el) el.value = zlKey(t);
+  window._zView = { y: t.getFullYear(), m: t.getMonth(), sel: t };
+  _zRenderMain();
+}
+function zangliShift(dy, dm){
+  var v = window._zView;
+  var d = new Date(v.y + dy, v.m + dm, 1, 0, 0, 0);
+  window._zView.y = d.getFullYear(); window._zView.m = d.getMonth();
+  _zRenderMain();
+}
+function _zCellClick(ts){
+  window._zView.sel = new Date(ts);
+  var el = document.getElementById('zangliDate');
+  if (el) el.value = zlKey(window._zView.sel);
+  _zRenderMain();
+}
+
+// —— 主渲染：主卡（选中日）＋ 月历，均按当前图层叠加 ——
+function _zRenderMain(){
+  var box = document.getElementById('zangliMain');
+  if (!box) return;
+  var v = window._zView;
+  var today = new Date(); today.setHours(0,0,0,0);
+  var onT = zlIsOn('t'), onL = zlIsOn('l');
+  var bothLunar = onT && onL;      // 两个农历系图层同时开启时，行首加层色小方块
+
+  // ===== 主卡 =====
+  var selD = v.sel || (function(){ var t = new Date(); t.setHours(0,0,0,0); return t; })();
+  var z = zangliOf(selD);
+  if (z && z.value === 'error') z = { value:'超出可换算范围', extraInfo:'', extraInfo2:'', month:'', day:'' };
+  var lv = zlLunar(selD);
+  var hd = zlCNHoliday(selD);
+
+  var rows = [];
+  rows.push('<div class="zangli-greg">公历 ' + zangliFmtG(selD) + '</div>');
+  if (onT) rows.push('<div class="zangli-tib">藏历 ' + zlEsc(z.value || '') + '</div>');
+  if (onL && lv){
+    rows.push('<div class="zangli-lun">农历 ' + zlEsc(lv.gzYear) + '（' + zlEsc(lv.animal) + '）年 '
+      + zlEsc(lv.monthCn) + zlEsc(lv.dayCn) + '</div>');
+  }
+
+  // 节日标签
+  var chips = [];
+  if (onT && z.value !== '超出可换算范围'){
+    var zf = [];
+    if (z.extraInfo) zf.push(String(z.extraInfo).replace(/<br>/g,''));
+    if (z.day === '初一' && z.month === '正') zf.push('藏历新年');
+    if (z.extraInfo2) zf.push(z.extraInfo2);
+    zf.forEach(function(f){ chips.push('<span class="zangli-fest-name">' + zlEsc(f) + '</span>'); });
+  }
+  if (onL && lv){
+    var lfm = zlLunarFest(selD, lv);
+    if (lfm) chips.push('<span class="zangli-fest-name zangli-fest-name-lun">' + zlEsc(lfm) + '</span>');
+  }
+  var chipHtml = chips.length ? '<div class="zangli-fest">' + chips.join('') + '</div>'
+    : '<div class="zangli-fest"><span style="color:var(--ink-soft)">本日无特定节日</span></div>';
+
+  // 法定放假 / 调休上班
+  var holHtml = '';
+  if (onL){
+    if (hd && hd.type === 'off'){
+      holHtml = '<div><span class="zangli-fchip zangli-fchip-off">法定放假 · ' + zlEsc(hd.name) + '</span></div>';
+    } else if (hd && hd.type === 'work'){
+      holHtml = '<div><span class="zangli-fchip zangli-fchip-work">调休上班 · 补' + zlEsc(hd.name) + '的班</span></div>';
+    } else if (!zlHolidayCovered(selD.getFullYear())){
+      holHtml = '<div><span class="zangli-fchip zangli-fchip-none">该年无官方放假安排（本页仅收录 2007–2026 年）</span></div>';
+    }
+  }
+
+  // 理发日吉凶（属藏历图层）
+  var hairHtml = '';
+  if (onT){
+    var hc = zHaircut(z);
+    if (hc.d && hc.item){
+      var isGood = (hc.j8 || hc.item[1] === '吉');
+      var isBad  = (hc.j9 || hc.item[1] === '凶');
+      var tagColor = isGood ? 'var(--accent)' : (isBad ? '#1f1a17' : '#8d8d8d');
+      var hairTag = hc.j8 ? '八吉同聚' : (hc.j9 ? '九凶同聚' : hc.item[1]);
+      var hairMain, hairSub;
+      if (hc.j8){
+        hairMain = '藏历' + zlMonthName(hc.m) + '月' + zlNumName(hc.d) + ' 见「八吉同聚」，诸事吉祥';
+        hairSub  = '《菩萨头发品》吉为：' + hc.item[0] + '（同聚之日凶星无妨）';
+      } else if (hc.j9){
+        hairMain = '藏历' + zlMonthName(hc.m) + '月' + zlNumName(hc.d) + ' 见「九凶同聚」，诸事不吉，尤忌嫁娶';
+        hairSub  = '《菩萨头发品》：' + hc.item[0];
+      } else {
+        hairMain = '藏历' + zlMonthName(hc.m) + '月' + zlNumName(hc.d) + '：' + hc.item[0];
+        hairSub  = '';
+      }
+      hairHtml = '<div style="margin-top:.6rem;font-size:.98rem;line-height:1.65">'
+        + '<span style="display:inline-block;border-radius:6px;padding:.12rem .55rem;color:#fff;background:' + tagColor + ';font-weight:600">✂ 理发 ' + zlEsc(hairTag) + '</span>'
+        + ' <span>' + zlEsc(hairMain) + '</span>'
+        + (hairSub ? '<div style="color:var(--ink-soft);font-size:.85rem;margin-top:.15rem">' + zlEsc(hairSub) + '</div>' : '')
+        + '</div>';
+    }
+  }
+
+  var main = '<div class="zangli-today">' + rows.join('') + chipHtml + holHtml + hairHtml + '</div>';
+
+  // ===== 月历 =====
+  var first = new Date(v.y, v.m, 1, 0, 0, 0);
+  var dim = new Date(v.y, v.m + 1, 0).getDate();
+  var lead = first.getDay();
+  var cells = '';
+  var i;
+  for (i = 0; i < lead; i++) cells += '<div><div class="zangli-cell zangli-empty"></div></div>';
+  for (var d0 = 1; d0 <= dim; d0++){
+    var d = new Date(v.y, v.m, d0, 0, 0, 0);
+    var zz = zangliOf(d);
+    if (zz && zz.value === 'error') zz = null;
+    var ll = zlLunar(d);
+    var hh = zlCNHoliday(d);
+    var isHui = !!(onT && zz && zz.extraInfo && String(zz.extraInfo).indexOf('荟供') >= 0);
+    var isNew = !!(onT && zz && zz.day === '初一' && zz.month === '正');
+    var isToday = (zlKey(d) === zlKey(today));
+    var isSel = !!(v.sel && zlKey(v.sel) === zlKey(d));
+    var hairGood = false;
+    if (onT && zz){
+      try { var hz = zHaircut(zz); hairGood = !!(hz.item && (hz.item[1] === '吉' || hz.j8)); } catch (e) {}
+    }
+    var lfest = (onL && ll) ? zlLunarFest(d, ll) : '';
+
+    var cls = 'zangli-cell';
+    if (isNew || (onT && zz && zz.extraInfo)) cls += ' zangli-cell-hasfest';
+    if (isToday) cls += ' zangli-cell-today';
+    if (isSel) cls += ' zangli-cell-sel';
+    if (isHui) cls += ' zangli-cell-huilun';
+    if (hairGood) cls += ' zangli-cell-hair';
+
+    // —— 固定插槽逐层一行，绝不叠压 ——
+    // 角标（休/班）就排在阳历日数字之前，随行居中，不另占位、不压任何内容
+    var badgeHtml = '';
+    if (hh){
+      badgeHtml = '<i class="zl-badge ' + (hh.type === 'off' ? 'zl-badge-off' : 'zl-badge-work') + '"'
+        + ' title="' + zlEsc(hh.name) + (hh.type === 'off' ? '（法定放假）' : '（调休上班）') + '">'
+        + (hh.type === 'off' ? '休' : '班') + '</i>';
+    }
+    // 第 1 行：阳历日（基础层，常显）
+    var inner = '<span class="zangli-cell-g"' + (isHui ? ' style="color:var(--accent);font-weight:700"' : '') + '>' + badgeHtml + d0 + '</span>';
+    // 第 2 行：藏历日
+    if (onT){
+      inner += '<span class="zangli-cell-r">'
+        + (bothLunar ? '<i class="zl-dot zl-dot-t"></i>' : '')
+        + '<span class="zangli-cell-t"' + (isHui ? ' style="color:var(--accent);font-weight:700"' : '') + '>'
+        + zlEsc((zz && zz.day) ? zz.day : '') + '</span></span>';
+    }
+    // 第 3 行：农历日
+    if (onL && ll){
+      inner += '<span class="zangli-cell-r">'
+        + (bothLunar ? '<i class="zl-dot zl-dot-l"></i>' : '')
+        + '<span class="zangli-cell-n">' + zlEsc(zlLunarDayText(ll)) + '</span></span>';
+    }
+    // 角标已随阳历日行内联，此处不再另插
+    // 右上角：理发吉祥日红点（藏历图层）
+    if (hairGood) inner += '<span class="zangli-hairdot" title="理发吉祥日"></span>';
+    // 末行：节日名（藏历金色、农历靛蓝，各自独立成行）
+    if (onT && isNew) inner += '<span class="zangli-cell-f">洛萨</span>';
+    else if (onT && zz && zz.extraInfo){
+      var tf = String(zz.extraInfo).replace(/<br>/g,'')
+        .replace('莲师荟供日','莲师荟供').replace('空行母荟供日','空行荟供').replace('节日','');
+      if (tf) inner += '<span class="zangli-cell-f' + (isHui ? ' zangli-cell-hui' : '') + '">' + zlEsc(tf) + '</span>';
+    }
+    if (lfest) inner += '<span class="zangli-cell-fp">' + zlEsc(lfest) + '</span>';
+
+    cells += '<div><div class="' + cls + '" onclick="_zCellClick(' + d.getTime() + ')">' + inner + '</div></div>';
+  }
+
+  var table = '<div class="zangli-cal">'
+    + '<div class="zangli-cal-head">'
+    + '<button type="button" onclick="zangliShift(0,-1)">‹ 上月</button>'
+    + '<div class="zangli-cal-title">' + v.y + '年' + (v.m+1) + '月 <small>（点任一天查询）</small></div>'
+    + '<button type="button" onclick="zangliShift(0,1)">下月 ›</button>'
+    + '<button type="button" onclick="zangliToday()" title="回到今天的日期与本月">◎ 今天</button>'
+    + '</div>'
+    + '<div class="zangli-week"><div>日</div><div>一</div><div>二</div><div>三</div><div>四</div><div>五</div><div>六</div></div>'
+    + '<div class="zangli-grid">' + cells + '</div>'
+    + '</div>';
+  box.innerHTML = main + table;
+}
+"""
+
+
+# ---------------------------------------------------------------------------
+# 「修行日历」构建期辅助（2026-09-20）
+# ZANGLI_PAGE_JS 里的 @@ZANGLI_CSS_JSON@@ / @@ZANGLI_BODY_JSON@@ 在构建时被换成
+# JSON 字面量，从而让「样式／正文／脚本」三者只有一处定义，主站与独立页共用。
+# ---------------------------------------------------------------------------
+def _js_str_literal(s):
+    """把 Python 字符串转成可安全嵌进 <script> 的 JS 字符串字面量。"""
+    return (json.dumps(s, ensure_ascii=False)
+            .replace("\u2028", "\\u2028")
+            .replace("\u2029", "\\u2029"))
+
+
+def zangli_page_js():
+    """返回「修行日历」共享脚本（样式与正文已注入为常量）。"""
+    return (ZANGLI_PAGE_JS
+            .replace("@@ZANGLI_CSS_JSON@@", _js_str_literal(ZANGLI_CSS_BODY))
+            .replace("@@ZANGLI_BODY_JSON@@", _js_str_literal(ZANGLI_BODY_HTML)))
+
+
 def main():
     pages = discover_pages()
     if not pages:
@@ -6277,6 +6547,27 @@ def main():
         zangli_lib = "/* zangli.js not found */"
     html_out = html_out.replace("@@ZANGLI_LIB@@", zangli_lib)
 
+    # 内联农历换算库（solarlunar，ISC © yize）：1951–2051 农历日期与传统农历节日
+    solarlunar_path = os.path.join(CONTENT_DIR, "assets", "solarlunar.min.js")
+    if os.path.exists(solarlunar_path):
+        with open(solarlunar_path, "r", encoding="utf-8") as f:
+            solarlunar_lib = f.read()
+    else:
+        solarlunar_lib = "/* solarlunar.min.js not found */"
+    html_out = html_out.replace("@@SOLARLUNAR_LIB@@", solarlunar_lib)
+
+    # 内联法定放假/调休数据（holiday-cn，MIT © 2019 NateScarlet）：收录 2007–2026
+    cn_holidays_path = os.path.join(CONTENT_DIR, "assets", "cn-holidays.js")
+    if os.path.exists(cn_holidays_path):
+        with open(cn_holidays_path, "r", encoding="utf-8") as f:
+            cn_holidays_lib = f.read()
+    else:
+        cn_holidays_lib = "window.CN_HOLIDAYS = null;"
+    html_out = html_out.replace("@@CN_HOLIDAYS_LIB@@", cn_holidays_lib)
+
+    # 注入「修行日历」页面脚本（样式/正文/脚本三份单一来源，主站与独立页共用）
+    html_out = html_out.replace("@@ZANGLI_PAGE_JS@@", zangli_page_js())
+
     os.makedirs(DIST_DIR, exist_ok=True)
     out_path = os.path.join(DIST_DIR, "index.html")
     with open(out_path, "w", encoding="utf-8") as f:
@@ -6511,15 +6802,17 @@ def main():
     print("破缓存: index.html 内 ?v= 注入 %d 处；处理文本产物 %d 个" % (
         len(_re_bust.findall(r"\?v=[0-9a-f]{8}", _probe)), len(_text_targets)))
 
-    # ---- 藏历独立页（2026-09-19 小谦指示）：dist/zangli.html ----
+    # ---- 修行日历独立页（2026-09-19 小谦指示；2026-09-20 更名）：dist/zangli.html ----
     # 公开单页：纯历表数据无站内内容；无登录墙（middleware isPublicPath 放行）；
-    # 单文件自足（zangli.js/qrcode.min.js 内联），支持查询/月历/回到今天/理发/荟供红字红点；
+    # 单文件自足（zangli.js/solarlunar/cn-holidays/qrcode 全内联），支持多日历叠加/查询/月历/回到今天/理发/荟供；
     # 页脚二维码按当前地址实时生成（location.href，多域访问各自可扫）。
     _emit_standalone_zangli(DIST_DIR)
 
 
-# ---- 藏历独立页生成器（2026-09-19）：dist/zangli.html 公开可收藏 ----
-# 注意：本页 JS 与主站「藏历」模块同源同表（Z_HAIRCUT/Z_8/Z_9 与其一致），两处改动需同步。
+# ---- 修行日历独立页生成器（2026-09-19 新增；2026-09-20 更名并升级为多日历叠加）----
+# dist/zangli.html 公开可收藏；文件名沿用 zangli.html（既往分享链接/二维码不失效）。
+# 单一来源：样式 ZANGLI_CSS_BODY、正文 ZANGLI_BODY_HTML、脚本 ZANGLI_PAGE_JS
+#          —— 与主站「修行日历」模块完全同源，改一处即两处生效，不再需要「两处同步」。
 STANDALONE_Z_HEAD = """<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
@@ -6527,197 +6820,56 @@ STANDALONE_Z_HEAD = """<!DOCTYPE html>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow">
 <meta name="theme-color" content="#8a1f1c">
-<title>藏历查询 · 公历藏历对照与佛教节日</title>
+<title>修行日历 · 公历 藏历 农历对照与佛教节日</title>
 <style>
 :root{--bg:#f6f1e6;--surface:#fffdf8;--surface-soft:#f1e9db;--ink:#3b2f28;--ink-soft:#6f6258;--accent:#8a1f1c;--line:#e2d8c4}
 *{box-sizing:border-box}
 body{margin:0;padding:1.1rem 1rem 3rem;background:var(--bg);color:var(--ink);
   font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Hiragino Sans GB","Microsoft YaHei",serif}
-.zangli-wrap{max-width:52rem;margin:0 auto;overflow-x:hidden}
 h1{font-size:1.3rem;margin:.2rem 0 .4rem}
-.zangli-today{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:1.3rem 1.4rem;margin:1rem 0;overflow-wrap:break-word}
-.zangli-greg{font-size:1.15rem;font-weight:700;color:var(--ink)}
-.zangli-tib{font-size:1.5rem;font-weight:700;color:var(--accent);margin:.5rem 0 .2rem;overflow-wrap:break-word}
-.zangli-fest{margin-top:.55rem;font-size:1.02rem;color:var(--ink);line-height:1.65}
-.zangli-fest-name{display:inline-block;background:var(--accent);color:#fff;border-radius:6px;padding:.12rem .55rem;margin-right:.45rem;font-weight:600}
-.zangli-cal{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:1rem;margin-top:1.1rem;overflow-x:hidden}
-.zangli-cal-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:.6rem;gap:.4rem}
-.zangli-cal-title{font-weight:700;text-align:center;overflow-wrap:break-word}
-.zangli-cal-title small{color:var(--ink-soft);font-weight:400}
-.zangli-cal button{border:1px solid var(--line);background:var(--surface-soft);color:var(--ink);border-radius:8px;padding:.35rem .85rem;cursor:pointer;flex:none;font-family:inherit}
-.zangli-week{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;margin-bottom:2px}
-.zangli-week div{text-align:center;font-size:.78em;color:var(--ink-soft);padding:.3rem 0}
-.zangli-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;align-items:stretch}
-.zangli-cell{display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding:.25rem 1px;border-radius:8px;cursor:pointer;line-height:1.25;text-align:center;height:100%;overflow-wrap:break-word;word-break:break-word;position:relative}
-.zangli-cell-g{font-size:.82em;color:var(--ink-soft);line-height:1.2}
-.zangli-cell-t{font-size:.9em;color:var(--ink);line-height:1.2}
-.zangli-cell-f{display:block;font-size:.62em;color:#b08d2f;line-height:1.2;overflow-wrap:anywhere;max-width:100%}
-.zangli-cell-hui{color:var(--accent)}
-.zangli-hairdot{position:absolute;top:3px;right:4px;width:6px;height:6px;border-radius:50%;background:var(--accent)}
-.zangli-cell-today{box-shadow:inset 0 0 0 2px var(--accent)}
-.zangli-cell-sel{background:var(--surface-soft);outline:1px solid var(--accent)}
-.zangli-cell-hasfest .zangli-cell-t{color:var(--accent);font-weight:700}
-.zangli-legend{color:var(--ink-soft);font-size:.8rem;margin-top:.6rem;line-height:1.75;text-align:left}
-.zangli-querybar{display:flex;gap:.6rem;align-items:center;flex-wrap:wrap;margin:1rem 0 .2rem}
-.zangli-querybar input[type=date]{padding:.5rem .7rem;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--ink);font-family:inherit;max-width:44vw}
-.zangli-querybar button{padding:.5rem .9rem;border:1px solid var(--accent);background:var(--accent);color:#fff;border-radius:8px;cursor:pointer;font-family:inherit}
+a{color:var(--accent)}
+@@ZANGLI_CSS@@
 .zangli-qr{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:1rem;margin-top:1.1rem;text-align:center}
 .zangli-qrbox{display:inline-block;margin:.4rem 0}
-.zangli-qrhint{color:var(--ink-soft);font-size:.8rem;line-height:1.7}
-a{color:var(--accent)}
-@media(max-width:768px){.zangli-cell{padding:.18rem 1px}.zangli-cell-g{font-size:.72em}.zangli-cell-t{font-size:.78em}.zangli-cell-f{font-size:.54em}.zangli-today{padding:.9rem}.zangli-tib{font-size:1.12rem}}
+.zangli-qrhint{color:var(--ink-soft);font-size:.8rem;line-height:1.7;overflow-wrap:anywhere}
+.zl-foot{color:var(--ink-soft);font-size:.76rem;margin-top:.9rem;line-height:1.7}
 </style>
 </head>
 <body>
+@@ZANGLI_BODY@@
 <div class="zangli-wrap">
-<h1>藏历查询</h1>
-<p style="color:var(--ink-soft);font-size:.9rem;line-height:1.8;margin:.2rem 0 .6rem">公历日期、藏历日期与佛教节日同一视图。支持 1951-01-08 至 2051-02-11（数据依《藏历、公历、农历对照百年历书》）。</p>
-<div class="zangli-querybar"><input type="date" id="zangliDate" min="1951-01-08" max="2051-02-11"><button onclick="zangliGoto()">查这一天</button><button style="background:var(--surface-soft);color:var(--ink);border:1px solid var(--line)" onclick="zangliToday()">今天</button></div>
-<div id="zangliMain"></div>
-<div class="zangli-legend">
-<div>🛕 金标＝佛教节日殊胜日；<span style="color:var(--accent);font-weight:700">红字＝荟供日</span>（每月藏历初十「莲师荟供日」、廿五「空行母荟供日」）</div>
-<div><span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--accent)"></span> 红点＝理发吉祥日（藏历日序吉日＋八吉同聚日）；⭕ 红框＝今天；灰底＝选中日</div>
-<div>✂ 理发日吉凶出自佛说《菩萨头发品》（30 日逐日）；「八吉同聚」＝乔美仁波切、米旁仁波切口传认定；「九凶同聚」＝诸事不吉</div>
-<div>口径：理发日按藏历日序 1–30 固定取表；闰日依藏历本序同数查表；传统历算之说，供参考</div>
-</div>
-<div class="zangli-cal">
+<div class="zangli-qr">
 <div class="zangli-cal-title" style="margin-bottom:.4rem">📲 收藏与分享</div>
 <p class="zangli-qrhint">手机浏览器菜单里「添加到主屏幕」即可像 App 一样从桌面打开；下方二维码即本页地址，长按或截图可分享。</p>
 <div class="zangli-qrbox" id="qrbox"></div>
 <div class="zangli-qrhint" id="qrhint"></div>
 </div>
-<p style="color:var(--ink-soft);font-size:.76rem;margin-top:.8rem">换算数据来自开源项目 stonelf/zangli（MIT），数据源《藏历、公历、农历对照百年历书（1951-2050）》；理发日吉凶出自佛说《菩萨头发品》。本页为龙的传人网站（longchen-nyingtik.wiki）藏历功能独立版。</p>
+<p class="zl-foot">本页为龙的传人网站（longchen-nyingtik.wiki）「修行日历」独立版，只含历表数据与公开节日，不含站内内容。</p>
+</div>
 <script>
 @@ZANGLI_JS@@
+@@SOLARLUNAR_JS@@
+@@CN_HOLIDAYS_JS@@
 @@QRCODE_JS@@
 </script>
 <script>
-// —— 理发日吉凶表（与主站 zangli 模块同源，改需同步）——
-var Z_HAIRCUT = { 1:['短命','凶'],2:['多病，有口舌之争','凶'],3:['得财富','吉'],4:['得权势、增容颜','吉'],5:['增财','吉'],6:['损颜，极不利','凶'],7:['遇诉讼','凶'],8:['长寿','吉'],9:['艳遇（少年）','中'],10:['增欢喜','吉'],11:['增智慧','吉'],12:['患病，危及生命','凶'],13:['能精进，极殊胜','吉'],14:['增财富','吉'],15:['大福德','吉'],16:['诸事不吉，患病','凶'],17:['目不明，肤色暗','凶'],18:['破财，不吉','凶'],19:['增妙法','吉'],20:['遇饥饿，不吉','凶'],21:['遇传染病','凶'],22:['多病','凶'],23:['得财','吉'],24:['遇瘟疫','凶'],25:['患眼疾，不吉','凶'],26:['得福乐','吉'],27:['吉祥','吉'],28:['遇纷争','凶'],29:['幽魂不吉，声哑','凶'],30:['恶口成真，遇凶害，不吉','凶'] };
-var Z_8 = { 1:[3,15,27],2:[10,22],3:[5,17,29],4:[12,24],5:[7,19],6:[2,14,26],7:[9,21],8:[4,16,28],9:[11,23],10:[6,18,30],11:[1,13,25],12:[8,20] };
-var Z_9 = { 1:[13],2:[11],3:[9],4:[7],5:[5],6:[3],7:[29],8:[27],9:[25],10:[23],11:[21],12:[19] };
-function zDayNum(z){
-  var M = { '正':1,'二':2,'三':3,'四':4,'五':5,'六':6,'七':7,'八':8,'九':9,'十':10,'十一':11,'十二':12 };
-  var D = { '初一':1,'初二':2,'初三':3,'初四':4,'初五':5,'初六':6,'初七':7,'初八':8,'初九':9,'初十':10,'十一':11,'十二':12,'十三':13,'十四':14,'十五':15,'十六':16,'十七':17,'十八':18,'十九':19,'二十':20,'廿一':21,'廿二':22,'廿三':23,'廿四':24,'廿五':25,'廿六':26,'廿七':27,'廿八':28,'廿九':29,'三十':30 };
-  return { m: M[(z.month||'').replace('闰','')] || 0, d: D[(z.day||'').replace('闰','')] || 0 };
-}
-function zHaircut(z){
-  var nd = zDayNum(z);
-  var item = Z_HAIRCUT[nd.d] || null;
-  return { m: nd.m, d: nd.d, item: item, j8: !!(Z_8[nd.m]||[]).indexOf ? (Z_8[nd.m]||[]).indexOf(nd.d) >= 0 : false, j9: (Z_9[nd.m]||[]).indexOf(nd.d) >= 0 };
-}
-function zMonthName(n){ return ['','正','二','三','四','五','六','七','八','九','十','十一','十二'][n] || ''; }
-function zNumName(n){ return ['','初一','初二','初三','初四','初五','初六','初七','初八','初九','初十','十一','十二','十三','十四','十五','十六','十七','十八','十九','二十','廿一','廿二','廿三','廿四','廿五','廿六','廿七','廿八','廿九','三十'][n] || ''; }
-function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
-function zangliFmtG(d){ return d.getFullYear() + ' 年 ' + (d.getMonth()+1) + ' 月 ' + d.getDate() + ' 日 · 星期' + ['日','一','二','三','四','五','六'][d.getDay()]; }
-window._zView = { y: new Date().getFullYear(), m: new Date().getMonth(), sel: null };
-function _zRenderMain(){
-  var box = document.getElementById('zangliMain');
-  var v = window._zView;
-  var today = new Date(); today.setHours(0,0,0,0);
-  var fmt = function(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); };
-  var selD = v.sel || (function(){ var t = new Date(); t.setHours(0,0,0,0); return t; })();
-  var z = getZangli(selD);
-  var fest = [];
-  if (z && z.value !== 'error'){
-    if (z.extraInfo) fest.push(String(z.extraInfo).replace(/<br>/g,''));
-    if (z.day === '初一' && z.month === '正') fest.push('藏历新年');
-    if (z.extraInfo2) fest.push(z.extraInfo2);
-  } else { z = { value:'超出可换算范围', extraInfo:'', extraInfo2:'', month:'', day:'' }; }
-  var hc = zHaircut(z);
-  var hairHtml = '';
-  if (hc.d && hc.item){
-    var tagColor = (hc.j8 || hc.item[1] === '吉') ? 'var(--accent)' : (hc.j9 || hc.item[1] === '凶') ? '#1f1a17' : '#8d8d8d';
-    var hairTag = hc.j8 ? '八吉同聚' : (hc.j9 ? '九凶同聚' : hc.item[1]);
-    var hairMain = hc.j8 ? '藏历' + zMonthName(hc.m) + '月' + zNumName(hc.d) + ' 见「八吉同聚」，诸事吉祥' : (hc.j9 ? '藏历' + zMonthName(hc.m) + '月' + zNumName(hc.d) + ' 见「九凶同聚」，诸事不吉，尤忌嫁娶' : '藏历' + zMonthName(hc.m) + '月' + zNumName(hc.d) + '：' + hc.item[0]);
-    var hairSub = hc.j8 ? '《菩萨头发品》：' + hc.item[0] + '（同聚之日凶星无妨）' : (hc.j9 ? '《菩萨头发品》：' + hc.item[0] : '');
-    hairHtml = '<div style="margin-top:.5rem;font-size:.98rem;line-height:1.65">'
-      + '<span style="display:inline-block;border-radius:6px;padding:.12rem .55rem;color:#fff;background:' + tagColor + ';font-weight:600">✂ 理发 ' + hairTag + '</span>'
-      + ' <span>' + hairMain + '</span>'
-      + (hairSub ? '<div style="color:var(--ink-soft);font-size:.85rem;margin-top:.15rem">' + hairSub + '</div>' : '')
-      + '</div>';
-  }
-  var main = '<div class="zangli-today">'
-    + '<div class="zangli-greg">公历 ' + zangliFmtG(selD) + '</div>'
-    + '<div class="zangli-tib">藏历 ' + esc(z.value || '') + '</div>'
-    + '<div class="zangli-fest">' + (fest.length ? '<span class="zangli-fest-name">' + fest[0] + '</span>' + (fest[1] ? ' <span style="color:var(--ink-soft)">' + fest[1] + '</span>' : '') : '<span style="color:var(--ink-soft)">本日无特定节日</span>') + '</div>'
-    + (hairHtml ? hairHtml : '')
-    + '</div>';
-  var first = new Date(v.y, v.m, 1, 0, 0, 0);
-  var dim = new Date(v.y, v.m + 1, 0).getDate();
-  var lead = first.getDay();
-  var cells = '';
-  var i;
-  for (i = 0; i < lead; i++) cells += '<div><div class="zangli-cell"></div></div>';
-  for (var d0 = 1; d0 <= dim; d0++){
-    var d = new Date(v.y, v.m, d0, 0, 0, 0);
-    var zz = getZangli(d);
-    var isFest = !!(zz && zz.extraInfo);
-    var isHui = !!(isFest && String(zz.extraInfo).indexOf('荟供') >= 0);
-    var isNew = !!(zz && zz.day === '初一' && zz.month === '正');
-    var isToday = fmt(d) === fmt(today);
-    var isSel = v.sel && fmt(v.sel) === fmt(d);
-    var hz = null; try { hz = zHaircut(zz); } catch (e) {}
-    var hairGood = !!(hz && hz.item && (hz.item[1] === '吉' || hz.j8));
-    var cls = 'zangli-cell';
-    if (isFest || isNew) cls += ' zangli-cell-hasfest';
-    if (isToday) cls += ' zangli-cell-today';
-    if (isSel) cls += ' zangli-cell-sel';
-    var fLabel = isNew ? '洛萨' : (zz && zz.extraInfo ? String(zz.extraInfo).replace(/<br>/g,'') : '');
-    cells += '<div><span class="' + cls + '" onclick="_zCellClick(' + d.getTime() + ')">'
-      + '<span class="zangli-cell-g"' + (isHui ? ' style="color:var(--accent);font-weight:700"' : '') + '>' + d0 + '</span>'
-      + '<span class="zangli-cell-t"' + (isHui ? ' style="color:var(--accent);font-weight:700"' : '') + '>' + (zz && zz.day ? zz.day : '') + '</span>'
-      + (hairGood ? '<span class="zangli-hairdot" title="理发吉祥日"></span>' : '')
-      + (fLabel ? '<span class="zangli-cell-f' + (isHui ? ' zangli-cell-hui' : '') + '">' + fLabel.replace('莲师荟供日','莲师荟供').replace('空行母荟供日','空行荟供').replace('节日','') + '</span>' : '')
-      + '</span></div>';
-  }
-  box.innerHTML = main
-    + '<div class="zangli-cal"><div class="zangli-cal-head">'
-    + '<button onclick="zangliShift(0,-1)">‹ 上月</button>'
-    + '<div class="zangli-cal-title">' + v.y + '年' + (v.m+1) + '月 <small>（点任一天查询）</small></div>'
-    + '<button onclick="zangliShift(0,1)">下月 ›</button>'
-    + '<button onclick="zangliToday()">◎ 今天</button>'
-    + '</div><div class="zangli-week"><div>日</div><div>一</div><div>二</div><div>三</div><div>四</div><div>五</div><div>六</div></div>'
-    + '<div class="zangli-grid">' + cells + '</div></div>';
-}
-function _zCellClick(ts){
-  window._zView.sel = new Date(ts);
-  var d = window._zView.sel;
-  document.getElementById('zangliDate').value = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
-  _zRenderMain();
-}
-function zangliGoto(){
-  var v = document.getElementById('zangliDate').value;
-  if (!v) return;
-  var p = v.split('-');
-  window._zView.sel = new Date(+p[0], +p[1]-1, +p[2], 0, 0, 0);
-  window._zView.y = +p[0]; window._zView.m = +p[1]-1;
-  _zRenderMain();
-}
-function zangliToday(){
-  var t = new Date(); t.setHours(0,0,0,0);
-  document.getElementById('zangliDate').value = t.getFullYear() + '-' + String(t.getMonth()+1).padStart(2,'0') + '-' + String(t.getDate()).padStart(2,'0');
-  window._zView = { y: t.getFullYear(), m: t.getMonth(), sel: t };
-  _zRenderMain();
-}
-function zangliShift(dy, dm){
-  var v = window._zView;
-  var d = new Date(v.y + dy, v.m + dm, 1, 0, 0, 0);
-  window._zView.y = d.getFullYear(); window._zView.m = d.getMonth();
-  _zRenderMain();
-}
-(function initStandalone(){
-  // 深链 ?d=YYYY-MM-DD
-  var q = new URLSearchParams ? new URLSearchParams(location.search) : null;
-  var dParam = q ? (q.get('d') || '') : '';
-  var m0 = dParam ? dParam.split('-') : null;
-  if (m0 && m0.length === 3){
-    var sd = new Date(+m0[0], +m0[1]-1, +m0[2], 0, 0, 0);
-    window._zView = { y: sd.getFullYear(), m: sd.getMonth(), sel: sd };
-    var inp = document.getElementById('zangliDate');
-    if (inp) inp.value = dParam;
-  }
-  _zRenderMain();
+@@ZANGLI_PAGE_JS@@
+</script>
+<script>
+(function(){
+  // 深链 ?d=YYYY-MM-DD：先设状态再初始化，避免被「今天」覆盖
+  try {
+    var q = (typeof URLSearchParams !== 'undefined') ? new URLSearchParams(location.search) : null;
+    var dp = q ? (q.get('d') || '') : '';
+    var m0 = dp ? dp.split('-') : null;
+    if (m0 && m0.length === 3 && !isNaN(+m0[0])){
+      var sd = new Date(+m0[0], +m0[1]-1, +m0[2], 0, 0, 0);
+      window._zView = { y: sd.getFullYear(), m: sd.getMonth(), sel: sd };
+      var inp = document.getElementById('zangliDate');
+      if (inp) inp.value = dp;
+    }
+  } catch (e) {}
+  initZangliPage();
   // 二维码：按当前地址实时生成（哪个域打开就回到哪个域）
   try {
     var qr = qrcode(0, 'M');
@@ -6727,7 +6879,7 @@ function zangliShift(dy, dm){
     var box = document.getElementById('qrbox');
     if (box) box.innerHTML = qr.createSvgTag({ cellSize: 5, margin: 6 });
     var hint = document.getElementById('qrhint');
-    if (hint) hint.textContent = '本页地址：' + encodeURIComponent(location.href.split('#')[0]).replace(/%2F/g,'/');
+    if (hint) hint.textContent = '本页地址：' + location.href.split('#')[0];
   } catch (err) { /* 二维码生成失败不影响查询主功能 */ }
 })();
 </script>
@@ -6735,24 +6887,37 @@ function zangliShift(dy, dm){
 </html>
 """
 
+
 STANDALONE_ZANGLI_JS_INJECT = """;window.getZangli = (typeof getZangli === 'function') ? getZangli : window.getZangli;"""
+
 
 def _emit_standalone_zangli(dist_dir):
     standalone_path = os.path.join(dist_dir, "zangli.html")
-    zangli_src = os.path.join(CONTENT_DIR, "assets", "zangli.js")
-    qrcode_src = os.path.join(os.path.dirname(os.path.abspath(__file__)), "qrcode.min.js")
+    here = os.path.dirname(os.path.abspath(__file__))
     def _read(p, fallback):
         try:
             with open(p, "r", encoding="utf-8") as f:
                 return f.read()
         except OSError:
             return fallback
-    zangli_js = _read(zangli_src, "/* zangli.js missing */") + STANDALONE_ZANGLI_JS_INJECT
-    qrcode_js = _read(qrcode_src, "/* qrcode.min.js missing */")
-    html = STANDALONE_Z_HEAD.replace("@@ZANGLI_JS@@", zangli_js).replace("@@QRCODE_JS@@", qrcode_js)
+    zangli_js = _read(os.path.join(CONTENT_DIR, "assets", "zangli.js"),
+                      "/* zangli.js missing */") + STANDALONE_ZANGLI_JS_INJECT
+    solarlunar_js = _read(os.path.join(CONTENT_DIR, "assets", "solarlunar.min.js"),
+                          "/* solarlunar.min.js missing */")
+    cn_holidays_js = _read(os.path.join(CONTENT_DIR, "assets", "cn-holidays.js"),
+                           "window.CN_HOLIDAYS = null;")
+    qrcode_js = _read(os.path.join(here, "qrcode.min.js"), "/* qrcode.min.js missing */")
+    html = (STANDALONE_Z_HEAD
+            .replace("@@ZANGLI_JS@@", zangli_js)
+            .replace("@@SOLARLUNAR_JS@@", solarlunar_js)
+            .replace("@@CN_HOLIDAYS_JS@@", cn_holidays_js)
+            .replace("@@QRCODE_JS@@", qrcode_js)
+            .replace("@@ZANGLI_CSS@@", ZANGLI_CSS_BODY)
+            .replace("@@ZANGLI_BODY@@", ZANGLI_BODY_HTML)
+            .replace("@@ZANGLI_PAGE_JS@@", zangli_page_js()))
     with open(standalone_path, "w", encoding="utf-8", newline="") as f:
         f.write(html)
-    print("藏历独立页: %s（公开/可收藏/%.1f KB）" % (standalone_path, os.path.getsize(standalone_path) / 1024.0))
+    print("修行日历独立页: %s（公开/可收藏/%.1f KB）" % (standalone_path, os.path.getsize(standalone_path) / 1024.0))
 
 
 # ---- 生成锁屏封面图（纯标准库手写 PNG）：深红底 + 金色同心圆（坛城意象）----
