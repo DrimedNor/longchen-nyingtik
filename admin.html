@@ -440,7 +440,7 @@
 
 <script>
 const API_BASE = 'https://stats.longchen-nyingtik.wiki';
-const ADMIN_PAGE_VERSION = 'v2026-09-20c';
+const ADMIN_PAGE_VERSION = 'v2026-09-21b';
 // ⚠️ 2026-09-20：管理员设备 ID 列表已从本页移除（本页公开可读，硬编码等于泄露白名单）。
 // 设备白名单仅存于 Worker 环境变量 env.ADMIN_DEVICE_IDS，前端只上报自身设备 ID 由后端判定。
 let adminPassword = '';
@@ -460,17 +460,20 @@ function getDeviceId() {
   } catch (e) { return ''; }
 }
 
-// —— 所有 /api/admin/* 请求自动附带 X-Device-ID（Worker 端据此对管理员设备放行）——
+// —— 所有指向统计 Worker 的请求自动附带 X-Device-ID（Worker 端据此对管理员设备免密放行）——
+// ⚠️ 2026-09-21 修正：原来只匹配 '/api/admin'，导致 /api/stats/ai-ask 等端点拿不到设备头，
+//   在「免密模式」（adminPassword 为空）下必然 401。现改为覆盖全部 /api/ 与 API_BASE 请求。
 (function () {
   const _origFetch = window.fetch.bind(window);
   window.fetch = function (input, init) {
     try {
       const url = (typeof input === 'string') ? input : ((input && input.url) || '');
-      if (url.indexOf('/api/admin') >= 0) {
+      const isApi = url.indexOf(API_BASE) === 0 || url.indexOf('/api/') === 0;
+      if (isApi) {
         init = init || {};
         const h = Object.assign({}, init.headers || {});
         const did = getDeviceId();
-        if (did) h['X-Device-ID'] = did;
+        if (did && !h['X-Device-ID']) h['X-Device-ID'] = did;
         init.headers = h;
       }
     } catch (e) { /* 保底：不阻断请求 */ }
@@ -499,10 +502,29 @@ function checkLogin() {
     .catch(function () { showLogin(); });
 }
 
-// —— 一次性登记链接：/admin/?enroll=<token>（2026-09-20 新增）——
+// —— 一次性登记链接：/admin/#enroll=<token>（2026-09-20 新增，09-21 改为 hash 承载）——
 // 在待登记的设备上打开该链接 → 本机设备 ID 写入服务端白名单（KV）→ 之后本机长期免密。
-// 链接为一次性凭证：用满约定次数或到期即失效（服务端判定），且 token 只出现在地址栏；
-// 登记成功后立刻从地址栏抹除，避免留在浏览历史或被复制带出。
+// token 走 URL hash：hash 不发送到服务器，故不受「/admin/ 带查询串一律 404」的平台限制影响。
+// 链接为一次性凭证：用满约定次数或到期即失效（服务端判定）；
+// 登记成功后立刻 replaceState 抹除，避免留在地址栏或被复制带出。
+// 页内轻提示（登记流程用；不依赖页面里预先写好的元素，避免改 HTML 结构）
+function enrollNotice(text, done) {
+  try {
+    let el = document.getElementById('enrollNotice');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'enrollNotice';
+      el.style.cssText = 'position:fixed;left:50%;top:14px;transform:translateX(-50%);z-index:99999;'
+        + 'background:#8a1f1c;color:#fff;padding:10px 16px;border-radius:8px;font-size:14px;line-height:1.5;'
+        + 'box-shadow:0 6px 20px rgba(0,0,0,.22);max-width:90vw;text-align:center;';
+      document.body.appendChild(el);
+    }
+    el.textContent = text;
+    if (done) setTimeout(function () { try { el.remove(); } catch (e) {} }, 6000);
+    return el;
+  } catch (e) { return null; }
+}
+
 function enrollFromLink(token) {
   showLogin();
   const le = document.getElementById('loginError');
@@ -524,7 +546,19 @@ function enrollFromLink(token) {
         try { history.replaceState(null, '', location.pathname); } catch (e) { /* 保底 */ }
         adminPassword = '';
         showAdmin();
+        // ⚠️ Cloudflare KV 是最终一致的：登记写入后约 1 分钟才全球生效，
+        //   刚登记完的接口调用可能短暂 401。这里给出明确提示并自动重试，
+        //   避免主人看到空数据误判为「登记失败」。
+        const notice = enrollNotice('本机已登记为管理员设备 ✓　云端同步约需 1 分钟，数据若暂为空会自动重试…');
         loadAll();
+        [8000, 20000, 45000].forEach(function (ms) {
+          setTimeout(function () {
+            loadAll();
+            if (ms === 45000) {
+              enrollNotice('本机已登记为管理员设备 ✓　同步完成。之后本机打开 /admin/ 即免密进入。', true);
+            }
+          }, ms);
+        });
       } else {
         if (le) le.textContent = d.message || ('登记失败（HTTP ' + res.status + '）');
       }
@@ -1273,10 +1307,21 @@ document.getElementById('adminPassword').addEventListener('keydown', function(e)
   if (e.key === 'Enter') login();
 });
 
-// 初始化：优先处理一次性登记链接（?enroll=），否则走常规登录判定
+// 初始化：优先处理一次性登记链接（token 走 URL hash），否则走常规登录判定。
+// ⚠️ 2026-09-21 重要修正：token 必须放在 URL **hash** 里（/admin/#enroll=xxx），不能用查询串。
+//   实测：Cloudflare 对 /admin/ 携带任意查询串一律返回 404（平台资产层行为，
+//   不经过本站 Functions 与 _headers），因此 ?enroll= 形式的链接打开就是一张空 404 页——
+//   这正是「链接打开没反应、KV 次数从未被消耗」的根因。
+//   hash 不会发送到服务器，服务端永远只看到 /admin/（稳定 200），由浏览器端解析 token。
 (function () {
   let et = '';
-  try { et = new URLSearchParams(location.search).get('enroll') || ''; } catch (e) { /* 保底 */ }
+  try {
+    // 1) 首选 hash：#enroll=<token> 或 #/enroll=<token>
+    const hs = (location.hash || '').replace(/^#\/?/, '');
+    if (hs && hs.indexOf('=') > 0) et = new URLSearchParams(hs).get('enroll') || '';
+    // 2) 兼容查询串（兜底：平台层对 /admin/?xxx 会 404，正常走不到这里）
+    if (!et) et = new URLSearchParams(location.search).get('enroll') || '';
+  } catch (e) { /* 保底 */ }
   if (et) { enrollFromLink(et); } else { checkLogin(); }
 })();
 

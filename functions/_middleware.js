@@ -497,6 +497,30 @@ export async function onRequest(context) {
     return html(registerPageHTML(code, codeState), codeState === "ok" ? 200 : 404);
   }
 
+  // 4.5) 后台入口规范化（2026-09-21）
+  //   ⚠️ 实测：Cloudflare 对 /admin/ 携带任意查询串一律返回 404（平台资产层行为），
+  //     故一次性登记链接不能走查询串，token 统一改走 URL hash（hash 不发送到服务器）。
+  //   本段把旧的 ?enroll= 形式 302 到 #enroll=，使已发出的旧链接仍然可用；
+  //   同时把无斜杠的 /admin 归一到 /admin/，并丢弃其余无意义查询串（否则会落到 404）。
+  if (path === "/admin" || path === "/admin/") {
+    const tk = url.searchParams.get("enroll") || "";
+    if (tk) {
+      return new Response(null, {
+        status: 302,
+        headers: {
+          Location: "/admin/#enroll=" + encodeURIComponent(tk),
+          "Cache-Control": "no-store",
+        },
+      });
+    }
+    if (path === "/admin" || url.search) {
+      return new Response(null, {
+        status: path === "/admin" ? 308 : 302,
+        headers: { Location: "/admin/", "Cache-Control": "no-store" },
+      });
+    }
+  }
+
   // 5) robots.txt 与 /admin/ 放行（但要加盖 noindex 头）
   if (isPublicPath(path)) return withNoindex(await next());
 
