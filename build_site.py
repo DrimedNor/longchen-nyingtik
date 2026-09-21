@@ -5593,8 +5593,8 @@ ZANGLI_CSS_BODY = r"""
 .zangli-fest-name{display:inline-block;background:var(--accent);color:#fff;border-radius:6px;padding:.12rem .55rem;margin-right:.45rem;font-weight:600}
 .zangli-fest-name-lun{background:#2f6f8a}
 .zangli-fchip{display:inline-block;border-radius:6px;padding:.14rem .55rem;margin:.25rem .45rem 0 0;font-size:.88rem;font-weight:600}
-.zangli-fchip-off{background:#2f6f8a;color:#fff}
-.zangli-fchip-work{background:#c9bfa8;color:#3b2f28}
+.zangli-fchip-off{background:#7a5aa6;color:#fff}
+.zangli-fchip-work{background:#ded2ec;color:#3d2a55}
 .zangli-fchip-none{background:transparent;color:var(--ink-soft);border:1px dashed var(--line);font-weight:400}
 .zangli-cal{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:1rem;margin-top:1.1rem;overflow-x:hidden}
 .zangli-cal-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:.6rem;gap:.4rem}
@@ -5609,8 +5609,8 @@ ZANGLI_CSS_BODY = r"""
 .zangli-empty{}
 .zangli-hairdot{position:absolute;top:3px;right:4px;width:6px;height:6px;border-radius:50%;background:var(--accent)}
 .zl-badge{display:inline-block;font-size:.62em;line-height:1.15;padding:0 2px;margin-right:2px;border-radius:3px;font-weight:600;vertical-align:.08em}
-.zl-badge-off{background:#2f6f8a;color:#fff}
-.zl-badge-work{background:#d8cfba;color:#40372c}
+.zl-badge-off{background:#7a5aa6;color:#fff}
+.zl-badge-work{background:#ded2ec;color:#3d2a55}
 .zangli-cell-g{font-size:.82em;color:var(--ink-soft);line-height:1.2}
 .zangli-cell-r{display:flex;align-items:center;justify-content:center;gap:3px;max-width:100%;line-height:1.2}
 .zangli-cell-t{font-size:.9em;color:var(--ink);line-height:1.2}
@@ -5618,6 +5618,7 @@ ZANGLI_CSS_BODY = r"""
 .zl-dot{display:inline-block;width:4px;height:4px;border-radius:2px;flex:none}
 .zl-dot-t{background:var(--accent)}
 .zl-dot-l{background:#2f6f8a}
+.zl-dot-h{background:#7a5aa6}
 .zangli-cell-f{display:block;font-size:.62em;color:#b08d2f;line-height:1.2;overflow-wrap:anywhere;max-width:100%}
 .zangli-cell-fp{display:block;font-size:.62em;color:#2f6f8a;line-height:1.2;overflow-wrap:anywhere;max-width:100%}
 .zangli-cell-today{box-shadow:inset 0 0 0 2px var(--accent)}
@@ -5626,7 +5627,7 @@ ZANGLI_CSS_BODY = r"""
 .zangli-cell-huilun .zangli-cell-n{color:#1f5a72;font-weight:700}
 .zangli-legend{color:var(--ink-soft);font-size:.82rem;margin-top:.9rem;line-height:1.6;overflow-wrap:break-word}
 .zangli-legend h3{font-size:.92rem;color:var(--ink);margin:1.1rem 0 .35rem;font-weight:700}
-.zangli-legend h4{font-size:.84rem;color:#2f6f8a;margin:.75rem 0 .25rem;font-weight:700}
+.zangli-legend h4{font-size:.84rem;color:var(--ink);margin:.75rem 0 .25rem;font-weight:700}
 .zangli-legend h5{font-size:.82rem;color:var(--accent);margin:.75rem 0 .25rem;font-weight:700}
 .zangli-legend ul{margin:0;padding-left:1.05rem;list-style:disc}
 .zangli-legend li{margin:.18rem 0}
@@ -5642,9 +5643,11 @@ ZANGLI_CSS_BODY = r"""
 .zl-chip[data-layer=g]{cursor:default;opacity:.9}
 .zl-chip[data-layer=t] .zl-sw{background:var(--accent);border-color:var(--accent)}
 .zl-chip[data-layer=l] .zl-sw{background:#2f6f8a;border-color:#2f6f8a}
+.zl-chip[data-layer=h] .zl-sw{background:#7a5aa6;border-color:#7a5aa6}
 .zl-chip[data-layer=g] .zl-sw{background:#6f6258;border-color:#6f6258}
 .zl-chip[data-layer=t].zl-chip-on{background:var(--accent)}
 .zl-chip[data-layer=l].zl-chip-on{background:#2f6f8a}
+.zl-chip[data-layer=h].zl-chip-on{background:#7a5aa6}
 .zl-chip[data-layer=g].zl-chip-on{background:#6f6258}
 .zl-chip:not(.zl-chip-on) .zl-sw{opacity:.35}
 .zl-tip{color:var(--ink-soft);font-size:.78rem;margin:.45rem 0 .1rem;line-height:1.65}
@@ -5675,7 +5678,7 @@ ZANGLI_BODY_HTML = """
 <div class="zangli-wrap">
 <h1 style="font-size:1.3rem">修行日历</h1>
 <div class="zl-layers" id="zLayers" role="group" aria-label="显示哪些日历"></div>
-<p class="zl-tip">可同时叠加显示多个日历；默认只显示「藏历」与「阳历」。</p>
+<p class="zl-tip">共四层可自由叠加：默认只开「阳历」与「藏历」，「农历」与「法定节假日」按需打开。</p>
 <div class="zangli-querybar"><input type="date" id="zangliDate" min="1951-01-08" max="2051-02-11"><button type="button" onclick="zangliGoto()">查这一天</button><button type="button" style="background:var(--surface-soft);color:var(--ink);border:1px solid var(--line)" onclick="zangliToday()">今天</button></div>
 <div id="zangliMain"></div>
 <div class="zangli-legend">
@@ -5693,21 +5696,25 @@ ZANGLI_BODY_HTML = """
 <li><span class="zl-key" style="background:#b08d2f"></span>金色小字＝该日所属日历的节日名。</li>
 <li>点月历里任意一天，即在上方大卡中查看该日详情。</li>
 </ul>
-<h5>「藏历」图层（默认开启）</h5>
+<h4 style="color:var(--accent)">「藏历」图层（默认开启）</h4>
 <ul>
 <li><span class="zl-key" style="background:var(--accent)"></span>格内第二行＝藏历日，闰日与缺日照原样标注。</li>
 <li><span class="zl-key" style="background:var(--accent)"></span>红字＝荟供日，即每月藏历初十「莲师荟供日」、廿五「空行母荟供日」。</li>
 <li><span class="zl-key" style="background:var(--accent);border-radius:50%"></span>右上角红点＝理发吉祥日，含藏历日序吉日与「八吉同聚」日。</li>
 <li>大卡中显示该日理发的吉凶与出处。</li>
 </ul>
-<h4>「农历法定节假日」图层（默认关闭）</h4>
+<h4 style="color:#2f6f8a">「农历」图层（默认关闭）</h4>
 <ul>
-<li><span class="zl-key" style="background:#2f6f8a"></span>格内第三行＝农历日，逢初一显示月名，闰月标注「闰」。</li>
+<li><span class="zl-key" style="background:#2f6f8a"></span>格内下方一行＝农历日，逢初一显示月名，闰月标注「闰」。</li>
 <li><span class="zl-key" style="background:#2f6f8a"></span>靛蓝字＝传统农历节日：春节、元宵、端午、七夕、中元、中秋、重阳、腊八、小年、除夕。</li>
-<li><span class="zl-key" style="background:#2f6f8a"></span>日期前带「休」＝法定放假。</li>
-<li><span class="zl-key" style="background:#d8cfba"></span>日期前带「班」＝调休上班。</li>
-<li>「休」「班」在日期数字前，鼠标停上去可看是哪个节日、或补哪一天的班。</li>
-<li>两个农历系图层同时开启时，行首会出现对应颜色的小方块，便于分辨哪一行属于哪一个日历。</li>
+<li>「农历」与「藏历」同时开启时，两行行首会出现各自颜色的小方块，便于分辨哪一行属于哪一个日历。</li>
+</ul>
+<h4 style="color:#7a5aa6">「法定节假日」图层（默认关闭）</h4>
+<ul>
+<li><span class="zl-key" style="background:#7a5aa6"></span>日期前带「休」＝法定放假。</li>
+<li><span class="zl-key" style="background:#ded2ec"></span>日期前带「班」＝调休上班。</li>
+<li>「休」「班」紧排在阳历日数字之前，鼠标停上去可看是哪个节日、或补哪一天的班。</li>
+<li>本层与「农历」各自独立开关：只想要节假日、不想看农历日，单开这一层即可。</li>
 </ul>
 <h3>理发日吉凶</h3>
 <ul>
@@ -5735,7 +5742,7 @@ ZANGLI_BODY_HTML = """
 # 「修行日历」页 —— 脚本（主站与独立页共用同一份）
 # 依赖（均由构建时内联）：getZangli()（zangli.js）、solarlunar（solarlunar.min.js）、
 #                          window.CN_HOLIDAYS（cn-holidays.js）
-# 图层：g 阳历（基础层，常显）/ t 藏历（默认开）/ l 农历法定节假日（默认关）
+# 图层：g 阳历（基础层，常显）/ t 藏历（默认开）/ l 农历（默认关）/ h 法定节假日（默认关）
 # 叠加原则：每层固定占一行、各有专属色，绝不重叠；图层开关本身即是图例。
 # @@ZANGLI_CSS_JSON@@ / @@ZANGLI_BODY_JSON@@ 由构建时注入为 JS 字符串常量。
 # ---------------------------------------------------------------------------
@@ -5775,8 +5782,8 @@ function zlKey(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,
 function zlMonthName(n){ return ['','正','二','三','四','五','六','七','八','九','十','十一','十二'][n] || ''; }
 function zlNumName(n){ return ['','初一','初二','初三','初四','初五','初六','初七','初八','初九','初十','十一','十二','十三','十四','十五','十六','十七','十八','十九','二十','廿一','廿二','廿三','廿四','廿五','廿六','廿七','廿八','廿九','三十'][n] || ''; }
 
-// —— 图层状态：藏历默认开、农历法定节假日默认关；阳历为常显基础层 ——
-if (!window._zLayers) window._zLayers = { t: true, l: false };
+// —— 图层状态：藏历默认开；农历、法定节假日默认关；阳历为常显基础层 ——
+if (!window._zLayers) window._zLayers = { t: true, l: false, h: false };
 function zlIsOn(k){ return !!window._zLayers[k]; }
 function zlToggleLayer(k){
   if (k === 'g') return;                      // 阳历为基础层，不可关闭
@@ -5787,7 +5794,7 @@ function zlToggleLayer(k){
 function zlRenderChips(){
   var box = document.getElementById('zLayers');
   if (!box) return;
-  var defs = [ {k:'g', n:'阳历'}, {k:'t', n:'藏历'}, {k:'l', n:'农历法定节假日'} ];
+  var defs = [ {k:'g', n:'阳历'}, {k:'t', n:'藏历'}, {k:'l', n:'农历'}, {k:'h', n:'法定节假日'} ];
   var html = '<span class="zl-layers-label">显示日历</span>';
   defs.forEach(function(d){
     if (d.k === 'g'){
@@ -5832,7 +5839,7 @@ function zlLunarFest(d, l){
 
 // —— 法定放假 / 调休上班（holiday-cn，2007–2026）——
 function zlCNHoliday(d){
-  if (!zlIsOn('l')) return null;
+  if (!zlIsOn('h')) return null;
   var H = window.CN_HOLIDAYS;
   if (!H) return null;
   var k = zlKey(d);
@@ -5917,7 +5924,7 @@ function _zRenderMain(){
   if (!box) return;
   var v = window._zView;
   var today = new Date(); today.setHours(0,0,0,0);
-  var onT = zlIsOn('t'), onL = zlIsOn('l');
+  var onT = zlIsOn('t'), onL = zlIsOn('l'), onH = zlIsOn('h');
   var bothLunar = onT && onL;      // 两个农历系图层同时开启时，行首加层色小方块
 
   // ===== 主卡 =====
@@ -5951,9 +5958,9 @@ function _zRenderMain(){
   var chipHtml = chips.length ? '<div class="zangli-fest">' + chips.join('') + '</div>'
     : '<div class="zangli-fest"><span style="color:var(--ink-soft)">本日无特定节日</span></div>';
 
-  // 法定放假 / 调休上班
+  // 法定放假 / 调休上班（属「法定节假日」图层）
   var holHtml = '';
-  if (onL){
+  if (onH){
     if (hd && hd.type === 'off'){
       holHtml = '<div><span class="zangli-fchip zangli-fchip-off">法定放假 · ' + zlEsc(hd.name) + '</span></div>';
     } else if (hd && hd.type === 'work'){
