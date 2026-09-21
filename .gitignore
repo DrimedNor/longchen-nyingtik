@@ -41,3 +41,23 @@ _kv_dellist.json
 
 # 2026-09-19 WorkBuddy: 藏历独立项目构建产物（独立 Pages 项目 longchen-zangli，不入主库）
 dist-zangli/
+
+# ── 安全加固追加（2026-09-21 安全排查）──
+# 凭据与本地配置：永不入库
+.env
+.env.*
+*.key
+*.pem
+*.p12
+*.pfx
+*secret*
+*credential*
+*.sqlite
+*.sqlite3
+*.db
+.wrangler/
+node_modules/
+# AI 临时文件
+_zz_*
+*.bak-*
+.bak/
