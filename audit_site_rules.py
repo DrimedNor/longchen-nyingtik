@@ -443,6 +443,139 @@ def check_gallery_assets(full):
 
 
 # ---------------------------------------------------------------- main
+# ---- JS-1 / JS-2：标识符完整性（2026-09-22 新增）----------------------------
+# 为什么加这两条：09-22 一次端到端实跑就抓到两个同类缺陷 ——
+#   ① `timeupdate` 监听器里 `if (!needsKeepAlive)`，而 needsKeepAlive 全仓库从未定义
+#      → 每秒数次 ReferenceError，iOS 连播兜底从未生效（潜伏已久）
+#   ② `getElementById('audioPlayer')`，而音频元素是 createElement 出来的、没有 id
+#      → 查询永远返回 null，那段「停止当前播放」是死代码
+# 两者语法、构建、静态门禁、部署全绿，只有真播才暴露（类型同 09-19 的 autoNext）。
+# 故把形态固定下来做静态检查：让同类缺陷在改完当场就红，而不是等用户听见。
+
+BUILTIN = set("""this window document navigator location console localStorage sessionStorage
+JSON Math Date Object Array String Number Boolean RegExp Error Promise Map Set WeakMap WeakSet
+setTimeout clearTimeout setInterval clearInterval requestAnimationFrame cancelAnimationFrame
+fetch alert confirm prompt atob btoa encodeURIComponent decodeURIComponent parseInt parseFloat
+isNaN isFinite escape unescape arguments undefined null void typeof new delete in instanceof
+Event EventTarget HTMLElement Node Element Audio Image URL Blob FormData XMLHttpRequest
+performance screen history matchMedia getComputedStyle addEventListener removeEventListener
+dispatchEvent CustomEvent MutationObserver IntersectionObserver ResizeObserver AbortController
+crypto AudioContext MediaMetadata MediaSession Notification OfflineAudioContext
+solarlunar qrcode QRCode SolarLunar ChineseLunar
+""".split())
+
+# 出现在非 JS 区域（CSS / HTML）里的 `!xxx`，不是标识符引用
+NON_JS_BANG = {"important", "DOCTYPE", "doctype"}
+
+
+def strip_js_comments(s):
+    """剥掉 /* */ 与 // 行注释。
+
+    为什么必须剥：修复说明、规则注释里常引用旧写法（如本次注释里就写了
+    getElementById('audioPlayer')），不剥注释会把「文档里提到的旧写法」当成「仍在引用」而误报。
+    """
+    s = re.sub(r"/\*.*?\*/", "", s, flags=re.S)
+    s = re.sub(r'(?<![:/"])//[^\n]*', "", s)
+    return s
+
+
+def defined_identifiers(src):
+    """收集全部已定义名（var/let/const/function + 形参 + 箭头函数参 + catch 参）。"""
+    names = set()
+    for pat in (r"\bvar\s+([A-Za-z_$][\w$]*)", r"\blet\s+([A-Za-z_$][\w$]*)",
+                r"\bconst\s+([A-Za-z_$][\w$]*)", r"\bfunction\s+([A-Za-z_$][\w$]*)"):
+        names |= set(re.findall(pat, src))
+    for m in re.finditer(r"function\s*[\w$]*\s*\(([^)]*)\)", src):
+        for p in m.group(1).split(","):
+            p = p.strip().split("=")[0].strip()
+            if re.fullmatch(r"[A-Za-z_$][\w$]*", p or ""):
+                names.add(p)
+    for m in re.finditer(r"\(([^()]*)\)\s*=>", src):
+        for p in m.group(1).split(","):
+            p = p.strip().split("=")[0].strip()
+            if re.fullmatch(r"[A-Za-z_$][\w$]*", p or ""):
+                names.add(p)
+    names |= set(re.findall(r"([A-Za-z_$][\w$]*)\s*=>", src))
+    names |= set(re.findall(r"catch\s*\(\s*([\w$]+)", src))
+    return names
+
+
+def check_js_identifiers(src):
+    """JS-2：以 `!NAME` 形式引用的标识符必须有定义。"""
+    clean = strip_js_comments(src)
+    defined = defined_identifiers(clean) | BUILTIN
+    bad = {}
+    for m in re.finditer(r"!\s*([A-Za-z_$][\w$]*)", clean):
+        n = m.group(1)
+        if n in defined or n in NON_JS_BANG:
+            continue
+        bad[n] = bad.get(n, 0) + 1
+    if bad:
+        err("JS-2", "以下标识符以 `!NAME` 形式被引用，但全文件未见定义：%s"
+            % "、".join("%s×%d" % kv for kv in sorted(bad.items())),
+            "典型症状：相关回调每次执行都抛 ReferenceError，功能静默失效"
+            "（控制台刷错但页面看着正常）。\n"
+            "修法：补上定义，或删掉该分支。参照 2026-09-22 needsKeepAlive 案例。")
+    else:
+        ok("JS-2", "`!NAME` 引用的标识符均有定义")
+
+
+def all_known_ids():
+    """收集"视为存在"的 id：build_site.py 全文 + dist 下全部 html/js。
+
+    为什么必须是「全文 + 全部产物」而不是只看 dist/index.html：
+      ① 日历 DOM 是以 JS 字符串注入 index.html 的，写成转义形式 id=\\"zLayers\\"，
+         只匹配 id="X" 会漏（2026-09-22 首跑据此误报 3 个 id）；
+      ② 功课页 DOM 在 dist/practice.html（pgRoot 就只在那里），只比 index 会误报。
+    故用宽松正则 id=\\?["']X 扫全部来源。
+    """
+    ids = set()
+    src = rd("build_site.py")
+    if src:
+        ids |= set(re.findall(r'id=\\?["\']([^"\'\\]+)', src))
+    for root, _, files in os.walk(os.path.join(ROOT, "dist")):
+        for f in files:
+            if f.endswith((".html", ".js")):
+                try:
+                    t = io.open(os.path.join(root, f), encoding="utf-8", errors="replace").read()
+                except OSError:
+                    continue
+                ids |= set(re.findall(r'id=\\?["\']([^"\'\\]+)', t))
+    return ids
+
+
+def check_dom_ids(src):
+    """JS-1：getElementById / querySelector('#id') 引用的 id 必须存在。
+
+    当前级别说明（2026-09-22 首跑实测）：
+      真实渲染核对（_archive/zl/check_dom_ids_live.py）确认 6 处**静态无、渲染也无** ——
+      全部是「id 名字写错」的残留：backToTop↔backTop、aiAskFab↔fabSearch、
+      searchTabContent/aiTabContent（面板里根本没这两个容器）、shareArticleBtn、pageViews。
+      逐一核对调用方后确认均为**死代码或失效绑定，无用户可见故障**（零调用 / 另有可用实现），
+      唯二风险是 searchTabContent/aiTabContent 一旦被调用会抛 TypeError（地雷）。
+      故登记为在册违规 V-06 待清，本检查**暂列警告**；V-06 清零后应升为【错误】。
+    """
+    html = rd("dist", "index.html")
+    if html is None:
+        warn("JS-1", "dist/index.html 不存在（先构建再跑）")
+        return
+    known = all_known_ids()
+    clean = strip_js_comments(src)
+    dyn = set(re.findall(r"\.id\s*=\s*['\"]([^'\"]+)['\"]", clean))
+    dyn |= set(re.findall(r"setAttribute\(\s*['\"]id['\"]\s*,\s*['\"]([^'\"]+)['\"]", clean))
+    refs = set(re.findall(r"getElementById\(\s*['\"]([^'\"]+)['\"]", clean))
+    refs |= set(re.findall(r"querySelector(?:All)?\(\s*['\"]#([A-Za-z][\w-]*)['\"]", clean))
+    missing = sorted(refs - known - dyn)
+    if missing:
+        warn("JS-1", "以下 id 被 getElementById/querySelector 引用，但全线产物中不存在（%d 个）：%s"
+             % (len(missing), "、".join(missing)),
+             "多为「id 名字写错」的残留：查询永远返回 null → 相关代码静默失效或成地雷。\n"
+             "注意：JS 动态创建后赋 id 的元素需写成 .id='X' 或 setAttribute('id','X') 才算已存在。\n"
+             "参照 2026-09-22 案例（audioPlayer→playerAudio 已修；余 6 处登记为总纲 V-06）。")
+    else:
+        ok("JS-1", "getElementById / querySelector('#id') 引用 %d 个 id，全部存在" % len(refs))
+
+
 def main():
     full = "--full" in sys.argv
     src = rd("build_site.py")
@@ -461,6 +594,8 @@ def main():
         check_pages_meta(src)
         check_layout_css(src)
         check_audio_agg(src)
+        check_js_identifiers(src)
+        check_dom_ids(src)
     check_admin_device_ids()
     check_stale_headers()
     check_ai_endpoint()

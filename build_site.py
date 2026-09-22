@@ -3655,11 +3655,13 @@ function playAllAudio(albumName){
   
   if (albumName) {
     // 停止当前播放
-    var player = document.getElementById('audioPlayer');
-    if (player) {
-      player.pause();
-      player.currentTime = 0;
-    }
+    // ⚠️ 2026-09-22 修复：原先写的是 document.getElementById('audioPlayer')，而音频元素是
+    //   var playerAudio = document.createElement('audio')（并未设置 id）⇒ 该查询永远返回 null，
+    //   这段「停止当前播放」实际是死代码（点「播放专辑」时不会先停掉正在播的曲目）。
+    //   与下方 needsKeepAlive 同批发现，均属「引用了不存在的标识符/元素」——
+    //   语法、构建、门禁、部署全绿，只有端到端实跑才暴露（类型同 09-19 的 autoNext）。
+    playerAudio.pause();
+    playerAudio.currentTime = 0;
     
     // 从原始列表中过滤指定专辑
     // 专辑名称直接匹配文件夹路径中的任意部分
@@ -4290,6 +4292,19 @@ function updateModeBtn(){
   var b = document.getElementById('pMode');
   if (b) b.textContent = PLAY_ICONS[curMode()] + ' ' + curMode();
 }
+
+// iOS连播兜底开关：仅 iOS / iPadOS Safari 需要（锁屏时 ended 事件可能丢失，用 timeupdate 主动补触发）
+// ⚠️ 2026-09-22 修复：此前这里直接引用 needsKeepAlive，但该标识符**全仓库从未定义** ⇒ 每次
+//   timeupdate 都抛 ReferenceError（每秒数次），iOS 兜底从未生效、控制台持续刷错。
+//   与上方 getElementById('audioPlayer') 同批发现，均属「引用了不存在的标识符」：
+//   语法 / 构建 / 门禁 / 部署全绿，只有端到端实跑能暴露（类型同 09-19 的 autoNext）。
+var needsKeepAlive = (function(){
+  try{
+    var ua = navigator.userAgent || '';
+    return /iPad|iPhone|iPod/.test(ua)
+        || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  }catch(e){ return false; }
+})();
 
 // iOS连播兜底：锁屏状态下ended事件可能丢失，用timeupdate监测"疑似播完"主动触发下一首
 playerAudio.addEventListener('timeupdate', function(){
