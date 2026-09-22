@@ -1827,7 +1827,7 @@ function getClickTargetInfo(el) {
   } else if (onclick && onclick.indexOf('playAudio') >= 0 || target.classList.contains('audio-item')) {
     type = 'audio_play';
     targetName = text || '音频播放';
-  } else if (onclick && onclick.indexOf('openSearchPanel') >= 0 || onclick.indexOf('doPanelSearch') >= 0) {
+  } else if ((onclick && onclick.indexOf('openSearchPanel') >= 0) || (onclick && onclick.indexOf('doPanelSearch') >= 0)) {
     type = 'ai_search';
     targetName = text || 'AI搜索';
   } else if (onclick && onclick.indexOf('sendAiAsk') >= 0) {
