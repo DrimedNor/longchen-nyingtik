@@ -15,6 +15,14 @@
 #     ② build_site.py 注入的主站埋点（identify-device / device-info / click / duration / page-view）。
 #   故这里显式放行该域；除它之外仍保持 'self'。
 #   ⚠️ 新增任何浏览器侧跨源接口时，必须同步在此加域，否则会被静默拦截。
+# 2026-09-22 修正（⚠️ 同类回归第三次）：connect-src 还需放行 **AI 问答 Worker 域**。
+#   09-18 引入 CSP 时 connect-src 收敛为 'self'，09-21 只补回了统计域，
+#   漏掉 build_site.py:3804 的 `AI_API_ENDPOINT = 'https://ai.longchen-nyingtik.wiki'`
+#   （前端在 :4039 直连该域 POST，不经同源代理）。
+#   后果：请求被静默拦截 → .catch 走 renderAiFallback（:4089）→ 用户只看到
+#   「AI 服务暂时不可用」，**不报错、服务端无日志、curl 不执行 CSP**，因此长期无人报障。
+#   已由 `audit_site_rules.py` 的 SEC-3（浏览器侧跨源目标 ↔ connect-src 对表）发现。
+#   ⇒ 教训固化：新增跨源调用后，跑 `python audit_site_rules.py`，SEC-3 必须为 0。
 /*
   X-Robots-Tag: noindex, nofollow, noarchive, nosnippet, noimageindex
   X-Content-Type-Options: nosniff
@@ -22,7 +30,7 @@
   X-Frame-Options: DENY
   Strict-Transport-Security: max-age=31536000; includeSubDomains
   Permissions-Policy: camera=(), microphone=(), geolocation=(), interest-cohort=()
-  Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self' https://stats.longchen-nyingtik.wiki; font-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'
+  Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self' https://stats.longchen-nyingtik.wiki https://ai.longchen-nyingtik.wiki; font-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'
 
 # 2) 静态资源缓存策略（2026-09-19 2-1 C+ 实施：媒体全量 no-store——
 #    修复「边缘缓存命中时 Pages Function 不执行」的匿名可读漏洞；代价＝媒体请求全部回源鉴权）。
