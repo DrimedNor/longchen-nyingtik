@@ -1571,9 +1571,46 @@ img{height:auto;max-width:100%}
 </div>
 
 <script>
-@@ZANGLI_LIB@@
-@@SOLARLUNAR_LIB@@
-@@CN_HOLIDAYS_LIB@@
+/* 2026-09-22（小谦指示）：日历三库（藏历 28.5KB / 农历 14.4KB / 法定节假日 17.4KB，
+   合计 60.3KB）移出首包 → dist/zangli-lib.js。只有走到「修行日历」页（#/__zangli）才拉取，
+   沿 practice.js（§7.7）先例：脚本本体落 dist、首页只留一个极小的加载器。
+   独立页 zangli.html 仍内联（单文件自足，无首包问题）。
+
+   ⚠️ 踩坑记录（2026-09-22 发布前由端到端探针抓到；构建、静态门禁、渲染门禁全部照常放行）：
+      本段位于**已有脚本块的内部**，同一晚在这里连踩三次，且后一次的成因就是「描述前一次」：
+      ① 最初误写成 HTML 注释：在 JS 里那对尖括号感叹号只等于「单行」注释（Annex B 遗留语法），
+         其后的第 2~4 行成了裸文本；
+      ② 连带多写了一对脚本开闭标签，造成嵌套，其中一个结束标签提前闭合了首屏主脚本；
+      ③ 修正 ①② 之后**又在注释正文里写出了脚本的结束标签字面量**，HTML 解析器据此
+         就在注释中间把块截断 —— 症状与 ①② 一模一样，连中两次。
+      三者叠加：首屏主脚本整块解析失败 ⇒ **全站白屏**（首页一个字都不渲染）。
+      ⇒ 结论：① 在已有脚本块内绝不写出脚本标签字面量，注释正文里也不行；
+              ② 本段一律用块注释语法，且注释正文不得包含块注释的结束符号；
+              ③ 这类缺陷只有「真 JS 引擎解析」拦得住 ⇒ 已固化为仓库根 check_js_syntax.py。 */
+(function(){
+  var SRC = 'zangli-lib.js?v=@@ZANGLI_LIB_VER@@';
+  var st = 0;                 // 0=未开始 1=加载中 2=已就绪 3=失败
+  var waiters = [];
+  function flush(err){
+    var ws = waiters; waiters = [];
+    for (var i = 0; i < ws.length; i++){ try { ws[i](err); } catch(e){} }
+  }
+  // 供日历页判断当前状态（2 表示可直接渲染，无需等待）
+  window.zlLibState = function(){ return st; };
+  // 按需加载：回调签名 cb(err|null)。重复调用安全（并发去重、失败可重试）。
+  window.ensureZangliLib = function(cb){
+    if (cb) waiters.push(cb);
+    if (st === 2){ flush(null); return; }
+    if (st === 3){ flush(new Error('load failed')); return; }
+    if (st === 1) return;
+    st = 1;
+    var el = document.createElement('script');
+    el.src = SRC;
+    el.onload = function(){ st = 2; flush(null); };
+    el.onerror = function(){ st = 3; flush(new Error('load failed')); };
+    document.head.appendChild(el);
+  };
+})();
 @@QRCODE_LIB@@
 // ---- Service Worker 注册：音频离线缓存 + 页面更新策略（sw.js 由构建时复制到 dist 根） ----
 // 2026-09-14 修复：仅在确认"已登录"后才注册 SW。
@@ -2354,15 +2391,40 @@ function show(slug){
   if (slug === '__zangli'){
     // 「修行日历」功能页（2026-09-18 新增「藏历查询」；2026-09-20 更名并升级为多日历图层叠加）
     // 默认显示「阳历＋藏历」，可再叠加「农历法定节假日」；纯客户端本地换算，无网络请求
+    // 2026-09-22（小谦指示）：日历三库按需加载（口径同 §7.7）——
+    //   库未就绪 → 先渲染加载态；就绪后回到本页则就地回填渲染。
     currentSlug = slug;
     document.title = SITE_TITLE + ' · 修行日历';
     document.getElementById('pageCrumbs').textContent = ' / 日历';
     var contentElZ = document.getElementById('content');
-    contentElZ.innerHTML = '<div class="article">' + renderZangliPage() + '</div>';
-    contentElZ.classList.remove('page-anim');
-    void contentElZ.offsetWidth;
-    contentElZ.classList.add('page-anim');
-    initZangliPage();
+    var paintZangli = function(){
+      contentElZ.innerHTML = '<div class="article">' + renderZangliPage() + '</div>';
+      contentElZ.classList.remove('page-anim');
+      void contentElZ.offsetWidth;
+      contentElZ.classList.add('page-anim');
+      initZangliPage();
+    };
+    var showZangliLoading = function(){
+      contentElZ.innerHTML = '<div class="article"><div style="text-align:center;padding:3rem 0;color:var(--ink-faint);"><div style="font-size:2rem;margin-bottom:1rem;">\u{1F4C5}</div><div>正在加载日历组件…</div></div></div>';
+      contentElZ.classList.remove('page-anim');
+      void contentElZ.offsetWidth;
+      contentElZ.classList.add('page-anim');
+    };
+    if (window.zlLibState && window.zlLibState() === 2){
+      paintZangli();
+    } else if (window.ensureZangliLib){
+      showZangliLoading();
+      window.ensureZangliLib(function(err){
+        if (currentSlug !== '__zangli') return;          // 用户已离开，不再回填
+        if (err){
+          contentElZ.innerHTML = '<div class="article"><div style="text-align:center;padding:3rem 0;color:var(--ink-faint);"><div style="font-size:2rem;margin-bottom:1rem;">\u26A0\uFE0F</div><div>日历组件加载失败</div><button onclick="location.reload()" style="margin-top:1rem;padding:.5rem 1rem;border-radius:8px;border:1px solid var(--accent);background:var(--accent-soft);color:var(--accent-deep);cursor:pointer;">重新加载</button></div></div>';
+          return;
+        }
+        paintZangli();
+      });
+    } else {
+      paintZangli();                                     // 兜底：加载器缺失（不应发生）
+    }
     window.scrollTo({top:0, behavior:'smooth'});
     return;
   }
@@ -5403,8 +5465,9 @@ window.addEventListener('scroll', function(){
       return;
     }
 
-    // 如果不需要按需加载，或者是目录页，直接调用原始show函数
-    if (!p._need_load || p.is_index || slug === "index") {
+    // 2026-09-22（小谦指示）：目录页（p.is_index）也走按需加载 —— 与文章页同一条通道。
+    //   只留两类直接渲染：已加载过的页（_need_load 已置 false）与首页 index。
+    if (!p._need_load || slug === "index") {
       if (originalShow) originalShow(slug);
       return;
     }
@@ -5681,21 +5744,34 @@ ZANGLI_CSS_BODY = r"""
 .zl-chip{display:inline-flex;align-items:center;gap:.42rem;border:1px solid var(--line);background:var(--surface);color:var(--ink-soft);border-radius:999px;padding:.42rem .85rem;font-family:inherit;font-size:.86rem;line-height:1;cursor:pointer;white-space:nowrap}
 .zl-chip .zl-sw{border:1px solid var(--line);width:10px;height:10px;border-radius:3px;flex:none}
 .zl-chip-on{color:#fff;font-weight:600;border-color:transparent}
-.zl-chip[data-layer=g]{cursor:default;opacity:.9}
+/* 2026-09-22（小谦指示）：阳历为「基准层」，永不可关（始终显示）。
+   此前它与三颗真开关是**同款胶囊**（仅加 cursor:default + opacity:.9），
+   属「长得一样、点不动」的假开关——与 .zl-tip「四层可自由叠加」的文案互相矛盾
+   （《网站功能设计规则总纲》V 系列：说法与实现不符，既不报错也不被任何门禁抓到）。
+   现把视觉语言彻底分开：
+     · 虚线边框（三颗真开关＝实线）——一眼可辨「这不是按钮」
+     · 不放 .zl-sw 方块（方块本身就是「可勾选开关」的暗示）
+     · 次级文字色 + cursor:default，且语义上仍是非交互的 <span>
+   「始终显示」四个字由 .zl-base-tag 以细分隔线承接，替代原「（常显）」。 */
+.zl-chip-base{display:inline-flex;align-items:center;gap:.42rem;border:1px dashed var(--line);background:transparent;color:var(--ink-soft);border-radius:999px;padding:.42rem .72rem;font-family:inherit;font-size:.86rem;line-height:1;white-space:nowrap;cursor:default}
+.zl-base-tag{font-size:.78em;opacity:.8;border-left:1px solid var(--line);padding-left:.4rem;letter-spacing:.02em}
 .zl-chip[data-layer=t] .zl-sw{background:var(--accent);border-color:var(--accent)}
 .zl-chip[data-layer=l] .zl-sw{background:#2f6f8a;border-color:#2f6f8a}
 .zl-chip[data-layer=h] .zl-sw{background:#7a5aa6;border-color:#7a5aa6}
-.zl-chip[data-layer=g] .zl-sw{background:#6f6258;border-color:#6f6258}
 .zl-chip[data-layer=t].zl-chip-on{background:var(--accent)}
 .zl-chip[data-layer=l].zl-chip-on{background:#2f6f8a}
 .zl-chip[data-layer=h].zl-chip-on{background:#7a5aa6}
-.zl-chip[data-layer=g].zl-chip-on{background:#6f6258}
 .zl-chip:not(.zl-chip-on) .zl-sw{opacity:.35}
 .zl-tip{color:var(--ink-soft);font-size:.78rem;margin:.45rem 0 .1rem;line-height:1.65}
 .zangli-qr{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:1rem;margin-top:1.1rem;text-align:center}
 .zangli-qrbox{display:inline-block;margin:.4rem 0}
 .zangli-qrhint{color:var(--ink-soft);font-size:.8rem;line-height:1.7;overflow-wrap:anywhere}
-@media(max-width:768px){.zangli-cell{padding:.18rem 1px}.zangli-cell-g{font-size:.72em}.zangli-cell-t{font-size:.78em}.zangli-cell-n{font-size:.68em}.zangli-cell-f{font-size:.54em}.zangli-cell-fp{font-size:.54em}.zangli-today{padding:.9rem .9rem}.zangli-tib{font-size:1.12rem}.zangli-lun{font-size:1rem}.zangli-fest{font-size:.95rem}.zangli-cal{padding:.7rem}.zl-chip{padding:.38rem .7rem;font-size:.8rem}.zl-badge{font-size:.46em}.zl-dot{width:3px;height:3px}.zangli-cell-r{gap:2px}}
+@media(max-width:768px){.zangli-cell{padding:.18rem 1px}.zangli-cell-g{font-size:.72em}.zangli-cell-t{font-size:.78em}.zangli-cell-n{font-size:.68em}.zangli-cell-f,.zangli-cell-fp{display:none}.zangli-today{padding:.9rem .9rem}.zangli-tib{font-size:1.12rem}.zangli-lun{font-size:1rem}.zangli-fest{font-size:.95rem}.zangli-cal{padding:.7rem}.zl-chip{padding:.38rem .7rem;font-size:.8rem}.zl-chip-base{padding:.38rem .62rem;font-size:.8rem}.zl-badge{font-size:.46em}.zl-dot{width:3px;height:3px}.zangli-cell-r{gap:2px}}
+/* 2026-09-22（小谦指示 · 方案 B）：窄屏隐藏格子内的节日名（.zangli-cell-f 藏历金 / .zangli-cell-fp 农历靛蓝）。
+   沿革：此前用 font-size:.54em 硬压 —— 320px 下实测仅 9.72px（不可读），
+   而渲染门禁量的是**几何**、不量**字号**，照样报「0 问题」（教训：不溢出 ≠ 可读）。
+   改为 display:none 后，节日信息由「大卡」（.zangli-today / .zangli-fest）完整承载；
+   格子内仍保留：阳历日 + 藏历日（荟供日红字加粗）+ 农历日 + 休/班角标 + 理发红点。 */
 /* 2026-09-20：窄屏月历头部另起一行，避免「（点任一天查询）」被拦腰折断 */
 @media(max-width:600px){
 .zangli-cal-head{flex-wrap:wrap}
@@ -5717,10 +5793,12 @@ ZANGLI_CSS_BODY = r"""
    沿革：同日更早的版本曾让「显示日历」标签独占第一行（四颗按钮在第 2 行）；
    当日 23:5x 小谦指示**删掉该标签行**（下方 .zl-tip 已把「四层可自由叠加 + 默认只开阳历与藏历」
    说清，属重复），故 `.zl-layers-label` 的三条规则（基础/grid/≤374px）一并删除，
-   标签语义改由 `role=group` + `aria-describedby="zLayersTip"` 承担。四颗按钮现为第 1 行。 */
+   标签语义改由 `role=group` + `aria-describedby="zLayersTip"` 承担。
+      第 1 行现为「1 个基准层标识（.zl-chip-base，不可点）＋ 3 颗真开关（.zl-chip，<button>）」。 */
 .zl-layers{display:grid;grid-template-columns:repeat(4,max-content);justify-content:space-between;gap:.42rem .4rem;align-items:stretch}
 /* min-width:0 防「法定节假日」5 字撑破列宽；white-space:nowrap 保留——宁可列宽不均也不折字 */
 .zl-chip{justify-content:center;padding:.42rem .3rem;font-size:.78rem;min-width:0}
+.zl-chip-base{justify-content:center;padding:.42rem .5rem;font-size:.78rem;min-width:0}
 }
 /* 极窄屏（≤374px，典型 320/360）：四颗一行需 303+3×6.4≈322px > 可用宽 288/328px
    → 明确降级为 2×2（第二行 阳历|藏历，第三行 农历|法定节假日），依旧是声明式、不靠自动换行。
@@ -5739,7 +5817,7 @@ ZANGLI_BODY_HTML = """
 <div class="zangli-wrap">
 <h1 style="font-size:1.3rem">修行日历</h1>
 <div class="zl-layers" id="zLayers" role="group" aria-label="显示哪些日历" aria-describedby="zLayersTip"></div>
-<p class="zl-tip" id="zLayersTip">共四层可自由叠加：默认只开「阳历」与「藏历」，「农历」与「法定节假日」按需打开。</p>
+<p class="zl-tip" id="zLayersTip">阳历为基准层、始终显示；藏历、农历、法定节假日三层可自由叠加——藏历默认打开，农历与法定节假日按需打开。</p>
 <div class="zangli-querybar"><input type="date" id="zangliDate" min="1951-01-08" max="2051-02-11"><button type="button" onclick="zangliGoto()">查这一天</button><button type="button" style="background:var(--surface-soft);color:var(--ink);border:1px solid var(--line)" onclick="zangliToday()">今天</button></div>
 <div id="zangliMain"></div>
 <div class="zangli-legend">
@@ -5803,7 +5881,7 @@ ZANGLI_BODY_HTML = """
 # 「修行日历」页 —— 脚本（主站与独立页共用同一份）
 # 依赖（均由构建时内联）：getZangli()（zangli.js）、solarlunar（solarlunar.min.js）、
 #                          window.CN_HOLIDAYS（cn-holidays.js）
-# 图层：g 阳历（基础层，常显）/ t 藏历（默认开）/ l 农历（默认关）/ h 法定节假日（默认关）
+# 图层：g 阳历（基准层，始终显示、不可关）/ t 藏历（默认开）/ l 农历（默认关）/ h 法定节假日（默认关）
 # 叠加原则：每层固定占一行、各有专属色，绝不重叠；图层开关本身即是图例。
 # @@ZANGLI_CSS_JSON@@ / @@ZANGLI_BODY_JSON@@ 由构建时注入为 JS 字符串常量。
 # ---------------------------------------------------------------------------
@@ -5843,7 +5921,7 @@ function zlKey(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,
 function zlMonthName(n){ return ['','正','二','三','四','五','六','七','八','九','十','十一','十二'][n] || ''; }
 function zlNumName(n){ return ['','初一','初二','初三','初四','初五','初六','初七','初八','初九','初十','十一','十二','十三','十四','十五','十六','十七','十八','十九','二十','廿一','廿二','廿三','廿四','廿五','廿六','廿七','廿八','廿九','三十'][n] || ''; }
 
-// —— 图层状态：藏历默认开；农历、法定节假日默认关；阳历为常显基础层 ——
+// —— 图层状态：藏历默认开；农历、法定节假日默认关；阳历为基准层（始终显示，不可关）——
 if (!window._zLayers) window._zLayers = { t: true, l: false, h: false };
 function zlIsOn(k){ return !!window._zLayers[k]; }
 function zlToggleLayer(k){
@@ -5862,8 +5940,13 @@ function zlRenderChips(){
   var html = '';
   defs.forEach(function(d){
     if (d.k === 'g'){
-      html += '<span class="zl-chip zl-chip-on" data-layer="' + d.k + '" title="基础层，始终显示">'
-        + '<span class="zl-sw"></span>' + zlEsc(d.n) + '（常显）</span>';
+      /* 2026-09-22（小谦指示）：阳历＝基准层，始终显示、不可关闭。
+         改用独立的 .zl-chip-base（虚线边框 + 无勾选方块 + cursor:default），
+         与下面三颗真开关（<button>）在视觉与语义上彻底分开——
+         不再需要「长得一样却点不动」的假开关。
+         无障碍：仍带 data-layer/title，且外层 .zl-layers 有 role=group + aria-label。 */
+      html += '<span class="zl-chip-base" data-layer="g" title="阳历为基准层，始终显示，不可关闭">'
+        + zlEsc(d.n) + '<span class="zl-base-tag">始终显示</span></span>';
     } else {
       var on = zlIsOn(d.k);
       html += '<button type="button" class="zl-chip' + (on ? ' zl-chip-on' : '') + '" data-layer="' + d.k + '"'
@@ -6102,7 +6185,7 @@ function _zRenderMain(){
         + ' title="' + zlEsc(hh.name) + (hh.type === 'off' ? '（法定放假）' : '（调休上班）') + '">'
         + (hh.type === 'off' ? '休' : '班') + '</i>';
     }
-    // 第 1 行：阳历日（基础层，常显）
+    // 第 1 行：阳历日（基准层，始终显示）
     var inner = '<span class="zangli-cell-g"' + (isHui ? ' style="color:var(--accent);font-weight:700"' : '') + '>' + badgeHtml + d0 + '</span>';
     // 第 2 行：藏历日
     if (onT){
@@ -6567,11 +6650,14 @@ def main():
     _fazhao_n = sum(_fazhao_counts.values())
     pages_meta = []
     for p in pages:
-        if p.get("is_index") or p["slug"] == "index":
-            # 目录页和首页保留html内容
+        if p["slug"] == "index":
+            # 2026-09-22（小谦指示）：首包只留首页（index）——它是首屏直接渲染的那一页。
+            #   目录页（is_index）此前整页 html 都留在首包（78 页合计 47.3KB），
+            #   但它们**同样是"点进去才看"**，现改走与非目录页完全相同的按需加载通道
+            #   （pages/*.json + window.show 前置 fetch，见「文章内容按需加载模块」）。
             pages_meta.append(p)
         else:
-            # 非目录页：把html内容保存到单独JSON文件，PAGES只保留元数据
+            # 其余全部外置：把html内容保存到单独JSON文件，PAGES只保留元数据
             safe_name = p["slug"].replace("/", "__").replace(" ", "_").replace("?？:：\"'<>*|", "")
             json_path = os.path.join(pages_dir, safe_name + ".json")
             with open(json_path, 'w', encoding='utf-8') as jf:
@@ -6579,7 +6665,8 @@ def main():
             meta_page = {k: v for k, v in p.items() if k != "html"}
             meta_page["_need_load"] = True
             pages_meta.append(meta_page)
-    print(f"文章内容拆分: {len(pages) - len([p for p in pages if p.get('is_index') or p['slug'] == 'index'])} 篇文章已拆分为单独JSON文件")
+    _n_split = len([p for p in pages if p["slug"] != "index"])
+    print(f"内容拆分: {_n_split} 个页面（含目录页）已拆分为单独JSON文件；首包只留首页 index")
     html_out = html_out.replace("@@PAGES_JSON@@", json.dumps(pages_meta, ensure_ascii=False))
     html_out = html_out.replace("@@TREE_JSON@@", json.dumps(tree, ensure_ascii=False))
     # 知识库不再嵌入HTML，改为按需加载（初始为空数组，使用时fetch knowledge.json）
@@ -6607,34 +6694,45 @@ def main():
     # 确保 qrcode 暴露为全局变量（UMD 库在浏览器中可能不自动挂载）
     qrcode_lib += "\n;window.qrcode = (typeof qrcode !== 'undefined') ? qrcode : (window.qrcode || null);\n"
     html_out = html_out.replace("@@QRCODE_LIB@@", qrcode_lib)
-    # 内联藏历库（zangli.js，MIT，stonelf/zangli：1951-2050 公历藏历对照＋节日；2026-09-18 新增「藏历」功能）
+    # 2026-09-22（小谦指示）：日历三库不再内联首包，改合成为 dist/zangli-lib.js（按需加载）。
+    #   三库合计 60.3KB，而它们**只在「修行日历」页（#/__zangli）用得到** —— 首屏不该付出这份体积。
+    #   口径与 practice.js（§7.7）一致：脚本本体落 dist，首页只留极小的加载器（见 PAGE_TEMPLATE）。
+    #   独立页 zangli.html 仍内联（单文件自足，无首包问题）。
+    _zl_parts = []
     zangli_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "content", "assets", "zangli.js")
     if os.path.exists(zangli_path):
         with open(zangli_path, "r", encoding="utf-8") as f:
-            zangli_lib = f.read()
+            _zl_parts.append(f.read())
         # 防库尾 zangli_callback 干扰：强制为无回调环境
-        zangli_lib += "\n;window.getZangli = (typeof getZangli === 'function') ? getZangli : window.getZangli;\n"
+        _zl_parts.append("\n;window.getZangli = (typeof getZangli === 'function') ? getZangli : window.getZangli;\n")
     else:
-        zangli_lib = "/* zangli.js not found */"
-    html_out = html_out.replace("@@ZANGLI_LIB@@", zangli_lib)
+        _zl_parts.append("/* zangli.js not found */")
 
-    # 内联农历换算库（solarlunar，ISC © yize）：1951–2051 农历日期与传统农历节日
+    # 农历换算库（solarlunar，ISC © yize）：1951–2051 农历日期与传统农历节日
     solarlunar_path = os.path.join(CONTENT_DIR, "assets", "solarlunar.min.js")
     if os.path.exists(solarlunar_path):
         with open(solarlunar_path, "r", encoding="utf-8") as f:
-            solarlunar_lib = f.read()
+            _zl_parts.append(f.read())
     else:
-        solarlunar_lib = "/* solarlunar.min.js not found */"
-    html_out = html_out.replace("@@SOLARLUNAR_LIB@@", solarlunar_lib)
+        _zl_parts.append("/* solarlunar.min.js not found */")
 
-    # 内联法定放假/调休数据（holiday-cn，MIT © 2019 NateScarlet）：收录 2007–2026
+    # 法定放假/调休数据（holiday-cn，MIT © 2019 NateScarlet）：收录 2007–2026
     cn_holidays_path = os.path.join(CONTENT_DIR, "assets", "cn-holidays.js")
     if os.path.exists(cn_holidays_path):
         with open(cn_holidays_path, "r", encoding="utf-8") as f:
-            cn_holidays_lib = f.read()
+            _zl_parts.append(f.read())
     else:
-        cn_holidays_lib = "window.CN_HOLIDAYS = null;"
-    html_out = html_out.replace("@@CN_HOLIDAYS_LIB@@", cn_holidays_lib)
+        _zl_parts.append("window.CN_HOLIDAYS = null;")
+
+    _zl_lib = "\n".join(_zl_parts)
+    import hashlib as _zlhash
+    _zl_ver = _zlhash.sha256(_zl_lib.encode("utf-8")).hexdigest()[:8]   # 内容哈希做破缓存版本
+    os.makedirs(DIST_DIR, exist_ok=True)
+    _zl_out = os.path.join(DIST_DIR, "zangli-lib.js")
+    with open(_zl_out, "w", encoding="utf-8", newline="") as _zlf:
+        _zlf.write(_zl_lib)
+    print("日历库: %s（按需加载/%.1f KB/ver=%s）" % (_zl_out, os.path.getsize(_zl_out) / 1024.0, _zl_ver))
+    html_out = html_out.replace("@@ZANGLI_LIB_VER@@", _zl_ver)
 
     # 注入「修行日历」页面脚本（样式/正文/脚本三份单一来源，主站与独立页共用）
     html_out = html_out.replace("@@ZANGLI_PAGE_JS@@", zangli_page_js())
