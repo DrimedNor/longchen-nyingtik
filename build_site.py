@@ -1288,11 +1288,7 @@ button:active, .player-launch:active, .search-fab:active{transform:scale(.95)}
   width:95%;max-width:900px;background:var(--surface);border-radius:16px;
   box-shadow:0 10px 40px rgba(0,0,0,.3);overflow:hidden;max-height:92vh;display:flex;flex-direction:column}
 .search-panel-header{display:flex;align-items:center;padding:1rem 1.2rem;border-bottom:1px solid var(--line)}
-.search-panel-tabs{display:flex;gap:.5rem}
 .search-panel-title{font-weight:600;font-size:1.05em;color:var(--ink)}
-.search-panel-tab{padding:.4rem 1rem;border-radius:20px;cursor:pointer;font-size:.95em;
-  background:var(--surface-soft);color:var(--ink-soft);border:none;transition:all .2s}
-.search-panel-tab.active{background:var(--accent);color:#fff}
 .search-panel-close{margin-left:auto;background:none;border:none;font-size:1.3em;cursor:pointer;
   color:var(--ink-faint);padding:.2rem .5rem;border-radius:6px}
 .search-panel-close:hover{color:var(--ink);background:var(--surface-soft)}
@@ -2615,15 +2611,9 @@ function show(slug){
       playByAudio(b.dataset.audio);
     };
   });
-  // 文章分享按钮
-  var sab = document.getElementById('shareArticleBtn');
-  if (sab) sab.onclick = function(){ shareArticle(); };
   // 恢复本页划线
   if (!p.is_index) restoreHighlights(slug);
   updatePlayBtns();
-  // AI 问答浮动按钮：仅非首页显示
-  var _fab = document.getElementById('aiAskFab');
-  if (_fab) _fab.style.display = (p.is_index || slug === 'index') ? 'none' : 'flex';
   // 恢复阅读进度（非首页且有保存位置时）
   var savedScroll = 0;
   if (!p.is_index && slug !== 'index'){
@@ -2840,12 +2830,6 @@ function openSharePanel(opts){
 function closeSharePanel(){
   if (shareMask) shareMask.classList.remove('show');
   if (sharePanel) sharePanel.classList.remove('show');
-}
-function shareArticle(){
-  var p = bySlug[currentSlug];
-  if (!p) return;
-  var url = location.origin + location.pathname + '#/' + currentSlug.split('/').map(encodeURIComponent).join('/');
-  openSharePanel({ title: p.title, url: url, text: p.title + '\n' + url });
 }
 function shareHighlight(text){
   var p = bySlug[currentSlug];
@@ -3740,14 +3724,6 @@ function restoreSearchPanel(){
   document.getElementById('searchPanel').classList.add('open');
 }
 
-function switchSearchTab(tab){
-  var tabs = document.querySelectorAll('.search-panel-tab');
-  tabs.forEach(function(t){
-    t.classList.toggle('active', t.dataset.tab === tab);
-  });
-  document.getElementById('searchTabContent').style.display = tab === 'search' ? 'block' : 'none';
-  document.getElementById('aiTabContent').style.display = tab === 'ai' ? 'block' : 'none';
-}
 
 // 面板搜索 + AI 问答（自动触发）
 function doPanelSearch(){
@@ -5335,18 +5311,6 @@ setTimeout(function(){
   } catch(e){}
 }, 1000);
 
-// ---- 返回顶部按钮 ----
-window.addEventListener('scroll', function(){
-  var btn = document.getElementById('backToTop');
-  if (!btn) return;
-  if (window.scrollY > 400) btn.classList.add('visible');
-  else btn.classList.remove('visible');
-});
-document.addEventListener('click', function(e){
-  if (e.target.id === 'backToTop'){
-    window.scrollTo({top:0, behavior:'smooth'});
-  }
-});
 // ---- 页面访问次数统计（localStorage 本地计数，每页独立）----
 // 说明：纯静态站无后端，用 localStorage 记录每个页面在本设备的访问次数。
 // 如需跨用户统计，可接入 GoatCounter（免费）等服务。
@@ -5362,17 +5326,6 @@ function trackPageView(){
     localStorage.setItem(totalKey, String(total));
     return count;
   } catch(e){ return 0; }
-}
-function showPageViews(){
-  var box = document.getElementById('pageViews');
-  if (!box) return;
-  try {
-    var slug = currentSlug || 'index';
-    var count = parseInt(localStorage.getItem('longchen-pv-' + slug) || '0', 10);
-    var total = parseInt(localStorage.getItem('longchen-pv-total') || '0', 10);
-    box.textContent = '本页已访问 ' + count + ' 次 · 全站累计 ' + total + ' 次';
-    box.style.display = 'inline-block';
-  } catch(e){}
 }
 trackPageView();
 </script>

@@ -26,7 +26,11 @@
     AUTH-2 dist/_routes.json 门槛不被绕过
     CAC-1..4 缓存策略
     API-7  Worker CORS 口径一致
+    JS-1   getElementById / querySelector('#id') 引用的 id 必须存在   【错误】
+    JS-2   `!NAME` 形式引用的标识符必须有定义                          【错误】
     IMG-2  dist/assets 图库数量一致（--full）
+
+门禁级别：err() = 发布阻断（退出码 1）；warn() = 待观察，不阻断。
 """
 import io
 import os
@@ -425,21 +429,69 @@ def check_cors_consistency():
 
 
 def check_gallery_assets(full):
+    """IMG-2：图库镜像完整性 ＋ 海报 WebP 转化哨兵（需 --full）。
+
+    判据沿革（2026-09-22 21:5x 修正）：
+      旧写法＝「dist/assets 文件总数 == content/assets 文件总数」。**该判据是错的，且从未被执行过**
+      —— 本函数只在 --full 下运行，而历次发布跑的都是不带 --full 的体检，因此它从未报过警。
+      错在哪：dist/assets 是【并集】，不是源目录的镜像 ——
+        content/assets/** ＋ content 各处正文配图（Pasted image*.png、配图 jpeg）
+        ＋ 构建生成物（法音海报 19 张 *.webp、cover.png）
+        ⇒ 产物数必然【多于】源（2026-09-22 实测：源 106 / 产物 159，其中 57 个均为合法产物）。
+      反向同理：content/assets/*.js 是内联进页面的、`_来源对照.tsv` 是元数据 ⇒ 本就不发布。
+      故改判据为两条真命题：
+        ① 镜像完整性：源图库里的「可发布文件」必须【全部存在】于 dist/assets 同路径
+        ② WebP 哨兵：法音海报每张 jpg/jpeg/png 都要有同名 .webp
+           （托管 Python 无 Pillow 会静默跳过转码 → 产物体积暴增，曾发生 296KB→16MB，本条专防该事故）
+    """
     if not full:
         return
     src = os.path.join(ROOT, "content", "assets")
     dst = os.path.join(ROOT, "dist", "assets")
     if not os.path.isdir(src):
         return
-    n1 = sum(len(f) for _, _, f in os.walk(src))
     if not os.path.isdir(dst):
         err("IMG-2", "dist/assets 不存在（图库未复制进构建产物）", "相册会全部裂图")
         return
-    n2 = sum(len(f) for _, _, f in os.walk(dst))
-    if n1 == n2:
-        ok("IMG-2", "dist/assets 文件数与源一致（%d）" % n1)
+
+    def names(root):
+        out = set()
+        for dp, _, fn in os.walk(root):
+            for f in fn:
+                out.add(os.path.relpath(os.path.join(dp, f), root).replace("\\", "/"))
+        return out
+
+    a, b = names(src), names(dst)
+
+    def publishable(n):
+        base = os.path.basename(n)
+        return not n.lower().endswith(".js") and not base.startswith("_") and not base.startswith(".")
+
+    want = {n for n in a if publishable(n)}
+    missing = sorted(want - b)
+    if missing:
+        err("IMG-2", "源图库有 %d 个文件未出现在 dist/assets（相册/正文会裂图）：%s"
+            % (len(missing), "、".join(missing[:8])),
+            "检查 is_excluded_dir() 与「content/assets 单独复制」那一段是否仍生效")
     else:
-        err("IMG-2", "dist/assets 文件数不一致", "源 %d，产物 %d" % (n1, n2))
+        ok("IMG-2", "源图库 %d 个可发布文件全部镜像到 dist/assets（产物共 %d 个：额外部分为正文配图与生成的 WebP，属正常）"
+           % (len(want), len(b)))
+
+    # ---- IMG-2b：海报 WebP 转化哨兵
+    sub = "法音海报"
+    sp, dp2 = os.path.join(src, sub), os.path.join(dst, sub)
+    if os.path.isdir(sp) and os.path.isdir(dp2):
+        need = {os.path.splitext(f)[0] for f in os.listdir(sp)
+                if f.lower().endswith((".jpg", ".jpeg", ".png"))}
+        have = {os.path.splitext(f)[0] for f in os.listdir(dp2)
+                if f.lower().endswith(".webp")}
+        lack = sorted(need - have)
+        if lack:
+            err("IMG-2b", "海报未生成同名 .webp（%d 张）：%s" % (len(lack), "、".join(lack[:6])),
+                "典型症状＝构建用了没有 Pillow 的 Python → 静默跳过转码 → 产物体积暴增（曾 296KB→16MB）。"
+                "请改用系统 Python（带 Pillow）重建。")
+        else:
+            ok("IMG-2b", "法音海报 %d 张均已生成同名 .webp" % len(need))
 
 
 # ---------------------------------------------------------------- main
@@ -545,15 +597,15 @@ def all_known_ids():
 
 
 def check_dom_ids(src):
-    """JS-1：getElementById / querySelector('#id') 引用的 id 必须存在。
+    """JS-1：getElementById / querySelector('#id') 引用的 id 必须存在。级别＝【错误】。
 
-    当前级别说明（2026-09-22 首跑实测）：
-      真实渲染核对（_archive/zl/check_dom_ids_live.py）确认 6 处**静态无、渲染也无** ——
-      全部是「id 名字写错」的残留：backToTop↔backTop、aiAskFab↔fabSearch、
-      searchTabContent/aiTabContent（面板里根本没这两个容器）、shareArticleBtn、pageViews。
-      逐一核对调用方后确认均为**死代码或失效绑定，无用户可见故障**（零调用 / 另有可用实现），
-      唯二风险是 searchTabContent/aiTabContent 一旦被调用会抛 TypeError（地雷）。
-      故登记为在册违规 V-06 待清，本检查**暂列警告**；V-06 清零后应升为【错误】。
+    级别沿革：
+      2026-09-22 首跑时，真实渲染核对（_archive/zl/check_dom_ids_live.py，六种状态）确认
+      6 处**静态无、渲染也无** —— 全是「id 名字写错」的残留：backToTop↔backTop、
+      aiAskFab↔fabSearch、searchTabContent/aiTabContent（面板里根本没这两个容器）、
+      shareArticleBtn、pageViews；登记为在册违规 V-06，本检查**暂列警告**。
+      2026-09-22 21:4x **V-06 已清零**（六处死代码连同孤儿调用方一并纯删除，commit 见总纲 §17.2）
+      ⇒ 按约定**升为【错误】**：此后任何「引用了不存在的 id」都会挡住发布。
     """
     html = rd("dist", "index.html")
     if html is None:
@@ -567,11 +619,12 @@ def check_dom_ids(src):
     refs |= set(re.findall(r"querySelector(?:All)?\(\s*['\"]#([A-Za-z][\w-]*)['\"]", clean))
     missing = sorted(refs - known - dyn)
     if missing:
-        warn("JS-1", "以下 id 被 getElementById/querySelector 引用，但全线产物中不存在（%d 个）：%s"
-             % (len(missing), "、".join(missing)),
-             "多为「id 名字写错」的残留：查询永远返回 null → 相关代码静默失效或成地雷。\n"
-             "注意：JS 动态创建后赋 id 的元素需写成 .id='X' 或 setAttribute('id','X') 才算已存在。\n"
-             "参照 2026-09-22 案例（audioPlayer→playerAudio 已修；余 6 处登记为总纲 V-06）。")
+        err("JS-1", "以下 id 被 getElementById/querySelector 引用，但全线产物中不存在（%d 个）：%s"
+            % (len(missing), "、".join(missing)),
+            "均为「id 名字写错」型缺陷：查询永远返回 null → 相关代码静默失效或成地雷（调用即 TypeError）。\n"
+            "注意：JS 动态创建后赋 id 的元素需写成 .id='X' 或 setAttribute('id','X') 才算已存在。\n"
+            "参照 2026-09-22 案例：audioPlayer→playerAudio（已修）；V-06 六处（已删除）。\n"
+            "处置：**写错就改对（重新接线）或整块删除**，不要留着「反正不报错」。")
     else:
         ok("JS-1", "getElementById / querySelector('#id') 引用 %d 个 id，全部存在" % len(refs))
 
