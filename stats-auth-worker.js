@@ -445,16 +445,31 @@ export default {
       
       // 路由：用户发现记录（划线、收藏、阅读历史）
       if (path === '/api/user/discoveries' || path === '/user/discoveries') {
-        const body = request.method === 'POST' ? await request.json() : {};
-        const { username, action, data } = body;
-        
-        if (!username) {
+        const body = request.method === 'POST' ? await request.json().catch(() => ({})) : {};
+        const { action, data } = body;   // username 一律忽略（字段兼容保留，但绝不用于拼键）
+
+        // 2026-09-22 修复越权：身份一律由服务端从会话 token 反查，**永不接受前端传入的 username**。
+        // 原实现 `const { username } = body` 直接信任请求体 → 知道用户名即可读/写/删他人划线、收藏、阅读历史。
+        // ⚠️ 日后若接入前端：必须经中间件新增的 /__api/user/discoveries 代理
+        //   （照 /__auth/logout 写法：读 lct_session Cookie → 以 {token} 转发），前端不得再传 username。
+        //   直接 fetch('/api/user/discoveries', { body: { username } }) 会 401 —— 那是预期行为，不是 bug。
+        const session = body.token ? await env.STATS_KV.get('session_' + body.token, 'json') : null;
+        if (!session || !session.username) {
           return new Response(JSON.stringify({ success: false, message: '未登录' }), {
             status: 401,
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           });
         }
-        
+        // 用户被拒/删号时，已发会话立即失效（与 /api/session/verify 同口径）
+        const owner = await env.STATS_KV.get('user_' + session.username, 'json');
+        if (!owner || owner.status !== 'approved') {
+          if (body.token) await env.STATS_KV.delete('session_' + body.token).catch(() => {});
+          return new Response(JSON.stringify({ success: false, message: '账号状态异常' }), {
+            status: 401,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+        const username = session.username;            // ← 身份唯一来源
         const discoveriesKey = 'discoveries_' + username;
         let discoveries = await env.STATS_KV.get(discoveriesKey, 'json') || {
           highlights: [],
@@ -1389,10 +1404,8 @@ export default {
       }
       
       // 默认：404
-      return new Response(JSON.stringify({ 
-        error: 'Not found', 
-        paths: ['/api/track', '/api/stats', '/api/verify-password', '/api/register', '/api/login', '/api/user/info', '/api/user/discoveries', '/api/admin/pending', '/api/admin/review', '/api/admin/invite/create', '/api/admin/invite/list', '/api/admin/create-temp-link', '/api/verify-temp', '/api/stats/ai-ask', '/api/stats/click', '/api/stats/page-view', '/api/stats/audio-play', '/api/admin/device/rename', '/api/stats/duration', '/api/stats/device-info', '/api/stats/identify-device'] 
-      }), {
+      // 2026-09-22：去掉 paths 数组 —— 原先会把全部已知端点清单回给匿名调用者，属轻微信息泄露
+      return new Response(JSON.stringify({ error: 'Not found' }), {
         status: 404,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
