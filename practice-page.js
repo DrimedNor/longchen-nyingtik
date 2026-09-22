@@ -427,7 +427,18 @@
   function renderBody() {
     var box = document.getElementById('pgBody');
     if (!box) return;
-    if (!S.data) { box.innerHTML = '<p class="pg-sub">加载中…</p>'; return; }
+    if (!S.data) {
+      // 无数据只有两种可能：还在加载，或加载失败/未获授权。
+      // 后者必须给出可读文案＋重试按钮 —— 否则 S.msg 只在各视图内部渲染，
+      // 页面会永远停在「加载中…」（永久转圈，用户不知道发生了什么）。
+      box.innerHTML = S.loadErr
+        ? '<div class="pg-card"><p class="pg-msg err">' + esc(S.loadErr) + '</p>'
+          + '<p class="pg-hint"><button type="button" class="pg-btn tiny ghost" id="pgRetry">重试</button></p></div>'
+        : '<p class="pg-sub">加载中…</p>';
+      var rb = document.getElementById('pgRetry');
+      if (rb) rb.addEventListener('click', function () { S.loadErr = ''; initLoad(); });
+      return;
+    }
     var html = S.view === 'manage' ? viewManage()
       : S.view === 'stats' ? viewStats()
         : S.view === 'tools' ? viewTools()
@@ -441,13 +452,31 @@
   function refresh() {
     return api('list', {}).then(function (j) {
       if (!j || !j.success) {
-        S.msg = (j && j.message) || '加载失败';
-        S.msgErr = true;
-        if (j && j._status === 401) { S.data = null; }
+        var st = j && j._status;
+        // 401/403 是「根本没拿到身份」，必须清空数据让 renderBody 走错误分支；
+        // 其它失败保留已有数据，只在视图内提示，不至于把已看到的内容抹掉。
+        S.loadErr = (j && j.message) || (st === 401 ? '登录已过期，请重新登录后访问。'
+          : st === 403 ? '本设备未获授权：设备免密只读需先在后台登记。'
+            : '加载失败，请刷新重试。');
+        S.msg = S.loadErr; S.msgErr = true;
+        if (st === 401 || st === 403) { S.data = null; }
         return;
       }
+      S.loadErr = '';
       S.data = j;
     });
+  }
+
+  // 首屏/重试共用：先重放离线队列，再拉数据，最后渲染
+  function initLoad() {
+    renderBody();
+    return flushQueue().then(function () { return refresh(); }).then(function () { renderBody(); })
+      .catch(function () {
+        S.loadErr = '网络异常，加载失败，请刷新重试。';
+        S.msg = S.loadErr; S.msgErr = true;
+        S.data = null;
+        renderBody();
+      });
   }
 
   function bindBody() {
@@ -674,10 +703,8 @@
     // 每次进入都从「今日」开始（hash 路由语义：进出＝重新进入该页）
     S.view = 'today'; S.msg = ''; S.msgErr = false; S.wiz = null;
     bindShell();
-    S.data = null;
-    renderBody();
-    flushQueue().then(function () { return refresh(); }).then(function () { renderBody(); })
-      .catch(function () { S.data = null; var b = document.getElementById('pgBody'); if (b) b.innerHTML = '<p class="pg-msg err">加载失败，请刷新重试。</p>'; });
+    S.data = null; S.loadErr = '';
+    initLoad();
   }
 
   root.renderPracticePage = renderPracticePage;
