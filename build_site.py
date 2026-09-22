@@ -5625,6 +5625,10 @@ ZANGLI_CSS_BODY = r"""
 .zangli-cell-sel{background:var(--surface-soft);outline:1px solid var(--accent)}
 .zangli-cell-hasfest .zangli-cell-t{color:var(--accent);font-weight:700}
 .zangli-cell-huilun .zangli-cell-n{color:#1f5a72;font-weight:700}
+/* 2026-09-22：荟供日文字改藏红（原来只标红日期，文字仍是金色；此前 zangli-cell-hui 类未定义）
+   写成双类选择器（0,2,0）而非单类（0,1,0）——与 .zangli-cell-f 同特异性时会变成
+   「后定义者胜」的声明顺序依赖，一旦有人调整顺序即静默失效。双类在此保证顺序无关。 */
+.zangli-cell-f.zangli-cell-hui{color:var(--accent);font-weight:700}
 .zangli-legend{color:var(--ink-soft);font-size:.82rem;margin-top:.9rem;line-height:1.6;overflow-wrap:break-word}
 .zangli-legend h3{font-size:.92rem;color:var(--ink);margin:1.1rem 0 .35rem;font-weight:700}
 .zangli-legend h4{font-size:.84rem;color:var(--ink);margin:.75rem 0 .25rem;font-weight:700}
