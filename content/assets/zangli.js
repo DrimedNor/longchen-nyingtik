@@ -212,7 +212,8 @@ function getZangli(p){
 				result.dayLeap=dayLeap;
 				result.monthLeap=monthLeap;
 				result.dayMiss=dayMiss;
-				result.value=result.year+"年"+result.month+"月("+result.tMonth+"月)"+result.day;
+				/* 2026-09-22：括号改全角，与同一张卡片里的农历行「（火马）」保持全角/半角一致；该 value 仅用于显示（build_site.py 只读、不解析），改动零风险。 */
+				result.value=result.year+"年"+result.month+"月（"+result.tMonth+"月）"+result.day;
 				extraInfo="";
 				extraInfo2=""
 				if(!dayLeap)switch (tDays){

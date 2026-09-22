@@ -5678,7 +5678,6 @@ ZANGLI_CSS_BODY = r"""
 .zangli-querybar input[type=date]{padding:.5rem .7rem;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--ink);font-family:inherit;max-width:42vw}
 .zangli-querybar button{padding:.5rem .9rem;border:1px solid var(--accent);background:var(--accent);color:#fff;border-radius:8px;cursor:pointer;font-family:inherit}
 .zl-layers{display:flex;flex-wrap:wrap;gap:.5rem;align-items:center;margin:.95rem 0 .1rem}
-.zl-layers-label{flex:0 0 100%;color:var(--ink-soft);font-size:.84rem;margin:0}
 .zl-chip{display:inline-flex;align-items:center;gap:.42rem;border:1px solid var(--line);background:var(--surface);color:var(--ink-soft);border-radius:999px;padding:.42rem .85rem;font-family:inherit;font-size:.86rem;line-height:1;cursor:pointer;white-space:nowrap}
 .zl-chip .zl-sw{border:1px solid var(--line);width:10px;height:10px;border-radius:3px;flex:none}
 .zl-chip-on{color:#fff;font-weight:600;border-color:transparent}
@@ -5708,16 +5707,18 @@ ZANGLI_CSS_BODY = r"""
 /* 格子窄：理发红点占着右上角，日期行用外边距让出这一角（用 margin 不用 padding，
    这样元素自身的盒子不会伸到红点下方，视觉与几何都干净） */
 .zangli-cell-hair .zangli-cell-g{margin-right:9px}
-/* 2026-09-22（小谦指示）：窄屏四颗开关改为「标签独占一行 + 四颗按钮另起一行」——
-   ① 「显示日历」独立成第一行（原先它占第 1 列、与「阳历（常显）」同排，读起来像"半个标签 + 一个宽按钮"）；
-   ② 四颗按钮排在第 2 行，列位/换行由 Grid 显式声明，**不用 flex 自动换行**——自动换行的
-      换行点会随机型宽度临时决定（375/390/414/430 各不相同）→ 长短行错位，甚至把「法定节假日」挤到第三行。
+/* 2026-09-22（小谦指示）：窄屏四颗开关的列位/换行由 Grid 显式声明，**不用 flex 自动换行**——
+   自动换行的换行点会随机型宽度临时决定（375/390/414/430 各不相同）→ 长短行错位，
+   甚至把「法定节假日」挤到第三行。
    列宽用 max-content 按内容给（不留等宽空白），实测四颗自然宽合计 303px：
      · ≥375px：容器 343px 起，装得下（余量 20px）✅ → 四颗一行
      · ≤374px：320px 容器仅 288px、360px 仅 328px（余量 5.8px，跨浏览器字宽不稳）❌
-       → 见下方 @media(max-width:374px) 明确降级为 2×2，仍不使用自动换行。 */
+       → 见下方 @media(max-width:374px) 明确降级为 2×2，仍不使用自动换行。
+   沿革：同日更早的版本曾让「显示日历」标签独占第一行（四颗按钮在第 2 行）；
+   当日 23:5x 小谦指示**删掉该标签行**（下方 .zl-tip 已把「四层可自由叠加 + 默认只开阳历与藏历」
+   说清，属重复），故 `.zl-layers-label` 的三条规则（基础/grid/≤374px）一并删除，
+   标签语义改由 `role=group` + `aria-describedby="zLayersTip"` 承担。四颗按钮现为第 1 行。 */
 .zl-layers{display:grid;grid-template-columns:repeat(4,max-content);justify-content:space-between;gap:.42rem .4rem;align-items:stretch}
-.zl-layers-label{grid-column:1/-1;display:block;margin:0 0 .05rem;font-size:.78rem}
 /* min-width:0 防「法定节假日」5 字撑破列宽；white-space:nowrap 保留——宁可列宽不均也不折字 */
 .zl-chip{justify-content:center;padding:.42rem .3rem;font-size:.78rem;min-width:0}
 }
@@ -5726,7 +5727,6 @@ ZANGLI_CSS_BODY = r"""
    注：不靠缩字号硬塞——320px 下把字号压到可读下限也只剩不到 5px 余量，跨浏览器必翻车。 */
 @media(max-width:374px){
 .zl-layers{grid-template-columns:repeat(2,minmax(0,1fr))}
-.zl-layers-label{font-size:.78rem}
 }
 """
 
@@ -5738,8 +5738,8 @@ ZANGLI_CSS_BODY = r"""
 ZANGLI_BODY_HTML = """
 <div class="zangli-wrap">
 <h1 style="font-size:1.3rem">修行日历</h1>
-<div class="zl-layers" id="zLayers" role="group" aria-label="显示哪些日历"></div>
-<p class="zl-tip">共四层可自由叠加：默认只开「阳历」与「藏历」，「农历」与「法定节假日」按需打开。</p>
+<div class="zl-layers" id="zLayers" role="group" aria-label="显示哪些日历" aria-describedby="zLayersTip"></div>
+<p class="zl-tip" id="zLayersTip">共四层可自由叠加：默认只开「阳历」与「藏历」，「农历」与「法定节假日」按需打开。</p>
 <div class="zangli-querybar"><input type="date" id="zangliDate" min="1951-01-08" max="2051-02-11"><button type="button" onclick="zangliGoto()">查这一天</button><button type="button" style="background:var(--surface-soft);color:var(--ink);border:1px solid var(--line)" onclick="zangliToday()">今天</button></div>
 <div id="zangliMain"></div>
 <div class="zangli-legend">
@@ -5856,7 +5856,10 @@ function zlRenderChips(){
   var box = document.getElementById('zLayers');
   if (!box) return;
   var defs = [ {k:'g', n:'阳历'}, {k:'t', n:'藏历'}, {k:'l', n:'农历'}, {k:'h', n:'法定节假日'} ];
-  var html = '<span class="zl-layers-label">显示日历</span>';
+  /* 2026-09-22（小谦指示）：不再插入「显示日历」这一行——它只是开关组的可见标签，
+     而下方 .zl-tip 已把「四层可自由叠加 + 默认只开阳历与藏历」说清楚，属重复。
+     标签的语义改由 role=group + aria-describedby="zLayersTip" 承担（无障碍不丢）。 */
+  var html = '';
   defs.forEach(function(d){
     if (d.k === 'g'){
       html += '<span class="zl-chip zl-chip-on" data-layer="' + d.k + '" title="基础层，始终显示">'
