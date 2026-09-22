@@ -36,6 +36,9 @@ function isPublicPath(path) {
   // 收藏/分享/扫码直达。noindex 照常由 withNoindex 盖章。
   //注意：Cloudflare Pages 对 /zangli.html 会做「去扩展名」308 重定向到 /zangli，两种形态都要放行。
   if (path === "/zangli.html" || path === "/zangli" || path === "/zangli/") return true;
+  // 功课独立页（2026-09-22）：页壳公开（零内容），数据接口仍由 Worker 按会话/设备鉴权。
+  // 之所以要公开：管理员设备免密访问时没有会话 Cookie，需能落到页面；写入仍需登录会话。
+  if (path === "/practice.html" || path === "/practice" || path === "/practice/") return true;
   return false;
 }
 
@@ -443,6 +446,59 @@ async function handleAuth(request, url) {
 }
 
 // ---------------------------------------------------------------------------
+// /__api/practice/* 同源代理（2026-09-22）
+//
+// 为什么必须经中间件：功课接口要认「会话」，而会话是本站主域上的第一方 httpOnly Cookie。
+// 中间件在服务端把 Cookie 读出来、以 {token} 转发给 Worker —— **token 从不出现在浏览器可见处**。
+// 前端**不得**传 username（身份只由 Worker 从 token 反查）；设备免密只走 X-Device-ID 头。
+// 本路径刻意放在登录门槛**之前**：设备免密访问没有会话 Cookie，必须由 Worker 用设备身份判。
+// ---------------------------------------------------------------------------
+async function handlePracticeApi(request, url) {
+  const action = url.pathname.slice('/__api/practice/'.length);
+  if (!/^[a-z]+$/.test(action)) return json({ success: false, message: 'Not found' }, 404);
+
+  const body = {};
+  if (request.method === 'POST') {
+    const parsed = await request.json().catch(() => null);
+    if (parsed && typeof parsed === 'object') {
+      for (const k of Object.keys(parsed)) body[k] = parsed[k];
+    }
+  }
+  // GET 形态（如 export）把查询串折进 body；token 稍后由服务端注入
+  url.searchParams.forEach((v, k) => { if (body[k] === undefined) body[k] = v; });
+
+  const token = getCookie(request, COOKIE_NAME);
+  delete body.token;           // 防线：token **只**认服务端从 Cookie 读到的那一个，前端传的一律丢弃
+  delete body.username;        // 防线：前端传什么都不认，顺手丢掉
+  if (token) body.token = token;
+
+  const headers = { 'Content-Type': 'application/json' };
+  const dev = request.headers.get('X-Device-ID');
+  if (dev) headers['X-Device-ID'] = dev;   // 设备只走头，绝不走 URL
+
+  let res;
+  try {
+    res = await fetch(WORKER + '/api/practice/' + action, {
+      method: 'POST',
+      headers: headers,
+      body: JSON.stringify(body),
+    });
+  } catch (e) {
+    return json({ success: false, message: '服务暂不可用' }, 503);
+  }
+  const text = await res.text();
+  return new Response(text, {
+    status: res.status,
+    headers: {
+      'Content-Type': res.headers.get('Content-Type') || 'application/json; charset=utf-8',
+      'Cache-Control': 'no-store',
+      'X-Robots-Tag': ROBOTS_HEADER,
+      'Content-Disposition': res.headers.get('Content-Disposition') || 'inline',
+    },
+  });
+}
+
+// ---------------------------------------------------------------------------
 // 中间件入口
 // ---------------------------------------------------------------------------
 export async function onRequest(context) {
@@ -452,6 +508,9 @@ export async function onRequest(context) {
 
   // 1) 同源鉴权接口
   if (path.startsWith("/__auth/")) return handleAuth(request, url);
+
+  // 1.5) 功课接口代理（含设备免密只读；鉴权在 Worker，见上方说明）
+  if (path.startsWith('/__api/practice/')) return handlePracticeApi(request, url);
 
   // 2) 登录页（匿名可达，但不含任何站内内容）
   if (path === "/login" || path === "/login/") return html(loginPageHTML(""), 200);

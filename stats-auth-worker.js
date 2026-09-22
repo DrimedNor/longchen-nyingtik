@@ -539,6 +539,11 @@ export default {
         });
       }
       
+      // 路由：功课模块（2026-09-22 · 网站独立实现，不与小程序联通）
+      if (path.indexOf('/api/practice/') === 0) {
+        return await handlePractice(request, env, url, corsHeaders);
+      }
+
       // 路由：管理员创建邀请码
       if (path === '/api/admin/invite/create' || path === '/admin/invite/create') {
         if (request.method !== 'POST') {
@@ -1557,8 +1562,18 @@ async function checkAdminAuth(request, env, url) {
     // 0b. 一次性登记链接登记过的设备（2026-09-20 新增）：KV 键 admin_dev_<deviceId>，
     //     由 /api/admin/enroll 写入、180 天自然过期；读失败不阻断，回落口令路径。
     try {
-      const enrolled = await env.STATS_KV.get('admin_dev_' + reqDeviceId);
-      if (enrolled) return { ok: true, viaDevice: true, viaEnroll: true };
+      // 2026-09-22 权限分离（任务书 §3.8.A）：后台**只认** scope 含 'admin' 的设备登记。
+      // 此前只判断记录是否存在 → 一个「只为看功课」登记的 practice 设备会连带拿到后台权限（越权放大 R1）。
+      // 兼容策略：无 scope 字段 / 非 JSON 的存量登记一律视为 admin，避免既有设备被锁在门外。
+      let rec = await env.STATS_KV.get('admin_dev_' + reqDeviceId, 'json');
+      if (!rec) {
+        const plain = await env.STATS_KV.get('admin_dev_' + reqDeviceId);
+        if (plain) rec = { scope: null };
+      }
+      if (rec) {
+        const sc = Array.isArray(rec.scope) ? rec.scope : null;
+        if (!sc || sc.indexOf('admin') >= 0) return { ok: true, viaDevice: true, viaEnroll: true };
+      }
     } catch (e) { /* 保底：回落口令校验 */ }
   }
 
@@ -1736,4 +1751,340 @@ async function getAccessStatus(env) {
     needPassword: passwordEnabled, // 一旦启用，永久需要密码或注册登录
     needRegister: registerEnabled, // 一旦启用，需要注册审核
   };
+}
+
+// ===========================================================================
+// 功课模块（2026-09-22）—— 网站独立实现，代码不与小程序联通
+//
+// 安全纪律（方案 §7.1 + 任务书 §3.4/§3.8，逐条落地）：
+//   S1 身份**只**由服务端从 session_ token 反查 —— 永不接受前端传入的 username
+//   S2 写接口只认会话；设备免密身份（viaDevice）打到写接口一律 403
+//   S3 不新建特权通道；**不复用 checkAdminAuth**（否则功课凭据即获得后台权限 R1）
+//   S4 写接口按 username 限流（60 次 / 10 分钟）
+//   S5 服务端也做输入校验（前端校验只是体验，不是防线）
+//   S6 一律 Cache-Control: no-store
+//   S7 功课数量属隐私 → 不写埋点、不进 knowledge.json、不进任何公开统计
+// ===========================================================================
+var PRACTICE_RATE_WINDOW_MS = 10 * 60 * 1000;
+var PRACTICE_RATE_MAX = 60;
+var PRACTICE_WRITES = { save: 1, delete: 1, checkin: 1 };
+var PRACTICE_TYPES = { switch: 1, checkbox: 1, count: 1, duration: 1 };
+
+function prPad2(n) { return (n < 10 ? '0' : '') + n; }
+function prLocalToday() { var d = new Date(); return d.getFullYear() + '-' + prPad2(d.getMonth() + 1) + '-' + prPad2(d.getDate()); }
+function prLocalYM() { var d = new Date(); return d.getFullYear() + '-' + prPad2(d.getMonth() + 1); }
+
+function pjson(obj, status, corsHeaders) {
+  return new Response(JSON.stringify(obj), {
+    status: status || 200,
+    headers: Object.assign({}, corsHeaders, {
+      'Content-Type': 'application/json; charset=utf-8',
+      'Cache-Control': 'no-store',
+    }),
+  });
+}
+
+function pvDate(s) {
+  if (typeof s !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(s)) return null;
+  var d = new Date(s + 'T00:00:00');
+  if (isNaN(d.getTime())) return null;
+  var y = d.getFullYear();
+  if (y < 2000 || y > 2100) return null;
+  return s;
+}
+
+function pvInt(v, min, max) {
+  var n = Number(v);
+  if (!isFinite(n) || Math.floor(n) !== n) return null;
+  if (n < min || n > max) return null;
+  return n;
+}
+
+/**
+ * 设备免密（**只读**）—— 任务书 §3.8.A/B/C
+ *  · 只认 X-Device-ID 头，**绝不**读 ?device= 查询串（避免进历史/Referer/边缘日志）
+ *  · 只认 KV admin_dev_<id> 的 scope 含 'practice'；静态 ADMIN_DEVICE_IDS 只服务后台，不进功课页
+ *  · 记录须带 username —— 设备能看到谁的功课是**显式登记**的，不靠猜
+ */
+async function checkPracticeDevice(request, env) {
+  var deviceId = request.headers.get('X-Device-ID') || '';
+  if (!deviceId) return null;
+  var rec = await env.STATS_KV.get('admin_dev_' + deviceId, 'json');
+  if (!rec) return null;
+  if (rec.expiresAt && new Date(rec.expiresAt) < new Date()) return null;
+  var scope = Array.isArray(rec.scope) ? rec.scope : [];
+  if (scope.indexOf('practice') < 0) return null;
+  if (!rec.username) return null;
+  return { deviceId: deviceId, username: rec.username };
+}
+
+async function resolvePracticeIdentity(request, env, body) {
+  var token = body && body.token;
+  if (token) {
+    var session = await env.STATS_KV.get('session_' + token, 'json');
+    if (!session || !session.username) return { error: 'unauth' };
+    var owner = await env.STATS_KV.get('user_' + session.username, 'json');
+    if (!owner || owner.status !== 'approved') {
+      await env.STATS_KV.delete('session_' + token).catch(function () {});
+      return { error: 'disabled' };
+    }
+    return { username: session.username, viaDevice: false };
+  }
+  var dev = await checkPracticeDevice(request, env);
+  if (dev) return { username: dev.username, viaDevice: true, deviceId: dev.deviceId };
+  return { error: 'unauth' };
+}
+
+async function practiceRateOk(env, username) {
+  var bucket = Math.floor(Date.now() / PRACTICE_RATE_WINDOW_MS);
+  var key = 'prate_' + username + '_' + bucket;
+  var n = parseInt(await env.STATS_KV.get(key), 10) || 0;
+  if (n >= PRACTICE_RATE_MAX) return false;
+  await env.STATS_KV.put(key, String(n + 1), { expirationTtl: 1200 }).catch(function () {});
+  return true;
+}
+
+async function practiceGetStat(env, username) {
+  var stat = await env.STATS_KV.get('practice_stat_' + username, 'json');
+  if (!stat || typeof stat !== 'object') stat = {};
+  if (!stat.totalDone || typeof stat.totalDone !== 'object') stat.totalDone = {};
+  if (!stat.baseline || typeof stat.baseline !== 'object') stat.baseline = {};
+  return stat;
+}
+
+async function practiceGetShard(env, username, ym) {
+  return (await env.STATS_KV.get('practice_log_' + username + '_' + ym, 'json')) || {};
+}
+
+/** 由月分片重算累计：baseline + Σ(各月各日各功课 value) */
+function practiceDeriveTotal(shards, stat, pid) {
+  var total = Number(stat.baseline[pid]) || 0;
+  Object.keys(shards).forEach(function (ym) {
+    var shard = shards[ym] || {};
+    Object.keys(shard).forEach(function (day) {
+      var rec = shard[day] && shard[day][pid];
+      if (rec) total += Number(rec.value) || 0;
+    });
+  });
+  return total;
+}
+
+async function handlePractice(request, env, url, corsHeaders) {
+  var action = url.pathname.replace('/api/practice/', '');
+  var body = {};
+  if (request.method === 'POST') {
+    try { body = await request.json(); } catch (e) { body = {}; }
+  }
+
+  var auth = await resolvePracticeIdentity(request, env, body);
+  if (auth.error) {
+    return pjson({ success: false, message: auth.error === 'disabled' ? '账号状态异常' : '未登录' }, 401, corsHeaders);
+  }
+  var username = auth.username;
+
+  // S2：设备免密身份不得写
+  if (PRACTICE_WRITES[action] && auth.viaDevice) {
+    return pjson({ success: false, message: '设备免密身份仅可查看，写入需登录会话' }, 403, corsHeaders);
+  }
+  // S4：写接口限流
+  if (PRACTICE_WRITES[action] && !(await practiceRateOk(env, username))) {
+    return pjson({ success: false, message: '操作过于频繁，请稍后再试' }, 429, corsHeaders);
+  }
+
+  // ------------------------------------------------------------ list
+  if (action === 'list') {
+    var def = (await env.STATS_KV.get('practice_' + username, 'json')) || {};
+    var stat = await practiceGetStat(env, username);
+    var meta = (await env.STATS_KV.get('practice_meta_' + username, 'json')) || {};
+    var ym = (body.month && /^\d{4}-\d{2}$/.test(body.month)) ? body.month : prLocalYM();
+    var shard = await practiceGetShard(env, username, ym);
+    return pjson({
+      success: true, username: username, viaDevice: !!auth.viaDevice,
+      practices: def.items || [], logs: shard, stat: stat, meta: meta,
+      month: ym, today: prLocalToday(),
+    }, 200, corsHeaders);
+  }
+
+  // ------------------------------------------------------------ save（新增/编辑功课定义）
+  if (action === 'save') {
+    var p = body.practice || {};
+    var name = String(p.name == null ? '' : p.name).trim();
+    if (!name || name.length > 30) return pjson({ success: false, message: '名称需为 1–30 字' }, 400, corsHeaders);
+    var type = PRACTICE_TYPES[p.type] ? p.type : null;
+    if (!type) return pjson({ success: false, message: '类型不合法' }, 400, corsHeaders);
+    var dailyTarget = pvInt(p.dailyTarget || 0, 0, 1000000000);
+    var cumulativeTarget = pvInt(p.cumulativeTarget || 0, 0, 1000000000000);
+    if (dailyTarget === null || cumulativeTarget === null) {
+      return pjson({ success: false, message: '目标数值不合法' }, 400, corsHeaders);
+    }
+    var deadline = '';
+    if (p.cumulativeDeadline) {
+      deadline = pvDate(p.cumulativeDeadline);
+      if (!deadline) return pjson({ success: false, message: '截止日期不合法（须 2000–2100 年）' }, 400, corsHeaders);
+    }
+    // 每日量：0 本身合法（存量大量功课 dailyTarget=0，语义是「不设每日量」）；
+    // 但「有总量 + 有截止日 + 每日量 0」＝计划不成立 → 拦下（§3.3「每日达成量至少 1」的真实语义）。
+    // ⚠️ 注意别写成 `if (p.dailyTarget && …)` —— 前端传 0 时是 falsy，整条校验会被短路。
+    if (cumulativeTarget > 0 && deadline && dailyTarget < 1 && !/^(switch|checkbox)$/.test(type)) {
+      return pjson({ success: false, message: '每日达成量至少 1' }, 400, corsHeaders);
+    }
+
+    var def2 = (await env.STATS_KV.get('practice_' + username, 'json')) || { items: [] };
+    if (!Array.isArray(def2.items)) def2.items = [];
+    var id = p.id ? String(p.id).slice(0, 64) : ('p_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8));
+    var rec = {
+      id: id, name: name, type: type,
+      category: String(p.category || 'other').slice(0, 20),
+      icon: String(p.icon || '✅').slice(0, 8),
+      unit: String(p.unit || '').slice(0, 8),
+      dailyTarget: dailyTarget, cumulativeTarget: cumulativeTarget,
+      cumulativeDeadline: deadline,
+      reminderEnabled: !!p.reminderEnabled,
+      reminderTime: String(p.reminderTime || '').slice(0, 5),
+      isActive: p.isActive !== false,
+      sortOrder: pvInt(p.sortOrder || 0, 0, 100000) || 0,
+      createdAt: '', updatedAt: new Date().toISOString(),
+    };
+    var idx = -1;
+    for (var i = 0; i < def2.items.length; i++) { if (def2.items[i] && def2.items[i].id === id) { idx = i; break; } }
+    if (idx >= 0) {
+      rec.createdAt = def2.items[idx].createdAt || rec.updatedAt;
+      def2.items[idx] = Object.assign({}, def2.items[idx], rec);
+    } else {
+      rec.createdAt = rec.updatedAt;
+      def2.items.push(rec);
+    }
+    def2.schemaVersion = 1;
+    def2.updatedAt = rec.updatedAt;
+    await env.STATS_KV.put('practice_' + username, JSON.stringify(def2));
+    return pjson({ success: true, practice: rec, practices: def2.items }, 200, corsHeaders);
+  }
+
+  // ------------------------------------------------------------ delete（删定义，保留历史日记录）
+  if (action === 'delete') {
+    var did = String(body.id || '');
+    if (!did) return pjson({ success: false, message: '缺少 id' }, 400, corsHeaders);
+    var def3 = (await env.STATS_KV.get('practice_' + username, 'json')) || { items: [] };
+    var before = (def3.items || []).length;
+    def3.items = (def3.items || []).filter(function (x) { return !x || x.id !== did; });
+    def3.updatedAt = new Date().toISOString();
+    await env.STATS_KV.put('practice_' + username, JSON.stringify(def3));
+    return pjson({ success: true, removed: before - def3.items.length, practices: def3.items }, 200, corsHeaders);
+  }
+
+  // ------------------------------------------------------------ checkin（打卡 / 补录）
+  if (action === 'checkin') {
+    var date = pvDate(body.date) || prLocalToday();
+    if (date > prLocalToday()) return pjson({ success: false, message: '不能填写未来日期' }, 400, corsHeaders);
+    var pid = String(body.practiceId || '');
+    if (!pid) return pjson({ success: false, message: '缺少 practiceId' }, 400, corsHeaders);
+    var def4 = (await env.STATS_KV.get('practice_' + username, 'json')) || { items: [] };
+    var found = null;
+    (def4.items || []).forEach(function (x) { if (x && x.id === pid) found = x; });
+    if (!found) return pjson({ success: false, message: '功课不存在' }, 404, corsHeaders);
+    var value = pvInt(body.value, 0, 1000000000000);
+    if (value === null) return pjson({ success: false, message: '数值不合法' }, 400, corsHeaders);
+    var mode = body.mode === 'add' ? 'add' : 'set';
+    var ym2 = date.slice(0, 7);
+    var shardKey = 'practice_log_' + username + '_' + ym2;
+    var sh = await practiceGetShard(env, username, ym2);
+    var day = sh[date] || {};
+    var prev = (day[pid] && Number(day[pid].value)) || 0;
+    var next = mode === 'add' ? prev + value : value;
+    if (next < 0) next = 0;
+    if (next === 0) delete day[pid];
+    else day[pid] = { value: next, type: found.type, note: String(body.note || '').slice(0, 200) };
+    if (Object.keys(day).length) sh[date] = day; else delete sh[date];
+    await env.STATS_KV.put(shardKey, JSON.stringify(sh));
+
+    var stat2 = await practiceGetStat(env, username);
+    var delta = next - prev;
+    stat2.totalDone[pid] = Math.max(0, (Number(stat2.totalDone[pid]) || 0) + delta);
+    stat2.updatedAt = new Date().toISOString();
+    stat2.lastDate = date;
+    await env.STATS_KV.put('practice_stat_' + username, JSON.stringify(stat2));
+
+    return pjson({ success: true, date: date, practiceId: pid, value: next, stat: stat2, logs: sh, month: ym2 }, 200, corsHeaders);
+  }
+
+  // ------------------------------------------------------------ export（json / csv / md）
+  if (action === 'export') {
+    var format = String(body.format || 'json').toLowerCase();
+    if (['json', 'csv', 'md'].indexOf(format) < 0) format = 'json';
+    var prefix = 'practice_log_' + username + '_';
+    var listed = await env.STATS_KV.list({ prefix: prefix });
+    var months = (listed.keys || []).map(function (k) { return k.name.slice(prefix.length); }).sort();
+    var shards = {};
+    for (var mi = 0; mi < months.length; mi++) {
+      shards[months[mi]] = await practiceGetShard(env, username, months[mi]);
+    }
+    var def5 = (await env.STATS_KV.get('practice_' + username, 'json')) || { items: [] };
+    var stat3 = await practiceGetStat(env, username);
+
+    // 自愈：以月分片重算为准（baseline 视为历史基数，不进分片）
+    var healed = false;
+    (def5.items || []).forEach(function (pr) {
+      var derived = practiceDeriveTotal(shards, stat3, pr.id);
+      if ((Number(stat3.totalDone[pr.id]) || 0) !== derived) {
+        stat3.totalDone[pr.id] = derived;
+        healed = true;
+      }
+    });
+    if (healed) await env.STATS_KV.put('practice_stat_' + username, JSON.stringify(stat3));
+
+    if (format === 'json') {
+      return pjson({
+        success: true, exportedAt: new Date().toISOString(), username: username,
+        practices: def5.items || [], stat: stat3, shards: shards, healed: healed,
+      }, 200, corsHeaders);
+    }
+
+    var nameOf = {};
+    (def5.items || []).forEach(function (pr) { nameOf[pr.id] = pr; });
+    var rows = [];
+    months.forEach(function (m) {
+      var shard = shards[m] || {};
+      Object.keys(shard).sort().forEach(function (d) {
+        Object.keys(shard[d] || {}).forEach(function (k) {
+          var r = shard[d][k];
+          rows.push({ date: d, practiceName: (nameOf[k] && nameOf[k].name) || k, type: r.type || '', value: r.value, unit: (nameOf[k] && nameOf[k].unit) || '', note: r.note || '' });
+        });
+      });
+    });
+
+    var text;
+    if (format === 'csv') {
+      var lines = ['date,practiceName,type,value,unit,note'];
+      rows.forEach(function (r) {
+        var cells = [r.date, r.practiceName, r.type, String(r.value), r.unit, r.note].map(function (c) {
+          return '"' + String(c == null ? '' : c).replace(/"/g, '""') + '"';
+        });
+        lines.push(cells.join(','));
+      });
+      text = lines.join('\r\n') + '\r\n';
+    } else {
+      var out = ['# 功课记录导出', '', '导出时间：' + new Date().toISOString(), '用户：' + username, ''];
+      out.push('## 功课定义');
+      (def5.items || []).forEach(function (pr) {
+        out.push('- ' + pr.name + '（' + pr.type + '／' + (pr.unit || '') + '）累计 ' + (Number(stat3.totalDone[pr.id]) || 0) + (pr.cumulativeTarget ? (' / ' + pr.cumulativeTarget) : '') + (pr.cumulativeDeadline ? ('　截止 ' + pr.cumulativeDeadline) : ''));
+      });
+      out.push('', '## 每日明细');
+      var lastDate = '';
+      rows.forEach(function (r) {
+        if (r.date !== lastDate) { out.push('', '### ' + r.date); lastDate = r.date; }
+        out.push('- ' + r.practiceName + '：' + r.value + (r.unit || '') + (r.note ? ('　（' + r.note + '）') : ''));
+      });
+      text = out.join('\n') + '\n';
+    }
+    return new Response(text, {
+      status: 200,
+      headers: Object.assign({}, corsHeaders, {
+        'Content-Type': (format === 'csv' ? 'text/csv' : 'text/markdown') + '; charset=utf-8',
+        'Cache-Control': 'no-store',
+        'Content-Disposition': 'attachment; filename="practice-' + username + '.' + format + '"',
+      }),
+    });
+  }
+
+  return pjson({ success: false, message: 'Not found' }, 404, corsHeaders);
 }
