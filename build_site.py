@@ -5670,6 +5670,16 @@ ZANGLI_CSS_BODY = r"""
 /* 格子窄：理发红点占着右上角，日期行用外边距让出这一角（用 margin 不用 padding，
    这样元素自身的盒子不会伸到红点下方，视觉与几何都干净） */
 .zangli-cell-hair .zangli-cell-g{margin-right:9px}
+/* 2026-09-22：窄屏四颗开关改为「定两行」——
+   不再依赖 flex 自动换行（换行点由「当时内容总宽 vs 容器宽」临时决定，
+   375/390/414/430 各机型换行点不一致 → 长短行错位，甚至把「法定节假日」挤到第三行）。
+   Grid 的 grid-template-columns 给出确定列位，换行结果成为布局声明的一部分。
+   行1：显示日历 + 阳历（常显，跨第 2、3 列）｜行2：藏历 | 农历 | 法定节假日 */
+.zl-layers{display:grid;grid-template-columns:repeat(3,1fr);gap:.45rem .4rem;align-items:stretch}
+.zl-layers-label{grid-column:1/2;display:flex;align-items:center;margin:0;font-size:.78rem}
+.zl-chip[data-layer=g]{grid-column:2/4}
+/* min-width:0 防「法定节假日」5 字撑破列宽；white-space:nowrap 保留——宁可列宽不均也不折字 */
+.zl-chip{justify-content:center;padding:.42rem .3rem;font-size:.78rem;min-width:0}
 }
 """
 
