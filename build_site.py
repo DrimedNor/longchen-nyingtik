@@ -2344,6 +2344,30 @@ function show(slug){
     window.scrollTo({top:0, behavior:'smooth'});
     return;
   }
+  if (slug === '__practice'){
+    // 「功课」功能页（2026-09-22）—— 网站独立实现，不与小程序联通
+    // 入口刻意不在侧栏与首页快捷卡渲染（小谦 D4：一期仅供个人使用），直接访问 #/__practice
+    // 脚本按需加载（§7.7）：主站首包不含功课代码，走到这里才拉 /practice.js
+    currentSlug = slug;
+    document.title = SITE_TITLE + ' · 功课';
+    document.getElementById('pageCrumbs').textContent = ' / 功课';
+    var contentElP = document.getElementById('content');
+    var paintPractice = function(){
+      contentElP.innerHTML = '<div class="article">' + renderPracticePage() + '</div>';
+      contentElP.classList.remove('page-anim');
+      void contentElP.offsetWidth;
+      contentElP.classList.add('page-anim');
+      initPracticePage();
+      window.scrollTo({top:0, behavior:'smooth'});
+    };
+    if (typeof window.renderPracticePage === 'function'){ paintPractice(); return; }
+    contentElP.innerHTML = '<div class="article"><p style="color:var(--ink-soft)">功课模块加载中…</p></div>';
+    loadPracticeScript(function(ok){
+      if (ok) { paintPractice(); }
+      else { contentElP.innerHTML = '<div class="article"><p style="color:var(--ink-soft)">功课模块加载失败，请刷新重试。</p></div>'; }
+    });
+    return;
+  }
   if (!p){
     // 404 页面
     currentSlug = slug;
@@ -3099,6 +3123,26 @@ function hcCountUnder(dirName){
 // ---- 修行日历：页面脚本由构建时注入（单一来源 ZANGLI_PAGE_JS，主站与独立页共用同一份）----
 @@ZANGLI_PAGE_JS@@
 function openZangli(){ go('__zangli'); }
+
+// ---- 功课模块：按需加载器（单一来源 practice-core.js + practice-page.js → 构建期合成 /practice.js）----
+// §7.7：功课页不塞进主站首包（index.html 已 ~620KB，勿再膨胀）；只在走到 #/__practice 时才拉。
+// 独立页 practice.html 用同样的 <script src="/practice.js?v=...">，两端同一份代码。
+function loadPracticeScript(cb){
+  if (typeof window.renderPracticePage === 'function'){ cb(true); return; }
+  var old = document.getElementById('practiceJs');
+  if (old){
+    old.addEventListener('load', function(){ cb(true); });
+    old.addEventListener('error', function(){ cb(false); });
+    return;
+  }
+  var s = document.createElement('script');
+  s.id = 'practiceJs';
+  s.src = '/practice.js?v=@@PRACTICE_VER@@';
+  s.async = true;
+  s.onload = function(){ cb(true); };
+  s.onerror = function(){ cb(false); };
+  document.head.appendChild(s);
+}
 
 function renderHomeCards(){
   var items = [];
@@ -6588,6 +6632,8 @@ def main():
 
     # 注入「修行日历」页面脚本（样式/正文/脚本三份单一来源，主站与独立页共用）
     html_out = html_out.replace("@@ZANGLI_PAGE_JS@@", zangli_page_js())
+    # 功课页按需加载：此处只注入版本号，脚本本体落在 dist/practice.js（§7.7 不膨胀首包）
+    html_out = html_out.replace("@@PRACTICE_VER@@", practice_bundle_ver())
 
     os.makedirs(DIST_DIR, exist_ok=True)
     out_path = os.path.join(DIST_DIR, "index.html")
@@ -6829,6 +6875,12 @@ def main():
     # 页脚二维码按当前地址实时生成（location.href，多域访问各自可扫）。
     _emit_standalone_zangli(DIST_DIR)
 
+    # ---- 功课独立页（2026-09-22）：dist/practice.html ----
+    # 公开页壳（零内容）；数据接口仍由 Worker 按会话/设备鉴权。
+    # 存在的意义：管理员设备免密访问时没有会话 Cookie，需要一个能落地的页面入口。
+    _emit_standalone_practice(DIST_DIR)
+    _emit_practice_bundle(DIST_DIR)
+
 
 # ---- 修行日历独立页生成器（2026-09-19 新增；2026-09-20 更名并升级为多日历叠加）----
 # dist/zangli.html 公开可收藏；文件名沿用 zangli.html（既往分享链接/二维码不失效）。
@@ -6939,6 +6991,87 @@ def _emit_standalone_zangli(dist_dir):
     with open(standalone_path, "w", encoding="utf-8", newline="") as f:
         f.write(html)
     print("修行日历独立页: %s（公开/可收藏/%.1f KB）" % (standalone_path, os.path.getsize(standalone_path) / 1024.0))
+
+# ---- 功课模块：页面脚本单一来源（2026-09-22）----
+# practice-core.js（算法，可被 Node 单测）+ practice-page.js（界面）在仓库根，
+# 构建期合成 dist/practice.js，主站 SPA 按需拉取、独立页 <script src> 引用 —— 改一处两端生效。
+def practice_page_js():
+    here = os.path.dirname(os.path.abspath(__file__))
+
+    def _read(name, fallback):
+        try:
+            with open(os.path.join(here, name), "r", encoding="utf-8") as f:
+                return f.read()
+        except OSError:
+            return fallback
+
+    return (_read("practice-core.js", "/* practice-core.js missing */")
+            + "\n"
+            + _read("practice-page.js", "/* practice-page.js missing */"))
+
+
+def practice_bundle_ver():
+    # 内容哈希前 8 位做破缓存版本：内容不变则版本不变（与 assets/audio 的 ?v= 同一策略）
+    import hashlib as _h
+    return _h.sha256(practice_page_js().encode("utf-8")).hexdigest()[:8]
+
+
+def _emit_practice_bundle(dist_dir):
+    # 功课脚本外置（§7.7）：不进 index.html 首包，由 SPA 按需加载 / 独立页直接引用。
+    js = practice_page_js()
+    out = os.path.join(dist_dir, "practice.js")
+    with open(out, "w", encoding="utf-8", newline="") as f:
+        f.write(js)
+    ver = practice_bundle_ver()
+    print("功课脚本: %s（按需加载/%.1f KB/ver=%s）" % (out, os.path.getsize(out) / 1024.0, ver))
+
+
+# ---- 功课独立页模板（2026-09-22）----
+# 只含页壳与样式变量；脚本外链 /practice.js（与主站 SPA 同一份，版本号构建期注入）。
+# 存在的意义：管理员设备免密访问时没有会话 Cookie，需要一个能落地的页面入口。
+STANDALONE_P_HEAD = """<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#8a1f1c">
+<title>功课 · 每日打卡与进度</title>
+<style>
+:root{--bg:#f6f1e6;--surface:#fffdf8;--surface-soft:#f1e9db;--ink:#3b2f28;--ink-soft:#6f6258;--accent:#8a1f1c;--line:#e2d8c4}
+*{box-sizing:border-box}
+body{margin:0;padding:1.1rem 1rem 3rem;background:var(--bg);color:var(--ink);
+  font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Hiragino Sans GB","Microsoft YaHei",serif}
+h1{font-size:1.3rem;margin:.2rem 0 .4rem}
+a{color:var(--accent)}
+code{background:var(--surface-soft);border-radius:4px;padding:0 .25rem}
+</style>
+</head>
+<body>
+<div id="pgRoot"></div>
+<script src="/practice.js?v=@@PRACTICE_VER@@"></script>
+<script>
+(function(){
+  try {
+    document.getElementById('pgRoot').innerHTML = renderPracticePage();
+    initPracticePage();
+  } catch (e) {
+    document.getElementById('pgRoot').innerHTML = '<p>页面初始化失败：' + e.message + '</p>';
+  }
+})();
+</script>
+</body>
+</html>
+"""
+
+
+def _emit_standalone_practice(dist_dir):
+    out = os.path.join(dist_dir, "practice.html")
+    html = STANDALONE_P_HEAD.replace("@@PRACTICE_VER@@", practice_bundle_ver())
+    with open(out, "w", encoding="utf-8", newline="") as f:
+        f.write(html)
+    print("功课独立页: %s（公开页壳/零内容/%.1f KB）" % (out, os.path.getsize(out) / 1024.0))
+
 
 
 # ---- 生成锁屏封面图（纯标准库手写 PNG）：深红底 + 金色同心圆（坛城意象）----

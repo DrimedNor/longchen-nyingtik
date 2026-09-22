@@ -39,6 +39,8 @@ function isPublicPath(path) {
   // 功课独立页（2026-09-22）：页壳公开（零内容），数据接口仍由 Worker 按会话/设备鉴权。
   // 之所以要公开：管理员设备免密访问时没有会话 Cookie，需能落到页面；写入仍需登录会话。
   if (path === "/practice.html" || path === "/practice" || path === "/practice/") return true;
+  // 功课页脚本：与页壳同为公开静态资源（纯界面代码、零数据）；设备免密设备要靠它渲染页面。
+  if (path === "/practice.js") return true;
   return false;
 }
 
@@ -453,6 +455,11 @@ async function handleAuth(request, url) {
 // 前端**不得**传 username（身份只由 Worker 从 token 反查）；设备免密只走 X-Device-ID 头。
 // 本路径刻意放在登录门槛**之前**：设备免密访问没有会话 Cookie，必须由 Worker 用设备身份判。
 // ---------------------------------------------------------------------------
+// GET 形态（如 export?format=csv）允许折进 body 的查询键白名单。
+// 不整体 forEach：那样 ?device=/?username= 等也会被上行，等于开了一条"参数从 URL 进来"的通道
+// （§3.8 明确：设备身份只认头，绝不读查询串——查询串会进浏览器历史/Referer/边缘日志）。
+const PRACTICE_QUERY_KEYS = ['format', 'month'];
+
 async function handlePracticeApi(request, url) {
   const action = url.pathname.slice('/__api/practice/'.length);
   if (!/^[a-z]+$/.test(action)) return json({ success: false, message: 'Not found' }, 404);
@@ -464,8 +471,10 @@ async function handlePracticeApi(request, url) {
       for (const k of Object.keys(parsed)) body[k] = parsed[k];
     }
   }
-  // GET 形态（如 export）把查询串折进 body；token 稍后由服务端注入
-  url.searchParams.forEach((v, k) => { if (body[k] === undefined) body[k] = v; });
+  for (const k of PRACTICE_QUERY_KEYS) {
+    const v = url.searchParams.get(k);
+    if (v !== null && body[k] === undefined) body[k] = v;
+  }
 
   const token = getCookie(request, COOKIE_NAME);
   delete body.token;           // 防线：token **只**认服务端从 Cookie 读到的那一个，前端传的一律丢弃
