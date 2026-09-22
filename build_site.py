@@ -688,7 +688,7 @@ button:focus-visible, a:focus-visible{outline:2px solid var(--accent); outline-o
 .sidebar-overlay.show{display:block}
 
 /* 内容区 */
-.content{flex:1; padding:2.6rem clamp(1.4rem, 6vw, 4.5rem) 9rem; max-width:820px; margin:0 auto}
+.content{flex:1; min-width:0; padding:2.6rem clamp(1.4rem, 6vw, 4.5rem) 9rem; max-width:820px; margin:0 auto}
 .article h1{font-size:1.85em; margin:.1rem 0 .7rem; line-height:1.35; font-weight:700; font-family:var(--serif)}
 .article h2{font-size:1.3em; margin:1.7em 0 .6em; padding-bottom:.35em; border-bottom:1px solid var(--line); font-weight:600}
 .article h3{font-size:1.1em; margin:1.5em 0 .4em; font-weight:600}
@@ -1027,7 +1027,7 @@ button:active, .player-launch:active, .search-fab:active{transform:scale(.95)}
   .audio-group-chev{order:1 !important; flex:0 0 auto !important}
   .audio-group-title{order:2 !important; flex:0 1 auto !important; min-width:0 !important; font-size:1em !important; margin-right:0 !important}
   .audio-group-count{order:3 !important; flex:0 0 auto !important; margin-left:0 !important}
-  .audio-group-spacer{order:4 !important; flex:0 0 100% !important; height:0 !important; padding:0 !important; margin:0 !important}
+  .audio-group-header .audio-group-spacer{order:4 !important; flex:0 0 100% !important; height:0 !important; padding:0 !important; margin:0 !important}
   .audio-group-play-btn{order:5 !important; flex:0 0 auto !important; margin-left:0 !important; margin-top:.4rem !important}
   .audio-group-hint{order:6 !important; flex:0 0 auto !important; margin-left:auto !important; margin-top:.4rem !important}
 }
@@ -1322,6 +1322,9 @@ button:active, .player-launch:active, .search-fab:active{transform:scale(.95)}
 /* ===== 全局响应式：防止页面超宽 ===== */
 html,body{overflow-x:hidden;width:100%;margin:0;padding:0}
 *{max-width:100%;box-sizing:border-box}
+/* 长不可断行串（本地路径 / 裸 URL / 目录点线）在任意位置断行：
+   overflow-wrap:anywhere 会参与 min-content 计算，可阻止其撑破 .layout>.content 这一 flex 子项。 */
+#content{overflow-wrap:anywhere}
 table{display:block;overflow-x:auto;white-space:nowrap}
 pre{white-space:pre-wrap;word-wrap:break-word;overflow-x:auto}
 img{height:auto;max-width:100%}
@@ -1377,6 +1380,11 @@ img{height:auto;max-width:100%}
   .dir-group-body{padding-left:.8rem}
   .hn-link{padding:.4rem .5rem; margin:.2rem 0; font-size:.95em}
   .dir-intro{padding-left:1.4rem !important; font-size:.82em !important}
+  /* 极窄屏（≤320px，如 iPhone SE 一代）：目录头 = 折角 + 目录名 + (N篇) + 占位，
+     其中目录名与篇数都带内联 flex:0 0 auto（不可压缩）→ 篇数徽标被挤出屏幕。
+     这里允许目录名压缩（min-width:0 + 继承 #content 的 overflow-wrap:anywhere 换行）。 */
+  .dir-group-header{flex-wrap:wrap}
+  .dir-group-header .hn-dir{flex:0 1 auto !important; min-width:0}
 }
 
 /* ===== 平板响应式（769px-1024px） ===== */
