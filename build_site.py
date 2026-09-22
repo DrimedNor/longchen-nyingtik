@@ -5692,7 +5692,7 @@ ZANGLI_CSS_BODY = r"""
 .zangli-querybar input[type=date]{padding:.5rem .7rem;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--ink);font-family:inherit;max-width:42vw}
 .zangli-querybar button{padding:.5rem .9rem;border:1px solid var(--accent);background:var(--accent);color:#fff;border-radius:8px;cursor:pointer;font-family:inherit}
 .zl-layers{display:flex;flex-wrap:wrap;gap:.5rem;align-items:center;margin:.95rem 0 .1rem}
-.zl-layers-label{color:var(--ink-soft);font-size:.84rem;margin-right:.15rem}
+.zl-layers-label{flex:0 0 100%;color:var(--ink-soft);font-size:.84rem;margin:0}
 .zl-chip{display:inline-flex;align-items:center;gap:.42rem;border:1px solid var(--line);background:var(--surface);color:var(--ink-soft);border-radius:999px;padding:.42rem .85rem;font-family:inherit;font-size:.86rem;line-height:1;cursor:pointer;white-space:nowrap}
 .zl-chip .zl-sw{border:1px solid var(--line);width:10px;height:10px;border-radius:3px;flex:none}
 .zl-chip-on{color:#fff;font-weight:600;border-color:transparent}
@@ -5722,16 +5722,25 @@ ZANGLI_CSS_BODY = r"""
 /* 格子窄：理发红点占着右上角，日期行用外边距让出这一角（用 margin 不用 padding，
    这样元素自身的盒子不会伸到红点下方，视觉与几何都干净） */
 .zangli-cell-hair .zangli-cell-g{margin-right:9px}
-/* 2026-09-22：窄屏四颗开关改为「定两行」——
-   不再依赖 flex 自动换行（换行点由「当时内容总宽 vs 容器宽」临时决定，
-   375/390/414/430 各机型换行点不一致 → 长短行错位，甚至把「法定节假日」挤到第三行）。
-   Grid 的 grid-template-columns 给出确定列位，换行结果成为布局声明的一部分。
-   行1：显示日历 + 阳历（常显，跨第 2、3 列）｜行2：藏历 | 农历 | 法定节假日 */
-.zl-layers{display:grid;grid-template-columns:repeat(3,1fr);gap:.45rem .4rem;align-items:stretch}
-.zl-layers-label{grid-column:1/2;display:flex;align-items:center;margin:0;font-size:.78rem}
-.zl-chip[data-layer=g]{grid-column:2/4}
+/* 2026-09-22（小谦指示）：窄屏四颗开关改为「标签独占一行 + 四颗按钮另起一行」——
+   ① 「显示日历」独立成第一行（原先它占第 1 列、与「阳历（常显）」同排，读起来像"半个标签 + 一个宽按钮"）；
+   ② 四颗按钮排在第 2 行，列位/换行由 Grid 显式声明，**不用 flex 自动换行**——自动换行的
+      换行点会随机型宽度临时决定（375/390/414/430 各不相同）→ 长短行错位，甚至把「法定节假日」挤到第三行。
+   列宽用 max-content 按内容给（不留等宽空白），实测四颗自然宽合计 303px：
+     · ≥375px：容器 343px 起，装得下（余量 20px）✅ → 四颗一行
+     · ≤374px：320px 容器仅 288px、360px 仅 328px（余量 5.8px，跨浏览器字宽不稳）❌
+       → 见下方 @media(max-width:374px) 明确降级为 2×2，仍不使用自动换行。 */
+.zl-layers{display:grid;grid-template-columns:repeat(4,max-content);justify-content:space-between;gap:.42rem .4rem;align-items:stretch}
+.zl-layers-label{grid-column:1/-1;display:block;margin:0 0 .05rem;font-size:.78rem}
 /* min-width:0 防「法定节假日」5 字撑破列宽；white-space:nowrap 保留——宁可列宽不均也不折字 */
 .zl-chip{justify-content:center;padding:.42rem .3rem;font-size:.78rem;min-width:0}
+}
+/* 极窄屏（≤374px，典型 320/360）：四颗一行需 303+3×6.4≈322px > 可用宽 288/328px
+   → 明确降级为 2×2（第二行 阳历|藏历，第三行 农历|法定节假日），依旧是声明式、不靠自动换行。
+   注：不靠缩字号硬塞——320px 下把字号压到可读下限也只剩不到 5px 余量，跨浏览器必翻车。 */
+@media(max-width:374px){
+.zl-layers{grid-template-columns:repeat(2,minmax(0,1fr))}
+.zl-layers-label{font-size:.78rem}
 }
 """
 
