@@ -1239,7 +1239,25 @@ button:active, .player-launch:active, .search-fab:active{transform:scale(.95)}
   .fs-pill button{width:1.7rem; height:1.7rem; font-size:.9rem}
   .player .p-footer{gap:.4rem; padding:.55rem .9rem}
   .player .p-pl-toggle{font-size:.82rem; padding:.3rem .7rem}
-  .player .p-pl-hint{font-size:.74rem}
+  /* 2026-09-22（小谦指示）修播放器窄屏溢出（总纲 §17.3 O-02）：
+     窄屏隐藏播放列表按钮内的长提示语「点击展开播放列表」。
+     根因：.p-footer 三个子项全是 flex:0 0 auto（不可压缩），实测总需 357px，
+     而该按钮 199px 里有 95px 是这条提示语（按钮文案「📋 播放列表」已自明，提示属冗余）。
+     隐藏后总需 ≈255px —— 320px 视口下仍有余量（可用 291px）。
+     为何不用 flex-wrap:wrap：换行点会随视口宽度临时决定 → 长短行错位（与日历图层区同一教训），
+     故一律「减内容量」，不让它折。实测数据见 _archive/zl/probe_player_geometry.py。 */
+  .player .p-pl-hint{display:none}
+}
+/* 极窄屏（≤374px，典型 320/360）播放器控制键：
+   .p-controls 原始需 322px，而 320px 视口仅 293px 可用 → 5 颗按钮被 flex-shrink
+   压缩成椭圆（实测 need=293/inner=293，即「已压缩」而非「越界」，故必须单独比 need vs inner
+   才看得出来——只看 right>vw 会漏掉这一类）。只缩 gap 不够（302px 仍超），须同时缩按钮：
+   15.6rem 按钮 + 4×.45rem gap = 278px < 297px ✓ */
+@media(max-width:374px){
+.player .p-controls{gap:.45rem; padding:.7rem}
+.player .p-btn{width:2.9rem; height:2.9rem; font-size:1.25rem}
+.player .p-btn.p-play{width:3.5rem; height:3.5rem; font-size:1.35rem}
+.player .p-btn.p-skip{width:3.15rem; height:3.15rem; font-size:.95rem}
 }
 /* 页脚 */
 .site-footer{border-top:1px solid var(--line); background:var(--surface-soft); padding:1.2rem 1rem; margin-top:2rem}
