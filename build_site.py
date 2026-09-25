@@ -5716,7 +5716,7 @@ ZANGLI_CSS_BODY = r"""
 .zl-badge{display:inline-block;font-size:.62em;line-height:1.15;padding:0 2px;margin-right:2px;border-radius:3px;font-weight:600;vertical-align:.08em}
 .zl-badge-work{background:#ded2ec;color:#3d2a55}
 /* 2026-09-25 第三轮：法定连休＝日期下紫横线（相邻格相连成一线）＋「XX休假」小字，取代单枚「休」角标 */
-.zangli-cell-off .zangli-cell-g{align-self:stretch;border-bottom:3px solid #7a5aa6;padding-bottom:1px}
+.zangli-cell-off .zangli-cell-g{display:block;width:calc(100% + 6px);max-width:none;margin:0 -3px;border-bottom:3px solid #7a5aa6;padding-bottom:1px}/* width=100%+6px、负边距外扩 3px：跨过 1px 格内边距＋2px 格间距，相邻连休格横线连成一线。⚠️ max-width:none 必须显式写——主站有通用规则 *{max-width:100%}（独立页没有），不写它 94px 会被压回 88px、横线断成两截（2026-09-25 第四轮实测）。小谦指示 */
 .zangli-cell-fh{display:block;font-size:.62em;color:#7a5aa6;font-weight:600;line-height:1.2;overflow-wrap:anywhere;max-width:100%}
 .zangli-cell-g{font-size:.82em;color:var(--ink-soft);line-height:1.2}
 .zangli-cell-r{display:flex;align-items:center;justify-content:center;gap:3px;max-width:100%;line-height:1.2}
@@ -5794,25 +5794,19 @@ ZANGLI_CSS_BODY = r"""
 /* 格子窄：理发红点占着右上角，日期行用外边距让出这一角（用 margin 不用 padding，
    这样元素自身的盒子不会伸到红点下方，视觉与几何都干净） */
 .zangli-cell-hair .zangli-cell-g{margin-right:9px}
-/* 2026-09-25（小谦指示）：开关扩为六颗（阳历/藏历/佛历/佛节/农历/法定节假日），
-   窄屏列位/换行仍由 Grid 显式声明，**不用 flex 自动换行**——自动换行的换行点会随机型
-   宽度临时决定（375/390/414/430 各不相同）→ 长短行错位。
-   六颗按 3 列两行声明（第一行 阳历·藏历·佛历，第二行 佛节·农历·法定节假日），
-   列宽 max-content 按内容给：三列最宽合计约 253px，375 容器 343px、360 容器 328px，余量充足 ✅
-     · ≥375px：3×2 两行
-     · ≤374px：降级 2×3 三行（见下方 @media(max-width:374px)），仍不使用自动换行。
-   沿革：2026-09-22 曾为四颗做「一行 4 列 / ≤374px 2×2」，并删掉「显示日历」标签行
-   （标签语义改由 role=group + aria-describedby="zLayersTip" 承担，此约定不变）；
-   2026-09-25 应小谦指示增「佛历」「佛节」两颗，由 4 列改 3 列。 */
-.zl-layers{display:grid;grid-template-columns:repeat(3,max-content);justify-content:space-between;gap:.42rem .4rem;align-items:stretch}
-/* min-width:0 防「法定节假日」5 字撑破列宽；white-space:nowrap 保留——宁可列宽不均也不折字 */
-.zl-chip{justify-content:center;padding:.42rem .3rem;font-size:.78rem;min-width:0}
-.zl-chip-base{justify-content:center;padding:.42rem .5rem;font-size:.78rem;min-width:0}
-}
-/* 极窄屏（≤374px，典型 320/360）：六颗 3 列约 253px 虽可容纳，但 320 容器 288px 余量过薄
-   （跨浏览器字宽不稳），明确降级为 2×3 三行，依旧是声明式、不靠自动换行。 */
-@media(max-width:374px){
-.zl-layers{grid-template-columns:repeat(2,minmax(0,1fr))}
+/* 2026-09-25 第四轮（小谦指示）：手机端六颗压缩为一行。
+   实测：320 容器 288px——基准「阳历」＋五颗（藏历/佛历/佛节/农历/法定节假日），
+   隐藏 .zl-base-tag「始终显示」后，.66rem 字号＋紧凑内边距合计约 250px，一行放得下。
+   flex + nowrap 显式单行（不用 wrap 自动换行——换行点会随机型宽度漂移）；
+   overflow-x:auto 仅作跨浏览器字宽异常时的兜底，正常视口不出滚动条。
+   沿革：2026-09-22 四颗（一行 4 列/≤374px 2×2）→ 2026-09-25 六颗 3×2＋2×3 降级
+   → 本轮应小谦指示压回一行，≤374px 降级块随之删除。
+   标签语义仍由 role=group + aria-describedby="zLayersTip" 承担（约定不变）。 */
+.zl-layers{display:flex;flex-wrap:nowrap;justify-content:space-between;gap:.25rem;align-items:center;overflow-x:auto}
+/* white-space:nowrap 保留——宁可整体微溢出滚动也不折字；min-width:0 配合 flex:none */
+.zl-chip{justify-content:center;padding:.34rem .26rem;font-size:.66rem;min-width:0;flex:none;white-space:nowrap}
+.zl-chip-base{justify-content:center;padding:.34rem .3rem;font-size:.66rem;min-width:0;flex:none;white-space:nowrap}
+.zl-base-tag{display:none}
 }
 """
 
