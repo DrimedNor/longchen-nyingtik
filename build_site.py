@@ -4462,11 +4462,17 @@ function playTrack(idx){
   try{ if ('mediaSession' in navigator) navigator.mediaSession.setPositionState({ duration: 0 }); }catch(e){}
   playerAudio.src = t.src;
   playerAudio.playbackRate = SPEEDS[speedIdx];
-  // 恢复上次播放进度（如果有保存）
+  // 恢复上次播放进度（如果有保存）：媒体可定位后再 seek，避免 src 刚设置时 currentTime 被重置为 0
   var savedPos = 0;
   try { savedPos = parseFloat(localStorage.getItem('longchen-audio-pos-' + idx) || '0'); } catch(e){}
   if (savedPos > 0 && savedPos < (t.duration || 99999)) {
-    playerAudio.currentTime = savedPos;
+    if (playerAudio.readyState >= 1) {
+      try { playerAudio.currentTime = savedPos; } catch(e){}
+    } else {
+      playerAudio.addEventListener('loadedmetadata', function(){
+        try { if (!isNaN(playerAudio.duration) && savedPos > playerAudio.duration - 2) return; playerAudio.currentTime = savedPos; } catch(e){}
+      }, { once: true });
+    }
   }
   // 播放：处理Promise，确保后台/自动连播时也能正常播放
   var playPromise = playerAudio.play();
@@ -4633,6 +4639,10 @@ playerAudio.addEventListener('play', function(){
 playerAudio.addEventListener('pause', function(){
   document.getElementById('pPlay').textContent = '▶'; updateMini();
   if ('mediaSession' in navigator){ try{ navigator.mediaSession.playbackState = 'paused'; }catch(e){} }
+  // 记忆：暂停时立即保存当前进度，精确捕获暂停点（timeupdate 在暂停后不再触发）
+  if (curIdx >= 0 && !isNaN(playerAudio.currentTime) && playerAudio.currentTime > 0) {
+    try { localStorage.setItem('longchen-audio-pos-' + curIdx, String(playerAudio.currentTime)); } catch(e){}
+  }
   // 音频播放统计：暂停时上报播放时长
   var now = Date.now() / 1000;
   if (audioPlayName && audioPlayStartTime) {
@@ -4640,6 +4650,14 @@ playerAudio.addEventListener('pause', function(){
     audioPlayStartTime = 0;
   }
 });
+// 记忆：离开页面或切到后台时保存当前进度，确保「下次打开续播」定位准确
+function saveResumePos(){
+  if (curIdx >= 0 && !isNaN(playerAudio.currentTime) && playerAudio.currentTime > 0) {
+    try { localStorage.setItem('longchen-audio-pos-' + curIdx, String(playerAudio.currentTime)); } catch(e){}
+  }
+}
+window.addEventListener('pagehide', saveResumePos);
+document.addEventListener('visibilitychange', function(){ if (document.visibilityState === 'hidden') saveResumePos(); });
 
 // ---- 锁屏播放控制（Media Session API）：手机锁屏/通知栏显示播放/暂停/上一首/下一首/快进快退按钮 ----
 if ('mediaSession' in navigator){
@@ -5354,7 +5372,7 @@ if (initSlug && routeWithAlias(initSlug)) {
 } else if (initSlug){ show(initSlug); }
 else { var home = TREE.children && TREE.children.find(function(c){ return c.is_index; }); show(home ? home.slug : PAGES[0].slug); }
 
-// 恢复上次播放的音频（仅加载，不自动播放）
+// 恢复上次播放的音频：定位到上次进度，并尝试续播（浏览器允许时自动继续；否则显示「继续听」胶囊供一键续播）
 setTimeout(function(){
   try {
     var savedIdx = parseInt(localStorage.getItem('longchen-audio-cur') || '-1', 10);
@@ -5362,13 +5380,25 @@ setTimeout(function(){
       curIdx = savedIdx;
       var t = AUDIO_TRACKS[savedIdx];
       playerAudio.src = t.src;
+      playerAudio.playbackRate = SPEEDS[speedIdx];
       var savedPos = parseFloat(localStorage.getItem('longchen-audio-pos-' + savedIdx) || '0');
-      if (savedPos > 0) playerAudio.currentTime = savedPos;
-      document.getElementById('pStatusText').innerHTML = '上次播放：<b>' + esc(t.title) + '</b>' + (savedPos > 0 ? '（点击继续）' : '');
+      var dur = t.duration || 0;
+      var canResume = savedPos > 0 && (dur === 0 || savedPos < dur - 2);
+      document.getElementById('pStatusText').innerHTML = '上次播放：<b>' + esc(t.title) + '</b>' + (canResume ? '（准备续播）' : '');
       document.getElementById('pPlay').textContent = '▶';
       renderPlist();
       updatePlayBtns();
       refreshLaunch(); // 静默恢复后刷新悬浮按钮形态（切「继续听」胶囊）
+      if (canResume) {
+        // 媒体可定位后再 seek，避免 currentTime 被重置为 0
+        var applyPos = function(){
+          try { if (!isNaN(playerAudio.duration) && savedPos > playerAudio.duration - 2) return; playerAudio.currentTime = savedPos; } catch(e){}
+        };
+        if (playerAudio.readyState >= 1) applyPos();
+        else playerAudio.addEventListener('loadedmetadata', applyPos, { once: true });
+        // 尝试自动续播：被自动播放策略阻止时静默失败，保持「继续听」胶囊供手动续播
+        playerAudio.play().catch(function(){});
+      }
     }
   } catch(e){}
 }, 1000);
