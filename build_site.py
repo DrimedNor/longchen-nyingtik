@@ -5695,8 +5695,8 @@ ZANGLI_CSS_BODY = r"""
 .zangli-fest-name-lun{background:#2f6f8a}
 .zangli-fest-name-bud{background:#c2571a}
 /* 佛历（2026-09-25 新增）：大卡第四行＝佛涅槃纪年；月历标题里的 .zangli-be 同色 */
-.zangli-fob{font-size:.95rem;font-weight:600;color:#8a6a0d;margin:.2rem 0 0}
-.zangli-be{color:#8a6a0d;font-weight:400;font-size:.82em;margin-left:.15rem}
+.zangli-fob{font-size:.95rem;font-weight:600;color:#b8860b;margin:.2rem 0 0}
+.zangli-be{color:#b8860b;font-weight:400;font-size:.82em;margin-left:.15rem}
 .zangli-fchip{display:inline-block;border-radius:6px;padding:.14rem .55rem;margin:.25rem .45rem 0 0;font-size:.88rem;font-weight:600}
 .zangli-fchip-off{background:#7a5aa6;color:#fff}
 .zangli-fchip-work{background:#ded2ec;color:#3d2a55}
@@ -5714,8 +5714,10 @@ ZANGLI_CSS_BODY = r"""
 .zangli-empty{}
 .zangli-hairdot{position:absolute;top:3px;right:4px;width:6px;height:6px;border-radius:50%;background:var(--accent)}
 .zl-badge{display:inline-block;font-size:.62em;line-height:1.15;padding:0 2px;margin-right:2px;border-radius:3px;font-weight:600;vertical-align:.08em}
-.zl-badge-off{background:#7a5aa6;color:#fff}
 .zl-badge-work{background:#ded2ec;color:#3d2a55}
+/* 2026-09-25 第三轮：法定连休＝日期下紫横线（相邻格相连成一线）＋「XX休假」小字，取代单枚「休」角标 */
+.zangli-cell-off .zangli-cell-g{align-self:stretch;border-bottom:3px solid #7a5aa6;padding-bottom:1px}
+.zangli-cell-fh{display:block;font-size:.62em;color:#7a5aa6;font-weight:600;line-height:1.2;overflow-wrap:anywhere;max-width:100%}
 .zangli-cell-g{font-size:.82em;color:var(--ink-soft);line-height:1.2}
 .zangli-cell-r{display:flex;align-items:center;justify-content:center;gap:3px;max-width:100%;line-height:1.2}
 .zangli-cell-t{font-size:.9em;color:var(--ink);line-height:1.2}
@@ -5730,7 +5732,7 @@ ZANGLI_CSS_BODY = r"""
 .zangli-cell-fb{display:block;font-size:.62em;color:#c2571a;line-height:1.2;overflow-wrap:anywhere;max-width:100%}
 .zangli-cell-today{box-shadow:inset 0 0 0 2px var(--accent)}
 .zangli-cell-sel{background:var(--surface-soft);outline:1px solid var(--accent)}
-.zangli-cell-hasfest .zangli-cell-t{color:var(--accent);font-weight:700}
+.zangli-cell-hasfest .zangli-cell-t{color:var(--ink);font-weight:700}
 .zangli-cell-huilun .zangli-cell-n{color:#1f5a72;font-weight:700}
 /* 2026-09-22：荟供日文字改藏红（原来只标红日期，文字仍是金色；此前 zangli-cell-hui 类未定义）
    写成双类选择器（0,2,0）而非单类（0,1,0）——与 .zangli-cell-f 同特异性时会变成
@@ -5767,7 +5769,7 @@ ZANGLI_CSS_BODY = r"""
 .zl-chip-base{display:inline-flex;align-items:center;gap:.42rem;border:1px dashed var(--line);background:transparent;color:var(--ink-soft);border-radius:999px;padding:.42rem .72rem;font-family:inherit;font-size:.86rem;line-height:1;white-space:nowrap;cursor:default}
 .zl-base-tag{font-size:.78em;opacity:.8;border-left:1px solid var(--line);padding-left:.4rem;letter-spacing:.02em}
 .zl-chip[data-layer=t].zl-chip-on{background:var(--accent)}
-.zl-chip[data-layer=b].zl-chip-on{background:#8a6a0d}
+.zl-chip[data-layer=b].zl-chip-on{background:#b8860b}
 .zl-chip[data-layer=l].zl-chip-on{background:#2f6f8a}
 .zl-chip[data-layer=f].zl-chip-on{background:#c2571a}
 .zl-chip[data-layer=h].zl-chip-on{background:#7a5aa6}
@@ -5775,7 +5777,7 @@ ZANGLI_CSS_BODY = r"""
 .zangli-qr{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:1rem;margin-top:1.1rem;text-align:center}
 .zangli-qrbox{display:inline-block;margin:.4rem 0}
 .zangli-qrhint{color:var(--ink-soft);font-size:.8rem;line-height:1.7;overflow-wrap:anywhere}
-@media(max-width:768px){.zangli-cell{padding:.18rem 1px}.zangli-cell-g{font-size:.72em}.zangli-cell-t{font-size:.78em}.zangli-cell-n{font-size:.68em}.zangli-cell-f,.zangli-cell-fb,.zangli-cell-fp{display:none}.zangli-today{padding:.9rem .9rem}.zangli-tib{font-size:1.12rem}.zangli-lun{font-size:1rem}.zangli-fest{font-size:.95rem}.zangli-cal{padding:.7rem}.zl-chip{padding:.38rem .7rem;font-size:.8rem}.zl-chip-base{padding:.38rem .62rem;font-size:.8rem}.zl-badge{font-size:.46em}.zl-dot{width:3px;height:3px}.zangli-cell-r{gap:2px}}
+@media(max-width:768px){.zangli-cell{padding:.18rem 1px}.zangli-cell-g{font-size:.72em}.zangli-cell-t{font-size:.78em}.zangli-cell-n{font-size:.68em}.zangli-cell-f,.zangli-cell-fb,.zangli-cell-fp,.zangli-cell-fh{display:none}.zangli-today{padding:.9rem .9rem}.zangli-tib{font-size:1.12rem}.zangli-lun{font-size:1rem}.zangli-fest{font-size:.95rem}.zangli-cal{padding:.7rem}.zl-chip{padding:.38rem .7rem;font-size:.8rem}.zl-chip-base{padding:.38rem .62rem;font-size:.8rem}.zl-badge{font-size:.46em}.zl-dot{width:3px;height:3px}.zangli-cell-r{gap:2px}}
 /* 2026-09-22（小谦指示 · 方案 B）：窄屏隐藏格子内的节日名（.zangli-cell-f 藏历金 / .zangli-cell-fp 农历靛蓝）。
    沿革：此前用 font-size:.54em 硬压 —— 320px 下实测仅 9.72px（不可读），
    而渲染门禁量的是**几何**、不量**字号**，照样报「0 问题」（教训：不溢出 ≠ 可读）。
@@ -5822,9 +5824,9 @@ ZANGLI_CSS_BODY = r"""
 ZANGLI_BODY_HTML = """
 <div class="zangli-wrap">
 <h1 style="font-size:1.3rem">修行日历</h1>
+<div class="zangli-querybar"><input type="date" id="zangliDate" min="1951-01-08" max="2051-02-11"><button type="button" onclick="zangliGoto()">查这一天</button><button type="button" style="background:var(--surface-soft);color:var(--ink);border:1px solid var(--line)" onclick="zangliToday()">今天</button></div>
 <div class="zl-layers" id="zLayers" role="group" aria-label="显示哪些日历" aria-describedby="zLayersTip"></div>
 <p class="zl-tip" id="zLayersTip">阳历为基准层、始终显示；藏历、佛历、佛节、农历、法定节假日五层可自由叠加——藏历、佛历与佛节默认打开，农历与法定节假日按需打开。</p>
-<div class="zangli-querybar"><input type="date" id="zangliDate" min="1951-01-08" max="2051-02-11"><button type="button" onclick="zangliGoto()">查这一天</button><button type="button" style="background:var(--surface-soft);color:var(--ink);border:1px solid var(--line)" onclick="zangliToday()">今天</button></div>
 <div id="zangliMain"></div>
 <div class="zangli-legend">
 <h3>关于本页</h3>
@@ -5849,9 +5851,9 @@ ZANGLI_BODY_HTML = """
 <li><span class="zl-key" style="background:var(--accent);border-radius:50%"></span>右上角红点＝理发吉祥日，含藏历日序吉日与「八吉同聚」日。</li>
 <li>大卡中显示该日理发的吉凶与出处。</li>
 </ul>
-<h4 style="color:#8a6a0d">「佛历」「佛节」图层（默认开启）</h4>
+<h4 style="color:#b8860b">「佛历」「佛节」图层（默认开启）</h4>
 <ul>
-<li><span class="zl-key" style="background:#8a6a0d"></span>佛黄字＝佛历纪年。佛历＝以佛涅槃之年为纪元的佛教纪年，佛历年＝公历年＋543（通行简化式，全年不跨年）；显示在月历标题与大卡中。</li>
+<li><span class="zl-key" style="background:#b8860b"></span>金黄字＝佛历纪年。佛历＝以佛涅槃之年为纪元的佛教纪年，佛历年＝公历年＋543（通行简化式，全年不跨年）；显示在月历标题与大卡中。</li>
 <li><span class="zl-key" style="background:#c2571a"></span>橙色字＝汉传佛教节日，依农历逐日标注：四月初八释迦牟尼佛圣诞、六月十九观音菩萨成道日、九月十九观音菩萨出家日、腊月初八释迦牟尼佛成道日等 22 个。</li>
 <li>闰月不重复过节；农历小月无三十日时，「三十」的节日并至廿九并注明（小月）。</li>
 <li>月历下方附「本月佛教节日」清单，进页即可一览本月殊胜日。</li>
@@ -5864,7 +5866,7 @@ ZANGLI_BODY_HTML = """
 </ul>
 <h4 style="color:#7a5aa6">「法定节假日」图层（默认关闭）</h4>
 <ul>
-<li><span class="zl-key" style="background:#7a5aa6"></span>日期前带「休」＝法定放假。</li>
+<li><span class="zl-key" style="background:#7a5aa6"></span>日期下紫横线（相邻连成一线）＝法定连休，格内小字标注如「中秋休假」；「班」＝调休上班。</li>
 <li><span class="zl-key" style="background:#ded2ec"></span>日期前带「班」＝调休上班。</li>
 <li>「休」「班」紧排在阳历日数字之前，鼠标停上去可看是哪个节日、或补哪一天的班。</li>
 <li>本层与「农历」各自独立开关：只想要节假日、不想看农历日，单开这一层即可。</li>
@@ -6234,22 +6236,29 @@ function _zRenderMain(){
     if (isSel) cls += ' zangli-cell-sel';
     if (isHui) cls += ' zangli-cell-huilun';
     if (hairGood) cls += ' zangli-cell-hair';
+    if (hh && hh.type === 'off') cls += ' zangli-cell-off';
 
     // —— 固定插槽逐层一行，绝不叠压 ——
     // 角标（休/班）就排在阳历日数字之前，随行居中，不另占位、不压任何内容
     var badgeHtml = '';
-    if (hh){
-      badgeHtml = '<i class="zl-badge ' + (hh.type === 'off' ? 'zl-badge-off' : 'zl-badge-work') + '"'
-        + ' title="' + zlEsc(hh.name) + (hh.type === 'off' ? '（法定放假）' : '（调休上班）') + '">'
-        + (hh.type === 'off' ? '休' : '班') + '</i>';
+    var offName = '';
+    if (hh && hh.type === 'work'){
+      badgeHtml = '<i class="zl-badge zl-badge-work" title="' + zlEsc(hh.name) + '（调休上班）">班</i>';
     }
-    // 第 1 行：阳历日（基准层，始终显示）
-    var inner = '<span class="zangli-cell-g"' + (isHui ? ' style="color:var(--accent);font-weight:700"' : '') + '>' + badgeHtml + d0 + '</span>';
+    if (hh && hh.type === 'off'){
+      var hn = hh.name;
+      var hnShort = (hn === '春节' || hn === '元旦' || hn === '劳动节') ? hn : hn.replace(/节$/, '');
+      offName = hnShort + '休假';
+    }
+    // 第 1 行：阳历日（基准层，始终显示）；荟供日仅加粗黑（2026-09-25 第三轮去红）
+    var inner = '<span class="zangli-cell-g"' + (isHui ? ' style="font-weight:700"' : '') + '>' + badgeHtml + d0 + '</span>';
+    // 法定休假（2026-09-25 第三轮）：日期下紫横线由 CSS .zangli-cell-off 承担，格内加节日休假小字
+    if (offName) inner += '<span class="zangli-cell-fh">' + zlEsc(offName) + '</span>';
     // 第 2 行：藏历日
     if (onT){
       inner += '<span class="zangli-cell-r">'
         + (bothLunar ? '<i class="zl-dot zl-dot-t"></i>' : '')
-        + '<span class="zangli-cell-t"' + (isHui ? ' style="color:var(--accent);font-weight:700"' : '') + '>'
+        + '<span class="zangli-cell-t"' + (isHui ? ' style="font-weight:700"' : '') + '>'
         + zlEsc((zz && zz.day) ? zz.day : '') + '</span></span>';
     }
     // 第 3 行：农历日
