@@ -5936,11 +5936,22 @@ function zlNumName(n){ return ['','初一','初二','初三','初四','初五','
 
 // —— 图层状态：藏历/佛历/佛节默认开；农历、法定节假日默认关；阳历为基准层（始终显示，不可关）——
 //   2026-09-25（小谦指示）：新增佛历（纪年）与佛节（汉传佛教节日提醒）两层
-if (!window._zLayers) window._zLayers = { t: true, b: true, f: true, l: false, h: false };
+//   2026-09-25（小谦追加）：记住用户选中的图层设置——刷新/重访后保持上次开关状态。
+var _zlDefaults = { t: true, b: true, f: true, l: false, h: false };
+if (!window._zLayers || typeof window._zLayers !== 'object') window._zLayers = Object.assign({}, _zlDefaults);
+(function(){
+  try {
+    var _saved = JSON.parse(localStorage.getItem('lct-zlayers') || 'null');
+    if (_saved && typeof _saved === 'object') {
+      ['t','b','f','l','h'].forEach(function(k){ if (k in _saved) window._zLayers[k] = !!_saved[k]; });
+    }
+  } catch (e) {}
+})();
 function zlIsOn(k){ return !!window._zLayers[k]; }
 function zlToggleLayer(k){
   if (k === 'g') return;                      // 阳历为基础层，不可关闭
   window._zLayers[k] = !window._zLayers[k];
+  try { localStorage.setItem('lct-zlayers', JSON.stringify(window._zLayers)); } catch (e) {}
   zlRenderChips();
   _zRenderMain();
 }
