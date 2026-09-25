@@ -1,0 +1,7 @@
+# Cloudflare Pages 重定向规则（由 build_site.py 复制到 dist/ 根）
+# 2026-09-26 小谦指示：修行日历独立页由 /zangli 更名 /calendar。
+# 旧址必须 301 到新址——已分享出去的链接、书签、二维码不能失效。
+# 注意：functions/_middleware.js 里旧址也保持放行，否则会先被登录门槛拦下、跳不过来。
+/zangli.html    /calendar   301
+/zangli/        /calendar   301
+/zangli         /calendar   301

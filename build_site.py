@@ -1572,9 +1572,9 @@ img{height:auto;max-width:100%}
 
 <script>
 /* 2026-09-22（小谦指示）：日历三库（藏历 28.5KB / 农历 14.4KB / 法定节假日 17.4KB，
-   合计 60.3KB）移出首包 → dist/zangli-lib.js。只有走到「修行日历」页（#/__zangli）才拉取，
+   合计 60.3KB）移出首包 → dist/calendar-lib.js。只有走到「修行日历」页（#/__calendar）才拉取，
    沿 practice.js（§7.7）先例：脚本本体落 dist、首页只留一个极小的加载器。
-   独立页 zangli.html 仍内联（单文件自足，无首包问题）。
+   独立页 calendar.html 仍内联（单文件自足，无首包问题）。
 
    ⚠️ 踩坑记录（2026-09-22 发布前由端到端探针抓到；构建、静态门禁、渲染门禁全部照常放行）：
       本段位于**已有脚本块的内部**，同一晚在这里连踩三次，且后一次的成因就是「描述前一次」：
@@ -1588,7 +1588,7 @@ img{height:auto;max-width:100%}
               ② 本段一律用块注释语法，且注释正文不得包含块注释的结束符号；
               ③ 这类缺陷只有「真 JS 引擎解析」拦得住 ⇒ 已固化为仓库根 check_js_syntax.py。 */
 (function(){
-  var SRC = 'zangli-lib.js?v=@@ZANGLI_LIB_VER@@';
+  var SRC = 'calendar-lib.js?v=@@ZANGLI_LIB_VER@@';
   var st = 0;                 // 0=未开始 1=加载中 2=已就绪 3=失败
   var waiters = [];
   function flush(err){
@@ -1598,7 +1598,7 @@ img{height:auto;max-width:100%}
   // 供日历页判断当前状态（2 表示可直接渲染，无需等待）
   window.zlLibState = function(){ return st; };
   // 按需加载：回调签名 cb(err|null)。重复调用安全（并发去重、失败可重试）。
-  window.ensureZangliLib = function(cb){
+  window.ensureCalLib = function(cb){
     if (cb) waiters.push(cb);
     if (st === 2){ flush(null); return; }
     if (st === 3){ flush(new Error('load failed')); return; }
@@ -2204,7 +2204,7 @@ function renderNav(){
     + '<span class="dir-label">搜索</span></div></div>';
   // 日历入口（2026-09-18 新增功能页；2026-09-20 由「藏历」更名「日历」，与 AI 搜索同为工具入口）
   html += '<div class="nav-sec" data-depth="0">'
-    + '<div class="nav-sec-head" onclick="go(\'__zangli\'); if (window.innerWidth <= 760) closeSidebar();">'
+    + '<div class="nav-sec-head" onclick="go(\'__calendar\'); if (window.innerWidth <= 760) closeSidebar();">'
     + '<span class="nav-chev nav-chev-none">📅</span>'
     + '<span class="dir-label">日历</span></div></div>';
   html += '<hr style="border:none;border-top:1px solid var(--line);margin:.5rem 0;">';
@@ -2388,7 +2388,7 @@ function show(slug){
   pageViewSlug = slug;
   pageViewStartTime = now;
   var p = bySlug[slug];
-  if (slug === '__zangli'){
+  if (slug === '__calendar'){
     // 「修行日历」功能页（2026-09-18 新增「藏历查询」；2026-09-20 更名并升级为多日历图层叠加）
     // 默认显示「阳历＋藏历」，可再叠加「农历法定节假日」；纯客户端本地换算，无网络请求
     // 2026-09-22（小谦指示）：日历三库按需加载（口径同 §7.7）——
@@ -2397,33 +2397,33 @@ function show(slug){
     document.title = SITE_TITLE + ' · 修行日历';
     document.getElementById('pageCrumbs').textContent = ' / 日历';
     var contentElZ = document.getElementById('content');
-    var paintZangli = function(){
-      contentElZ.innerHTML = '<div class="article">' + renderZangliPage() + '</div>';
+    var paintCal = function(){
+      contentElZ.innerHTML = '<div class="article">' + renderCalPage() + '</div>';
       contentElZ.classList.remove('page-anim');
       void contentElZ.offsetWidth;
       contentElZ.classList.add('page-anim');
-      initZangliPage();
+      initCalPage();
     };
-    var showZangliLoading = function(){
+    var showCalLoading = function(){
       contentElZ.innerHTML = '<div class="article"><div style="text-align:center;padding:3rem 0;color:var(--ink-faint);"><div style="font-size:2rem;margin-bottom:1rem;">\u{1F4C5}</div><div>正在加载日历组件…</div></div></div>';
       contentElZ.classList.remove('page-anim');
       void contentElZ.offsetWidth;
       contentElZ.classList.add('page-anim');
     };
     if (window.zlLibState && window.zlLibState() === 2){
-      paintZangli();
-    } else if (window.ensureZangliLib){
-      showZangliLoading();
-      window.ensureZangliLib(function(err){
-        if (currentSlug !== '__zangli') return;          // 用户已离开，不再回填
+      paintCal();
+    } else if (window.ensureCalLib){
+      showCalLoading();
+      window.ensureCalLib(function(err){
+        if (currentSlug !== '__calendar') return;          // 用户已离开，不再回填
         if (err){
           contentElZ.innerHTML = '<div class="article"><div style="text-align:center;padding:3rem 0;color:var(--ink-faint);"><div style="font-size:2rem;margin-bottom:1rem;">\u26A0\uFE0F</div><div>日历组件加载失败</div><button onclick="location.reload()" style="margin-top:1rem;padding:.5rem 1rem;border-radius:8px;border:1px solid var(--accent);background:var(--accent-soft);color:var(--accent-deep);cursor:pointer;">重新加载</button></div></div>';
           return;
         }
-        paintZangli();
+        paintCal();
       });
     } else {
-      paintZangli();                                     // 兜底：加载器缺失（不应发生）
+      paintCal();                                     // 兜底：加载器缺失（不应发生）
     }
     window.scrollTo({top:0, behavior:'smooth'});
     return;
@@ -3194,7 +3194,7 @@ function hcCountUnder(dirName){
 }
 // ---- 修行日历：页面脚本由构建时注入（单一来源 ZANGLI_PAGE_JS，主站与独立页共用同一份）----
 @@ZANGLI_PAGE_JS@@
-function openZangli(){ go('__zangli'); }
+function openCal(){ go('__calendar'); }
 
 // ---- 功课模块：按需加载器（单一来源 practice-core.js + practice-page.js → 构建期合成 /practice.js）----
 // §7.7：功课页不塞进主站首包（index.html 已 ~620KB，勿再膨胀）；只在走到 #/__practice 时才拉。
@@ -3242,7 +3242,7 @@ function renderHomeCards(){
     items.push({icon:'🪷', title:'法照', desc:'上师尊容、历代祖师与圣像法物', slug:'5. 瞻法照/index', count:(FAZHAO_IMG_COUNT > 0 ? FAZHAO_IMG_COUNT + ' 张' : '')});
   }
   // 日历（2026-09-19 小谦指示：卡片顺序调到最后，瞻法照之后；2026-09-20 由「藏历」更名）
-  items.push({icon:'📅', title:'日历', desc:'公历、藏历、农历叠加对照（含佛教节日与法定节假日）', slug:'__zangli', count:''});
+  items.push({icon:'📅', title:'日历', desc:'公历、藏历、农历叠加对照（含佛教节日与法定节假日）', slug:'__calendar', count:''});
   if (!items.length) return '';
   var html = '<nav class="home-cards" aria-label="首页快捷入口">';
   items.forEach(function(it){
@@ -5715,77 +5715,77 @@ window.addEventListener('scroll', function(){
 # 2026-09-20 由「藏历查询」更名，并升级为多日历图层叠加
 # ---------------------------------------------------------------------------
 ZANGLI_CSS_BODY = r"""
-.zangli-wrap{max-width:52rem;margin:0 auto;overflow-x:hidden}
-.zangli-today{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:1.3rem 1.4rem;margin:1rem 0;overflow-wrap:break-word}
-.zangli-greg{font-size:1.15rem;font-weight:700;color:var(--ink)}
-.zangli-tib{font-size:1.5rem;font-weight:700;color:var(--accent);margin:.5rem 0 .2rem;overflow-wrap:break-word}
-.zangli-lun{font-size:1.15rem;font-weight:700;color:#2f6f8a;margin:.15rem 0 .2rem;overflow-wrap:break-word}
-.zangli-fest{margin-top:.55rem;font-size:1.02rem;color:var(--ink);line-height:1.65}
-.zangli-fest-name{display:inline-block;background:var(--accent);color:#fff;border-radius:6px;padding:.12rem .55rem;margin-right:.45rem;font-weight:600}
-.zangli-fest-name-lun{background:#2f6f8a}
-.zangli-fest-name-bud{background:#c2571a}
-/* 佛历（2026-09-25 新增）：大卡第四行＝佛涅槃纪年；月历标题里的 .zangli-be 同色 */
-.zangli-fob{font-size:.95rem;font-weight:600;color:#b8860b;margin:.2rem 0 0}
-.zangli-be{color:#b8860b;font-weight:400;font-size:.82em;margin-left:.15rem}
-.zangli-fchip{display:inline-block;border-radius:6px;padding:.14rem .55rem;margin:.25rem .45rem 0 0;font-size:.88rem;font-weight:600}
-.zangli-fchip-off{background:#7a5aa6;color:#fff}
-.zangli-fchip-work{background:#ded2ec;color:#3d2a55}
-.zangli-fchip-none{background:transparent;color:var(--ink-soft);border:1px dashed var(--line);font-weight:400}
-.zangli-cal{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:1rem;margin-top:1.1rem;overflow-x:hidden}
-.zangli-cal-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:.6rem;gap:.4rem}
-.zangli-cal-title{font-weight:700;color:var(--ink);text-align:center;overflow-wrap:break-word}
-.zangli-cal-title small{color:var(--ink-soft);font-weight:400}
-.zangli-cal button{border:1px solid var(--line);background:var(--surface-soft);color:var(--ink);border-radius:8px;padding:.35rem .85rem;cursor:pointer;flex:none;font-family:inherit}
-.zangli-week{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;margin-bottom:2px}
-.zangli-week div{text-align:center;font-size:.78em;color:var(--ink-soft);padding:.3rem 0}
-.zangli-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;align-items:stretch}
-.zangli-grid>div{min-height:0}
-.zangli-cell{display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding:.25rem 1px;border-radius:8px;cursor:pointer;line-height:1.25;text-align:center;height:100%;overflow-wrap:break-word;word-break:break-word;position:relative}
-.zangli-empty{}
-.zangli-hairdot{position:absolute;top:3px;right:4px;width:6px;height:6px;border-radius:50%;background:var(--accent)}
+.cal-wrap{max-width:52rem;margin:0 auto;overflow-x:hidden}
+.cal-today{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:1.3rem 1.4rem;margin:1rem 0;overflow-wrap:break-word}
+.cal-greg{font-size:1.15rem;font-weight:700;color:var(--ink)}
+.cal-tib{font-size:1.5rem;font-weight:700;color:var(--accent);margin:.5rem 0 .2rem;overflow-wrap:break-word}
+.cal-lun{font-size:1.15rem;font-weight:700;color:#2f6f8a;margin:.15rem 0 .2rem;overflow-wrap:break-word}
+.cal-fest{margin-top:.55rem;font-size:1.02rem;color:var(--ink);line-height:1.65}
+.cal-fest-name{display:inline-block;background:var(--accent);color:#fff;border-radius:6px;padding:.12rem .55rem;margin-right:.45rem;font-weight:600}
+.cal-fest-name-lun{background:#2f6f8a}
+.cal-fest-name-bud{background:#c2571a}
+/* 佛历（2026-09-25 新增）：大卡第四行＝佛涅槃纪年；月历标题里的 .cal-be 同色 */
+.cal-fob{font-size:.95rem;font-weight:600;color:#b8860b;margin:.2rem 0 0}
+.cal-be{color:#b8860b;font-weight:400;font-size:.82em;margin-left:.15rem}
+.cal-fchip{display:inline-block;border-radius:6px;padding:.14rem .55rem;margin:.25rem .45rem 0 0;font-size:.88rem;font-weight:600}
+.cal-fchip-off{background:#7a5aa6;color:#fff}
+.cal-fchip-work{background:#ded2ec;color:#3d2a55}
+.cal-fchip-none{background:transparent;color:var(--ink-soft);border:1px dashed var(--line);font-weight:400}
+.cal-card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:1rem;margin-top:1.1rem;overflow-x:hidden}
+.cal-card-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:.6rem;gap:.4rem}
+.cal-card-title{font-weight:700;color:var(--ink);text-align:center;overflow-wrap:break-word}
+.cal-card-title small{color:var(--ink-soft);font-weight:400}
+.cal-card button{border:1px solid var(--line);background:var(--surface-soft);color:var(--ink);border-radius:8px;padding:.35rem .85rem;cursor:pointer;flex:none;font-family:inherit}
+.cal-week{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;margin-bottom:2px}
+.cal-week div{text-align:center;font-size:.78em;color:var(--ink-soft);padding:.3rem 0}
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;align-items:stretch}
+.cal-grid>div{min-height:0}
+.cal-cell{display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding:.25rem 1px;border-radius:8px;cursor:pointer;line-height:1.25;text-align:center;height:100%;overflow-wrap:break-word;word-break:break-word;position:relative}
+.cal-empty{}
+.cal-hairdot{position:absolute;top:3px;right:4px;width:6px;height:6px;border-radius:50%;background:var(--accent)}
 .zl-badge{display:inline-block;font-size:.62em;line-height:1.15;padding:0 2px;margin-right:2px;border-radius:3px;font-weight:600;vertical-align:.08em}
 .zl-badge-work{background:#ded2ec;color:#3d2a55}
 /* 2026-09-25 第五轮（小谦指示）：法定连休＝紫底白字加宽色块（相邻格外扩相接成一条带），取代原 3px 细横线＋紫色小字。
    每行（每周）只在第一个放假的格显示节日名，其余放假日只留纯紫块，更简洁。色块用 flex order:99 压到格底对齐成带。 */
-.zangli-cell-off .zangli-cell-g{border-bottom:0;margin:0;width:auto;max-width:100%;padding-bottom:0}
-.zangli-cell-fh{display:block;overflow-wrap:anywhere;max-width:100%}
-.zangli-cell-off .zangli-cell-fh{order:99;background:#7a5aa6;color:#fff;font-weight:600;font-size:.66em;text-align:center;border-radius:5px;padding:.16rem .2rem;margin:auto -3px 1px;width:calc(100% + 6px);max-width:none;line-height:1.15;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;box-shadow:0 1px 2px rgba(0,0,0,.18)}
-.zangli-cell-g{font-size:.82em;color:var(--ink-soft);line-height:1.2}
-.zangli-cell-r{display:flex;align-items:center;justify-content:center;gap:3px;max-width:100%;line-height:1.2}
-.zangli-cell-t{font-size:.9em;color:var(--ink);line-height:1.2}
-.zangli-cell-n{font-size:.78em;color:#2f6f8a;line-height:1.2}
+.cal-cell-off .cal-cell-g{border-bottom:0;margin:0;width:auto;max-width:100%;padding-bottom:0}
+.cal-cell-fh{display:block;overflow-wrap:anywhere;max-width:100%}
+.cal-cell-off .cal-cell-fh{order:99;background:#7a5aa6;color:#fff;font-weight:600;font-size:.66em;text-align:center;border-radius:5px;padding:.16rem .2rem;margin:auto -3px 1px;width:calc(100% + 6px);max-width:none;line-height:1.15;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;box-shadow:0 1px 2px rgba(0,0,0,.18)}
+.cal-cell-g{font-size:.82em;color:var(--ink-soft);line-height:1.2}
+.cal-cell-r{display:flex;align-items:center;justify-content:center;gap:3px;max-width:100%;line-height:1.2}
+.cal-cell-t{font-size:.9em;color:var(--ink);line-height:1.2}
+.cal-cell-n{font-size:.78em;color:#2f6f8a;line-height:1.2}
 .zl-dot{display:inline-block;width:4px;height:4px;border-radius:2px;flex:none}
 .zl-dot-t{background:var(--accent)}
 .zl-dot-l{background:#2f6f8a}
 .zl-dot-h{background:#7a5aa6}
-.zangli-cell-f{display:block;font-size:.62em;color:#b08d2f;line-height:1.2;overflow-wrap:anywhere;max-width:100%}
-.zangli-cell-fp{display:block;font-size:.62em;color:#2f6f8a;line-height:1.2;overflow-wrap:anywhere;max-width:100%}
+.cal-cell-f{display:block;font-size:.62em;color:#b08d2f;line-height:1.2;overflow-wrap:anywhere;max-width:100%}
+.cal-cell-fp{display:block;font-size:.62em;color:#2f6f8a;line-height:1.2;overflow-wrap:anywhere;max-width:100%}
 /* 2026-09-25（小谦指示，同日第二轮改橘）：格内汉传佛教节日名（深橘 #c2571a，佛节图层）——藏历金/农历靛/佛节橘三种分明 */
-.zangli-cell-fb{display:block;font-size:.62em;color:#c2571a;line-height:1.2;overflow-wrap:anywhere;max-width:100%}
-.zangli-cell-today{box-shadow:inset 0 0 0 2px var(--accent)}
-.zangli-cell-sel{background:var(--surface-soft);outline:1px solid var(--accent)}
-.zangli-cell-hasfest .zangli-cell-t{color:var(--ink);font-weight:700}
-.zangli-cell-huilun .zangli-cell-n{color:#1f5a72;font-weight:700}
-/* 2026-09-22：荟供日文字改藏红（原来只标红日期，文字仍是金色；此前 zangli-cell-hui 类未定义）
-   写成双类选择器（0,2,0）而非单类（0,1,0）——与 .zangli-cell-f 同特异性时会变成
+.cal-cell-fb{display:block;font-size:.62em;color:#c2571a;line-height:1.2;overflow-wrap:anywhere;max-width:100%}
+.cal-cell-today{box-shadow:inset 0 0 0 2px var(--accent)}
+.cal-cell-sel{background:var(--surface-soft);outline:1px solid var(--accent)}
+.cal-cell-hasfest .cal-cell-t{color:var(--ink);font-weight:700}
+.cal-cell-huilun .cal-cell-n{color:#1f5a72;font-weight:700}
+/* 2026-09-22：荟供日文字改藏红（原来只标红日期，文字仍是金色；此前 cal-cell-hui 类未定义）
+   写成双类选择器（0,2,0）而非单类（0,1,0）——与 .cal-cell-f 同特异性时会变成
    「后定义者胜」的声明顺序依赖，一旦有人调整顺序即静默失效。双类在此保证顺序无关。 */
-.zangli-cell-f.zangli-cell-hui{color:var(--accent);font-weight:700}
+.cal-cell-f.cal-cell-hui{color:var(--accent);font-weight:700}
 /* 本月佛教节日清单（2026-09-25 新增，佛节图层开启且有节日时显示） */
-.zangli-blist{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:.9rem 1.1rem;margin:.9rem 0 0;font-size:.92rem;overflow-wrap:break-word}
-.zangli-blist-t{font-weight:700;color:#c2571a;margin-bottom:.35rem}
-.zangli-blist ul{margin:0;padding-left:1.1rem;list-style:disc}
-.zangli-blist li{margin:.3rem 0;line-height:1.6}
-.zangli-blist .zbd{font-weight:600;color:var(--ink)}
-.zangli-legend{color:var(--ink-soft);font-size:.82rem;margin-top:.9rem;line-height:1.6;overflow-wrap:break-word}
-.zangli-legend h3{font-size:.92rem;color:var(--ink);margin:1.1rem 0 .35rem;font-weight:700}
-.zangli-legend h4{font-size:.84rem;color:var(--ink);margin:.75rem 0 .25rem;font-weight:700}
-.zangli-legend h5{font-size:.82rem;color:var(--accent);margin:.75rem 0 .25rem;font-weight:700}
-.zangli-legend ul{margin:0;padding-left:1.05rem;list-style:disc}
-.zangli-legend li{margin:.18rem 0}
-.zangli-legend .zl-key{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:.45rem;vertical-align:middle}
-.zangli-querybar{display:flex;gap:.6rem;align-items:center;flex-wrap:wrap;margin:1rem 0 .2rem}
-.zangli-querybar input[type=date]{padding:.5rem .7rem;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--ink);font-family:inherit;max-width:42vw}
-.zangli-querybar button{padding:.5rem .9rem;border:1px solid var(--accent);background:var(--accent);color:#fff;border-radius:8px;cursor:pointer;font-family:inherit}
+.cal-blist{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:.9rem 1.1rem;margin:.9rem 0 0;font-size:.92rem;overflow-wrap:break-word}
+.cal-blist-t{font-weight:700;color:#c2571a;margin-bottom:.35rem}
+.cal-blist ul{margin:0;padding-left:1.1rem;list-style:disc}
+.cal-blist li{margin:.3rem 0;line-height:1.6}
+.cal-blist .zbd{font-weight:600;color:var(--ink)}
+.cal-legend{color:var(--ink-soft);font-size:.82rem;margin-top:.9rem;line-height:1.6;overflow-wrap:break-word}
+.cal-legend h3{font-size:.92rem;color:var(--ink);margin:1.1rem 0 .35rem;font-weight:700}
+.cal-legend h4{font-size:.84rem;color:var(--ink);margin:.75rem 0 .25rem;font-weight:700}
+.cal-legend h5{font-size:.82rem;color:var(--accent);margin:.75rem 0 .25rem;font-weight:700}
+.cal-legend ul{margin:0;padding-left:1.05rem;list-style:disc}
+.cal-legend li{margin:.18rem 0}
+.cal-legend .zl-key{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:.45rem;vertical-align:middle}
+.cal-querybar{display:flex;gap:.6rem;align-items:center;flex-wrap:wrap;margin:1rem 0 .2rem}
+.cal-querybar input[type=date]{padding:.5rem .7rem;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--ink);font-family:inherit;max-width:42vw}
+.cal-querybar button{padding:.5rem .9rem;border:1px solid var(--accent);background:var(--accent);color:#fff;border-radius:8px;cursor:pointer;font-family:inherit}
 .zl-layers{display:flex;flex-wrap:wrap;gap:.5rem;align-items:center;margin:.95rem 0 .1rem}
 .zl-chip{display:inline-flex;align-items:center;justify-content:center;gap:.42rem;border:1px solid var(--line);background:var(--surface);color:var(--ink-soft);border-radius:999px;padding:.42rem .85rem;font-family:inherit;font-size:.86rem;line-height:1;cursor:pointer;white-space:nowrap}
 .zl-chip-on{color:#fff;font-weight:600;border-color:transparent}
@@ -5806,26 +5806,26 @@ ZANGLI_CSS_BODY = r"""
 .zl-chip[data-layer=f].zl-chip-on{background:#c2571a}
 .zl-chip[data-layer=h].zl-chip-on{background:#7a5aa6}
 .zl-tip{color:var(--ink-soft);font-size:.78rem;margin:.45rem 0 .1rem;line-height:1.65}
-.zangli-qr{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:1rem;margin-top:1.1rem;text-align:center}
-.zangli-qrbox{display:inline-block;margin:.4rem 0}
-.zangli-qrhint{color:var(--ink-soft);font-size:.8rem;line-height:1.7;overflow-wrap:anywhere}
-@media(max-width:768px){.zangli-cell{padding:.18rem 1px}.zangli-cell-g{font-size:.72em}.zangli-cell-t{font-size:.78em}.zangli-cell-n{font-size:.68em}.zangli-cell-f,.zangli-cell-fb,.zangli-cell-fp{display:none}/* 2026-09-25 第五轮：.zangli-cell-fh（紫底白字放假带）不再隐藏，窄屏也显示（原先手机端看不到是哪个节） */.zangli-today{padding:.9rem .9rem}.zangli-tib{font-size:1.12rem}.zangli-lun{font-size:1rem}.zangli-fest{font-size:.95rem}.zangli-cal{padding:.7rem}.zl-chip{padding:.38rem .7rem;font-size:.8rem}.zl-chip-base{padding:.38rem .62rem;font-size:.8rem}.zl-badge{font-size:.46em}.zl-dot{width:3px;height:3px}.zangli-cell-r{gap:2px}}
-/* 2026-09-22（小谦指示 · 方案 B）：窄屏隐藏格子内的节日名（.zangli-cell-f 藏历金 / .zangli-cell-fp 农历靛蓝）。
+.cal-qr{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:1rem;margin-top:1.1rem;text-align:center}
+.cal-qrbox{display:inline-block;margin:.4rem 0}
+.cal-qrhint{color:var(--ink-soft);font-size:.8rem;line-height:1.7;overflow-wrap:anywhere}
+@media(max-width:768px){.cal-cell{padding:.18rem 1px}.cal-cell-g{font-size:.72em}.cal-cell-t{font-size:.78em}.cal-cell-n{font-size:.68em}.cal-cell-f,.cal-cell-fb,.cal-cell-fp{display:none}/* 2026-09-25 第五轮：.cal-cell-fh（紫底白字放假带）不再隐藏，窄屏也显示（原先手机端看不到是哪个节） */.cal-today{padding:.9rem .9rem}.cal-tib{font-size:1.12rem}.cal-lun{font-size:1rem}.cal-fest{font-size:.95rem}.cal-card{padding:.7rem}.zl-chip{padding:.38rem .7rem;font-size:.8rem}.zl-chip-base{padding:.38rem .62rem;font-size:.8rem}.zl-badge{font-size:.46em}.zl-dot{width:3px;height:3px}.cal-cell-r{gap:2px}}
+/* 2026-09-22（小谦指示 · 方案 B）：窄屏隐藏格子内的节日名（.cal-cell-f 藏历金 / .cal-cell-fp 农历靛蓝）。
    沿革：此前用 font-size:.54em 硬压 —— 320px 下实测仅 9.72px（不可读），
    而渲染门禁量的是**几何**、不量**字号**，照样报「0 问题」（教训：不溢出 ≠ 可读）。
-   改为 display:none 后，节日信息由「大卡」（.zangli-today / .zangli-fest）完整承载；
+   改为 display:none 后，节日信息由「大卡」（.cal-today / .cal-fest）完整承载；
    格子内仍保留：阳历日 + 藏历日（荟供日红字加粗）+ 农历日 + 休/班角标 + 理发红点。 */
 /* 2026-09-20：窄屏月历头部另起一行，避免「（点任一天查询）」被拦腰折断 */
 @media(max-width:600px){
-.zangli-cal-head{flex-wrap:wrap}
-.zangli-cal-title{order:-1;flex:0 0 100%;margin-bottom:.5rem}
-.zangli-cal-head button{flex:1 1 0;min-width:0;padding:.4rem .25rem;white-space:nowrap}
-.zangli-cal-title small{display:none}
-.zangli-legend{font-size:.8rem}
-.zangli-legend h4,.zangli-legend h5{margin-top:.6rem}
+.cal-card-head{flex-wrap:wrap}
+.cal-card-title{order:-1;flex:0 0 100%;margin-bottom:.5rem}
+.cal-card-head button{flex:1 1 0;min-width:0;padding:.4rem .25rem;white-space:nowrap}
+.cal-card-title small{display:none}
+.cal-legend{font-size:.8rem}
+.cal-legend h4,.cal-legend h5{margin-top:.6rem}
 /* 格子窄：理发红点占着右上角，日期行用外边距让出这一角（用 margin 不用 padding，
    这样元素自身的盒子不会伸到红点下方，视觉与几何都干净） */
-.zangli-cell-hair .zangli-cell-g{margin-right:9px}
+.cal-cell-hair .cal-cell-g{margin-right:9px}
 /* 2026-09-25 第四轮（小谦指示）：手机端六颗压缩为一行。
    实测：320 容器 288px——基准「阳历」＋五颗（藏历/佛历/佛节/农历/法定节假日），
    隐藏 .zl-base-tag「始终显示」后，.66rem 字号＋紧凑内边距合计约 250px，一行放得下。
@@ -5848,13 +5848,13 @@ ZANGLI_CSS_BODY = r"""
 #                            → 分层图例（每个独立语义单独成行）→ 数据来源与范围
 # ---------------------------------------------------------------------------
 ZANGLI_BODY_HTML = """
-<div class="zangli-wrap">
+<div class="cal-wrap">
 <h1 style="font-size:1.3rem">修行日历</h1>
-<div class="zangli-querybar"><input type="date" id="zangliDate" min="1951-01-08" max="2051-02-11"><button type="button" onclick="zangliGoto()">查这一天</button><button type="button" style="background:var(--surface-soft);color:var(--ink);border:1px solid var(--line)" onclick="zangliToday()">今天</button></div>
+<div class="cal-querybar"><input type="date" id="calDate" min="1951-01-08" max="2051-02-11"><button type="button" onclick="calGoto()">查这一天</button><button type="button" style="background:var(--surface-soft);color:var(--ink);border:1px solid var(--line)" onclick="calToday()">今天</button></div>
 <div class="zl-layers" id="zLayers" role="group" aria-label="显示哪些日历" aria-describedby="zLayersTip"></div>
 <p class="zl-tip" id="zLayersTip">阳历为基准层、始终显示；藏历、佛历、佛节、农历、法定节假日五层可自由叠加——藏历、佛历与佛节默认打开，农历与法定节假日按需打开。</p>
-<div id="zangliMain"></div>
-<div class="zangli-legend">
+<div id="calMain"></div>
+<div class="cal-legend">
 <h3>关于本页</h3>
 <ul>
 <li>公历、藏历、佛历、农历同视图对照，并标注汉传佛教节日与法定节假日。</li>
@@ -5937,7 +5937,7 @@ ZANGLI_PAGE_JS = r"""
 // ===================================================================
 var Z_PAGE_CSS = @@ZANGLI_CSS_JSON@@;
 var Z_PAGE_BODY = @@ZANGLI_BODY_JSON@@;
-function renderZangliPage(){ return '<style>' + Z_PAGE_CSS + '</style>' + Z_PAGE_BODY; }
+function renderCalPage(){ return '<style>' + Z_PAGE_CSS + '</style>' + Z_PAGE_BODY; }
 
 // —— 理发日吉凶表（藏历日 1..30，出自《菩萨头发品》）——
 var Z_HAIRCUT = {
@@ -6088,7 +6088,7 @@ function zlHolidayCovered(y){
 }
 
 // —— 藏历取数 ——
-function zangliOf(d){ return window.getZangli ? getZangli(d) : { value:'error', extraInfo:'', extraInfo2:'', month:'', day:'' }; }
+function tibetanOf(d){ return window.getZangli ? getZangli(d) : { value:'error', extraInfo:'', extraInfo2:'', month:'', day:'' }; }
 function zDayNum(z){
   var M = { '正':1,'二':2,'三':3,'四':4,'五':5,'六':6,'七':7,'八':8,'九':9,'十':10,'十一':11,'十二':12 };
   var D = { '初一':1,'初二':2,'初三':3,'初四':4,'初五':5,'初六':6,'初七':7,'初八':8,'初九':9,'初十':10,
@@ -6101,15 +6101,15 @@ function zHaircut(z){
   return { m: nd.m, d: nd.d, item: Z_HAIRCUT[nd.d] || null,
            j8: (Z_8[nd.m] || []).indexOf(nd.d) >= 0, j9: (Z_9[nd.m] || []).indexOf(nd.d) >= 0 };
 }
-function zangliFmtG(d){
+function calFmtG(d){
   return d.getFullYear() + ' 年 ' + (d.getMonth()+1) + ' 月 ' + d.getDate() + ' 日 · 星期'
        + ['日','一','二','三','四','五','六'][d.getDay()];
 }
 
 // —— 页面状态与交互 ——
 if (!window._zView) window._zView = { y: new Date().getFullYear(), m: new Date().getMonth(), sel: null };
-function initZangliPage(){
-  var input = document.getElementById('zangliDate');
+function initCalPage(){
+  var input = document.getElementById('calDate');
   if (input){
     // 独立页深链 ?d= 会预先写入 input.value，此处不可覆盖
     if (!input.value) input.value = zlKey(new Date());
@@ -6124,8 +6124,8 @@ function initZangliPage(){
   zlRenderChips();
   _zRenderMain();
 }
-function zangliGoto(){
-  var el = document.getElementById('zangliDate');
+function calGoto(){
+  var el = document.getElementById('calDate');
   var v = el ? el.value : '';
   if (!v) return;
   var p = v.split('-');
@@ -6133,14 +6133,14 @@ function zangliGoto(){
   window._zView.y = +p[0]; window._zView.m = +p[1]-1;
   _zRenderMain();
 }
-function zangliToday(){
+function calToday(){
   var t = new Date(); t.setHours(0,0,0,0);
-  var el = document.getElementById('zangliDate');
+  var el = document.getElementById('calDate');
   if (el) el.value = zlKey(t);
   window._zView = { y: t.getFullYear(), m: t.getMonth(), sel: t };
   _zRenderMain();
 }
-function zangliShift(dy, dm){
+function calShift(dy, dm){
   var v = window._zView;
   var d = new Date(v.y + dy, v.m + dm, 1, 0, 0, 0);
   window._zView.y = d.getFullYear(); window._zView.m = d.getMonth();
@@ -6148,14 +6148,14 @@ function zangliShift(dy, dm){
 }
 function _zCellClick(ts){
   window._zView.sel = new Date(ts);
-  var el = document.getElementById('zangliDate');
+  var el = document.getElementById('calDate');
   if (el) el.value = zlKey(window._zView.sel);
   _zRenderMain();
 }
 
 // —— 主渲染：主卡（选中日）＋ 月历，均按当前图层叠加 ——
 function _zRenderMain(){
-  var box = document.getElementById('zangliMain');
+  var box = document.getElementById('calMain');
   if (!box) return;
   var v = window._zView;
   var today = new Date(); today.setHours(0,0,0,0);
@@ -6165,19 +6165,19 @@ function _zRenderMain(){
 
   // ===== 主卡 =====
   var selD = v.sel || (function(){ var t = new Date(); t.setHours(0,0,0,0); return t; })();
-  var z = zangliOf(selD);
+  var z = tibetanOf(selD);
   if (z && z.value === 'error') z = { value:'超出可换算范围', extraInfo:'', extraInfo2:'', month:'', day:'' };
   var lv = zlLunar(selD);
   var hd = zlCNHoliday(selD);
 
   var rows = [];
-  rows.push('<div class="zangli-greg">公历 ' + zangliFmtG(selD) + '</div>');
-  if (onT) rows.push('<div class="zangli-tib">藏历 ' + zlEsc(z.value || '') + '</div>');
+  rows.push('<div class="cal-greg">公历 ' + calFmtG(selD) + '</div>');
+  if (onT) rows.push('<div class="cal-tib">藏历 ' + zlEsc(z.value || '') + '</div>');
   if (onL && lv){
-    rows.push('<div class="zangli-lun">农历 ' + zlEsc(lv.gzYear) + '（' + zlEsc(lv.animal) + '）年 '
+    rows.push('<div class="cal-lun">农历 ' + zlEsc(lv.gzYear) + '（' + zlEsc(lv.animal) + '）年 '
       + zlEsc(lv.monthCn) + zlEsc(lv.dayCn) + '</div>');
   }
-  if (onB) rows.push('<div class="zangli-fob">佛历 ' + (selD.getFullYear() + 543) + ' 年</div>');
+  if (onB) rows.push('<div class="cal-fob">佛历 ' + (selD.getFullYear() + 543) + ' 年</div>');
 
   // 节日标签
   var chips = [];
@@ -6186,28 +6186,28 @@ function _zRenderMain(){
     if (z.extraInfo) zf.push(String(z.extraInfo).replace(/<br>/g,''));
     if (z.day === '初一' && z.month === '正') zf.push('藏历新年');
     if (z.extraInfo2) zf.push(z.extraInfo2);
-    zf.forEach(function(f){ chips.push('<span class="zangli-fest-name">' + zlEsc(f) + '</span>'); });
+    zf.forEach(function(f){ chips.push('<span class="cal-fest-name">' + zlEsc(f) + '</span>'); });
   }
   if (onL && lv){
     var lfm = zlLunarFest(selD, lv);
-    if (lfm) chips.push('<span class="zangli-fest-name zangli-fest-name-lun">' + zlEsc(lfm) + '</span>');
+    if (lfm) chips.push('<span class="cal-fest-name cal-fest-name-lun">' + zlEsc(lfm) + '</span>');
   }
   if (onF){
     var bf = zlBuddhistFest(selD);
-    if (bf) chips.push('<span class="zangli-fest-name zangli-fest-name-bud">' + zlEsc(bf) + '</span>');
+    if (bf) chips.push('<span class="cal-fest-name cal-fest-name-bud">' + zlEsc(bf) + '</span>');
   }
-  var chipHtml = chips.length ? '<div class="zangli-fest">' + chips.join('') + '</div>'
-    : '<div class="zangli-fest"><span style="color:var(--ink-soft)">本日无特定节日</span></div>';
+  var chipHtml = chips.length ? '<div class="cal-fest">' + chips.join('') + '</div>'
+    : '<div class="cal-fest"><span style="color:var(--ink-soft)">本日无特定节日</span></div>';
 
   // 法定放假 / 调休上班（属「法定节假日」图层）
   var holHtml = '';
   if (onH){
     if (hd && hd.type === 'off'){
-      holHtml = '<div><span class="zangli-fchip zangli-fchip-off">法定放假 · ' + zlEsc(hd.name) + '</span></div>';
+      holHtml = '<div><span class="cal-fchip cal-fchip-off">法定放假 · ' + zlEsc(hd.name) + '</span></div>';
     } else if (hd && hd.type === 'work'){
-      holHtml = '<div><span class="zangli-fchip zangli-fchip-work">调休上班 · 补' + zlEsc(hd.name) + '的班</span></div>';
+      holHtml = '<div><span class="cal-fchip cal-fchip-work">调休上班 · 补' + zlEsc(hd.name) + '的班</span></div>';
     } else if (!zlHolidayCovered(selD.getFullYear())){
-      holHtml = '<div><span class="zangli-fchip zangli-fchip-none">该年无官方放假安排（本页仅收录 2007–2026 年）</span></div>';
+      holHtml = '<div><span class="cal-fchip cal-fchip-none">该年无官方放假安排（本页仅收录 2007–2026 年）</span></div>';
     }
   }
 
@@ -6239,7 +6239,7 @@ function _zRenderMain(){
     }
   }
 
-  var main = '<div class="zangli-today">' + rows.join('') + chipHtml + holHtml + hairHtml + '</div>';
+  var main = '<div class="cal-today">' + rows.join('') + chipHtml + holHtml + hairHtml + '</div>';
 
   // ===== 月历 =====
   var first = new Date(v.y, v.m, 1, 0, 0, 0);
@@ -6249,10 +6249,10 @@ function _zRenderMain(){
   var budList = [];   // 本月佛节（供月历下方清单）
   var i;
   var rowLabeled = false;
-  for (i = 0; i < lead; i++) cells += '<div><div class="zangli-cell zangli-empty"></div></div>';
+  for (i = 0; i < lead; i++) cells += '<div><div class="cal-cell cal-empty"></div></div>';
   for (var d0 = 1; d0 <= dim; d0++){
     var d = new Date(v.y, v.m, d0, 0, 0, 0);
-    var zz = zangliOf(d);
+    var zz = tibetanOf(d);
     if (zz && zz.value === 'error') zz = null;
     var ll = zlLunar(d);
     var hh = zlCNHoliday(d);
@@ -6270,13 +6270,13 @@ function _zRenderMain(){
     var bfest = zlBuddhistFest(d);
     if (bfest) budList.push({ d: d, name: bfest });
 
-    var cls = 'zangli-cell';
-    if (isNew || (onT && zz && zz.extraInfo)) cls += ' zangli-cell-hasfest';
-    if (isToday) cls += ' zangli-cell-today';
-    if (isSel) cls += ' zangli-cell-sel';
-    if (isHui) cls += ' zangli-cell-huilun';
-    if (hairGood) cls += ' zangli-cell-hair';
-    if (hh && hh.type === 'off') cls += ' zangli-cell-off';
+    var cls = 'cal-cell';
+    if (isNew || (onT && zz && zz.extraInfo)) cls += ' cal-cell-hasfest';
+    if (isToday) cls += ' cal-cell-today';
+    if (isSel) cls += ' cal-cell-sel';
+    if (isHui) cls += ' cal-cell-huilun';
+    if (hairGood) cls += ' cal-cell-hair';
+    if (hh && hh.type === 'off') cls += ' cal-cell-off';
 
     // —— 固定插槽逐层一行，绝不叠压 ——
     // 角标（休/班）就排在阳历日数字之前，随行居中，不另占位、不压任何内容
@@ -6293,49 +6293,49 @@ function _zRenderMain(){
       rowLabeled = true;
     }
     // 第 1 行：阳历日（基准层，始终显示）；荟供日仅加粗黑（2026-09-25 第三轮去红）
-    var inner = '<span class="zangli-cell-g"' + (isHui ? ' style="font-weight:700"' : '') + '>' + badgeHtml + d0 + '</span>';
-    // 法定休假（2026-09-25 第三轮）：日期下紫横线由 CSS .zangli-cell-off 承担，格内加节日休假小字
-    if (offName) inner += '<span class="zangli-cell-fh">' + (offLabel ? zlEsc(offName) : '') + '</span>';
+    var inner = '<span class="cal-cell-g"' + (isHui ? ' style="font-weight:700"' : '') + '>' + badgeHtml + d0 + '</span>';
+    // 法定休假（2026-09-25 第三轮）：日期下紫横线由 CSS .cal-cell-off 承担，格内加节日休假小字
+    if (offName) inner += '<span class="cal-cell-fh">' + (offLabel ? zlEsc(offName) : '') + '</span>';
     // 第 2 行：藏历日
     if (onT){
-      inner += '<span class="zangli-cell-r">'
+      inner += '<span class="cal-cell-r">'
         + (bothLunar ? '<i class="zl-dot zl-dot-t"></i>' : '')
-        + '<span class="zangli-cell-t"' + (isHui ? ' style="font-weight:700"' : '') + '>'
+        + '<span class="cal-cell-t"' + (isHui ? ' style="font-weight:700"' : '') + '>'
         + zlEsc((zz && zz.day) ? zz.day : '') + '</span></span>';
     }
     // 第 3 行：农历日
     if (onL && ll){
-      inner += '<span class="zangli-cell-r">'
+      inner += '<span class="cal-cell-r">'
         + (bothLunar ? '<i class="zl-dot zl-dot-l"></i>' : '')
-        + '<span class="zangli-cell-n">' + zlEsc(zlLunarDayText(ll)) + '</span></span>';
+        + '<span class="cal-cell-n">' + zlEsc(zlLunarDayText(ll)) + '</span></span>';
     }
     // 角标已随阳历日行内联，此处不再另插
     // 右上角：理发吉祥日红点（藏历图层）
-    if (hairGood) inner += '<span class="zangli-hairdot" title="理发吉祥日"></span>';
+    if (hairGood) inner += '<span class="cal-hairdot" title="理发吉祥日"></span>';
     // 末行：节日名（藏历金色、农历靛蓝，各自独立成行）
-    if (onT && isNew) inner += '<span class="zangli-cell-f">洛萨</span>';
+    if (onT && isNew) inner += '<span class="cal-cell-f">洛萨</span>';
     else if (onT && zz && zz.extraInfo){
       var tf = String(zz.extraInfo).replace(/<br>/g,'')
         .replace('莲师荟供日','莲师荟供').replace('空行母荟供日','空行荟供').replace('节日','');
-      if (tf) inner += '<span class="zangli-cell-f' + (isHui ? ' zangli-cell-hui' : '') + '">' + zlEsc(tf) + '</span>';
+      if (tf) inner += '<span class="cal-cell-f' + (isHui ? ' cal-cell-hui' : '') + '">' + zlEsc(tf) + '</span>';
     }
-    if (lfest) inner += '<span class="zangli-cell-fp">' + zlEsc(lfest) + '</span>';
-    if (bfest) inner += '<span class="zangli-cell-fb">' + zlEsc(bfest) + '</span>';
+    if (lfest) inner += '<span class="cal-cell-fp">' + zlEsc(lfest) + '</span>';
+    if (bfest) inner += '<span class="cal-cell-fb">' + zlEsc(bfest) + '</span>';
 
     cells += '<div><div class="' + cls + '" onclick="_zCellClick(' + d.getTime() + ')">' + inner + '</div></div>';
   }
 
-  var table = '<div class="zangli-cal">'
-    + '<div class="zangli-cal-head">'
-    + '<button type="button" onclick="zangliShift(0,-1)">‹ 上月</button>'
-    + '<div class="zangli-cal-title">' + v.y + '年' + (v.m+1) + '月'
-    + (onB ? '<span class="zangli-be">佛历 ' + (v.y + 543) + ' 年</span>' : '')
+  var table = '<div class="cal-card">'
+    + '<div class="cal-card-head">'
+    + '<button type="button" onclick="calShift(0,-1)">‹ 上月</button>'
+    + '<div class="cal-card-title">' + v.y + '年' + (v.m+1) + '月'
+    + (onB ? '<span class="cal-be">佛历 ' + (v.y + 543) + ' 年</span>' : '')
     + ' <small>（点任一天查询）</small></div>'
-    + '<button type="button" onclick="zangliShift(0,1)">下月 ›</button>'
-    + '<button type="button" onclick="zangliToday()" title="回到今天的日期与本月">◎ 今天</button>'
+    + '<button type="button" onclick="calShift(0,1)">下月 ›</button>'
+    + '<button type="button" onclick="calToday()" title="回到今天的日期与本月">◎ 今天</button>'
     + '</div>'
-    + '<div class="zangli-week"><div>日</div><div>一</div><div>二</div><div>三</div><div>四</div><div>五</div><div>六</div></div>'
-    + '<div class="zangli-grid">' + cells + '</div>'
+    + '<div class="cal-week"><div>日</div><div>一</div><div>二</div><div>三</div><div>四</div><div>五</div><div>六</div></div>'
+    + '<div class="cal-grid">' + cells + '</div>'
     + '</div>';
   var budHtml = '';
   if (onF && budList.length){
@@ -6345,7 +6345,7 @@ function _zRenderMain(){
       return '<li><span class="zbd">' + zlEsc(x.name) + '</span> · 农历 ' + zlEsc(md)
         + ' · 公历 ' + (x.d.getMonth() + 1) + ' 月 ' + x.d.getDate() + ' 日</li>';
     }).join('');
-    budHtml = '<div class="zangli-blist"><div class="zangli-blist-t">📿 本月佛教节日（'
+    budHtml = '<div class="cal-blist"><div class="cal-blist-t">📿 本月佛教节日（'
       + (v.m + 1) + ' 月，共 ' + budList.length + ' 个）</div><ul>' + lis + '</ul></div>';
   }
   box.innerHTML = main + table + budHtml;
@@ -6365,7 +6365,7 @@ def _js_str_literal(s):
             .replace("\u2029", "\\u2029"))
 
 
-def zangli_page_js():
+def cal_page_js():
     """返回「修行日历」共享脚本（样式与正文已注入为常量）。"""
     return (ZANGLI_PAGE_JS
             .replace("@@ZANGLI_CSS_JSON@@", _js_str_literal(ZANGLI_CSS_BODY))
@@ -6817,14 +6817,14 @@ def main():
     # 确保 qrcode 暴露为全局变量（UMD 库在浏览器中可能不自动挂载）
     qrcode_lib += "\n;window.qrcode = (typeof qrcode !== 'undefined') ? qrcode : (window.qrcode || null);\n"
     html_out = html_out.replace("@@QRCODE_LIB@@", qrcode_lib)
-    # 2026-09-22（小谦指示）：日历三库不再内联首包，改合成为 dist/zangli-lib.js（按需加载）。
-    #   三库合计 60.3KB，而它们**只在「修行日历」页（#/__zangli）用得到** —— 首屏不该付出这份体积。
+    # 2026-09-22（小谦指示）：日历三库不再内联首包，改合成为 dist/calendar-lib.js（按需加载）。
+    #   三库合计 60.3KB，而它们**只在「修行日历」页（#/__calendar）用得到** —— 首屏不该付出这份体积。
     #   口径与 practice.js（§7.7）一致：脚本本体落 dist，首页只留极小的加载器（见 PAGE_TEMPLATE）。
-    #   独立页 zangli.html 仍内联（单文件自足，无首包问题）。
+    #   独立页 calendar.html 仍内联（单文件自足，无首包问题）。
     _zl_parts = []
-    zangli_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "content", "assets", "zangli.js")
-    if os.path.exists(zangli_path):
-        with open(zangli_path, "r", encoding="utf-8") as f:
+    tibetan_js_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "content", "assets", "zangli.js")
+    if os.path.exists(tibetan_js_path):
+        with open(tibetan_js_path, "r", encoding="utf-8") as f:
             _zl_parts.append(f.read())
         # 防库尾 zangli_callback 干扰：强制为无回调环境
         _zl_parts.append("\n;window.getZangli = (typeof getZangli === 'function') ? getZangli : window.getZangli;\n")
@@ -6851,14 +6851,14 @@ def main():
     import hashlib as _zlhash
     _zl_ver = _zlhash.sha256(_zl_lib.encode("utf-8")).hexdigest()[:8]   # 内容哈希做破缓存版本
     os.makedirs(DIST_DIR, exist_ok=True)
-    _zl_out = os.path.join(DIST_DIR, "zangli-lib.js")
+    _zl_out = os.path.join(DIST_DIR, "calendar-lib.js")
     with open(_zl_out, "w", encoding="utf-8", newline="") as _zlf:
         _zlf.write(_zl_lib)
     print("日历库: %s（按需加载/%.1f KB/ver=%s）" % (_zl_out, os.path.getsize(_zl_out) / 1024.0, _zl_ver))
     html_out = html_out.replace("@@ZANGLI_LIB_VER@@", _zl_ver)
 
     # 注入「修行日历」页面脚本（样式/正文/脚本三份单一来源，主站与独立页共用）
-    html_out = html_out.replace("@@ZANGLI_PAGE_JS@@", zangli_page_js())
+    html_out = html_out.replace("@@ZANGLI_PAGE_JS@@", cal_page_js())
     # 功课页按需加载：此处只注入版本号，脚本本体落在 dist/practice.js（§7.7 不膨胀首包）
     html_out = html_out.replace("@@PRACTICE_VER@@", practice_bundle_ver())
 
@@ -7018,6 +7018,15 @@ def main():
     if os.path.exists(_headers_src):
         shutil.copy2(_headers_src, os.path.join(DIST_DIR, "_headers"))
 
+    # 复制 Cloudflare Pages 的 _redirects（2026-09-26 新增：/zangli → /calendar 301）
+    # 旧址书签/分享链接/二维码靠它不失效；缺了它旧链接会 404（或被登录门槛拦下）。
+    _redirects_src = os.path.join(os.path.dirname(os.path.abspath(__file__)), "cloudflare", "_redirects")
+    if os.path.exists(_redirects_src):
+        shutil.copy2(_redirects_src, os.path.join(DIST_DIR, "_redirects"))
+        print("重定向表已复制: dist/_redirects")
+    else:
+        print("⚠️ 警告：未找到 cloudflare/_redirects——旧址 /zangli 将无法跳转！")
+
     # 复制 _routes.json（2026-09-12 新增，全站访问门槛必需）
     # include:["/*"] + exclude:[] 强制所有请求都先经 functions/_middleware.js 鉴权；
     # 若此文件缺失，wrangler 会自动生成排除静态资源的规则，mp3/json/首页将绕过鉴权直接暴露。
@@ -7096,11 +7105,11 @@ def main():
     print("破缓存: index.html 内 ?v= 注入 %d 处；处理文本产物 %d 个" % (
         len(_re_bust.findall(r"\?v=[0-9a-f]{8}", _probe)), len(_text_targets)))
 
-    # ---- 修行日历独立页（2026-09-19 小谦指示；2026-09-20 更名）：dist/zangli.html ----
+    # ---- 修行日历独立页（2026-09-19 小谦指示；2026-09-20 更名）：dist/calendar.html ----
     # 公开单页：纯历表数据无站内内容；无登录墙（middleware isPublicPath 放行）；
     # 单文件自足（zangli.js/solarlunar/cn-holidays/qrcode 全内联），支持多日历叠加/查询/月历/回到今天/理发/荟供；
     # 页脚二维码按当前地址实时生成（location.href，多域访问各自可扫）。
-    _emit_standalone_zangli(DIST_DIR)
+    _emit_standalone_cal(DIST_DIR)
 
     # ---- 功课独立页（2026-09-22）：dist/practice.html ----
     # 公开页壳（零内容）；数据接口仍由 Worker 按会话/设备鉴权。
@@ -7110,7 +7119,7 @@ def main():
 
 
 # ---- 修行日历独立页生成器（2026-09-19 新增；2026-09-20 更名并升级为多日历叠加）----
-# dist/zangli.html 公开可收藏；文件名沿用 zangli.html（既往分享链接/二维码不失效）。
+# dist/calendar.html 公开可收藏；文件名沿用 calendar.html（既往分享链接/二维码不失效）。
 # 单一来源：样式 ZANGLI_CSS_BODY、正文 ZANGLI_BODY_HTML、脚本 ZANGLI_PAGE_JS
 #          —— 与主站「修行日历」模块完全同源，改一处即两处生效，不再需要「两处同步」。
 STANDALONE_Z_HEAD = """<!DOCTYPE html>
@@ -7129,20 +7138,20 @@ body{margin:0;padding:1.1rem 1rem 3rem;background:var(--bg);color:var(--ink);
 h1{font-size:1.3rem;margin:.2rem 0 .4rem}
 a{color:var(--accent)}
 @@ZANGLI_CSS@@
-.zangli-qr{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:1rem;margin-top:1.1rem;text-align:center}
-.zangli-qrbox{display:inline-block;margin:.4rem 0}
-.zangli-qrhint{color:var(--ink-soft);font-size:.8rem;line-height:1.7;overflow-wrap:anywhere}
+.cal-qr{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:1rem;margin-top:1.1rem;text-align:center}
+.cal-qrbox{display:inline-block;margin:.4rem 0}
+.cal-qrhint{color:var(--ink-soft);font-size:.8rem;line-height:1.7;overflow-wrap:anywhere}
 .zl-foot{color:var(--ink-soft);font-size:.76rem;margin-top:.9rem;line-height:1.7}
 </style>
 </head>
 <body>
 @@ZANGLI_BODY@@
-<div class="zangli-wrap">
-<div class="zangli-qr">
-<div class="zangli-cal-title" style="margin-bottom:.4rem">📲 收藏与分享</div>
-<p class="zangli-qrhint">手机浏览器菜单里「添加到主屏幕」即可像 App 一样从桌面打开；下方二维码即本页地址，长按或截图可分享。</p>
-<div class="zangli-qrbox" id="qrbox"></div>
-<div class="zangli-qrhint" id="qrhint"></div>
+<div class="cal-wrap">
+<div class="cal-qr">
+<div class="cal-card-title" style="margin-bottom:.4rem">📲 收藏与分享</div>
+<p class="cal-qrhint">手机浏览器菜单里「添加到主屏幕」即可像 App 一样从桌面打开；下方二维码即本页地址，长按或截图可分享。</p>
+<div class="cal-qrbox" id="qrbox"></div>
+<div class="cal-qrhint" id="qrhint"></div>
 </div>
 <p class="zl-foot">本页为龙的传人网站（longchen-nyingtik.wiki）「修行日历」独立版，只含历表数据与公开节日，不含站内内容。</p>
 </div>
@@ -7165,11 +7174,11 @@ a{color:var(--accent)}
     if (m0 && m0.length === 3 && !isNaN(+m0[0])){
       var sd = new Date(+m0[0], +m0[1]-1, +m0[2], 0, 0, 0);
       window._zView = { y: sd.getFullYear(), m: sd.getMonth(), sel: sd };
-      var inp = document.getElementById('zangliDate');
+      var inp = document.getElementById('calDate');
       if (inp) inp.value = dp;
     }
   } catch (e) {}
-  initZangliPage();
+  initCalPage();
   // 二维码：按当前地址实时生成（哪个域打开就回到哪个域）
   try {
     var qr = qrcode(0, 'M');
@@ -7191,8 +7200,8 @@ a{color:var(--accent)}
 STANDALONE_ZANGLI_JS_INJECT = """;window.getZangli = (typeof getZangli === 'function') ? getZangli : window.getZangli;"""
 
 
-def _emit_standalone_zangli(dist_dir):
-    standalone_path = os.path.join(dist_dir, "zangli.html")
+def _emit_standalone_cal(dist_dir):
+    standalone_path = os.path.join(dist_dir, "calendar.html")
     here = os.path.dirname(os.path.abspath(__file__))
     def _read(p, fallback):
         try:
@@ -7200,7 +7209,7 @@ def _emit_standalone_zangli(dist_dir):
                 return f.read()
         except OSError:
             return fallback
-    zangli_js = _read(os.path.join(CONTENT_DIR, "assets", "zangli.js"),
+    tibetan_js_src = _read(os.path.join(CONTENT_DIR, "assets", "zangli.js"),
                       "/* zangli.js missing */") + STANDALONE_ZANGLI_JS_INJECT
     solarlunar_js = _read(os.path.join(CONTENT_DIR, "assets", "solarlunar.min.js"),
                           "/* solarlunar.min.js missing */")
@@ -7208,13 +7217,13 @@ def _emit_standalone_zangli(dist_dir):
                            "window.CN_HOLIDAYS = null;")
     qrcode_js = _read(os.path.join(here, "qrcode.min.js"), "/* qrcode.min.js missing */")
     html = (STANDALONE_Z_HEAD
-            .replace("@@ZANGLI_JS@@", zangli_js)
+            .replace("@@ZANGLI_JS@@", tibetan_js_src)
             .replace("@@SOLARLUNAR_JS@@", solarlunar_js)
             .replace("@@CN_HOLIDAYS_JS@@", cn_holidays_js)
             .replace("@@QRCODE_JS@@", qrcode_js)
             .replace("@@ZANGLI_CSS@@", ZANGLI_CSS_BODY)
             .replace("@@ZANGLI_BODY@@", ZANGLI_BODY_HTML)
-            .replace("@@ZANGLI_PAGE_JS@@", zangli_page_js()))
+            .replace("@@ZANGLI_PAGE_JS@@", cal_page_js()))
     with open(standalone_path, "w", encoding="utf-8", newline="") as f:
         f.write(html)
     print("修行日历独立页: %s（公开/可收藏/%.1f KB）" % (standalone_path, os.path.getsize(standalone_path) / 1024.0))

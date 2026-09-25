@@ -131,7 +131,7 @@ def cmd_status(_):
     print("线上缓存头（Purge 是否生效 / O-01 观察）：")
     for u in ["https://%s/robots.txt" % ZONE_NAME,
               "https://%s/practice.js" % ZONE_NAME,
-              "https://%s/zangli.html" % ZONE_NAME]:
+              "https://%s/calendar.html" % ZONE_NAME]:  # 2026-09-26 由 zangli.html 更名
         st, h = http_head(u)
         print("  %-44s %s  Cache-Control=%s  cf-cache-status=%s"
               % (u, st, h.get("Cache-Control") or h.get("err") or "(无)", h.get("cf-cache-status") or "-"))

@@ -32,9 +32,11 @@ const ROBOTS_HEADER = "noindex, nofollow, noarchive, nosnippet, noimageindex";
 function isPublicPath(path) {
   if (path === "/robots.txt") return true;
   if (path === "/admin" || path === "/admin/" || path.startsWith("/admin/")) return true;
-  // 藏历独立页（2026-09-19 小谦指示）：公开——纯节日历表数据，无站内内容、无用户数据；
-  // 收藏/分享/扫码直达。noindex 照常由 withNoindex 盖章。
-  //注意：Cloudflare Pages 对 /zangli.html 会做「去扩展名」308 重定向到 /zangli，两种形态都要放行。
+  // 修行日历独立页（2026-09-19 小谦指示；2026-09-26 由 /zangli 更名 /calendar）：
+  // 公开——纯历表数据，无站内内容、无用户数据；收藏/分享/扫码直达。noindex 照常由 withNoindex 盖章。
+  //注意：Cloudflare Pages 对 /calendar.html 会做「去扩展名」308 重定向到 /calendar，两种形态都要放行。
+  if (path === "/calendar.html" || path === "/calendar" || path === "/calendar/") return true;
+  // 旧址 /zangli 必须【继续放行】：否则旧链接会先被登录门槛拦下，_redirects 的 301 根本没机会执行。
   if (path === "/zangli.html" || path === "/zangli" || path === "/zangli/") return true;
   // 功课独立页（2026-09-22）：页壳公开（零内容），数据接口仍由 Worker 按会话/设备鉴权。
   // 之所以要公开：管理员设备免密访问时没有会话 Cookie，需能落到页面；写入仍需登录会话。
