@@ -5693,10 +5693,10 @@ ZANGLI_CSS_BODY = r"""
 .zangli-fest{margin-top:.55rem;font-size:1.02rem;color:var(--ink);line-height:1.65}
 .zangli-fest-name{display:inline-block;background:var(--accent);color:#fff;border-radius:6px;padding:.12rem .55rem;margin-right:.45rem;font-weight:600}
 .zangli-fest-name-lun{background:#2f6f8a}
-.zangli-fest-name-bud{background:#b0342c}
+.zangli-fest-name-bud{background:#c2571a}
 /* 佛历（2026-09-25 新增）：大卡第四行＝佛涅槃纪年；月历标题里的 .zangli-be 同色 */
-.zangli-fob{font-size:.95rem;font-weight:600;color:#b0342c;margin:.2rem 0 0}
-.zangli-be{color:#b0342c;font-weight:400;font-size:.82em;margin-left:.15rem}
+.zangli-fob{font-size:.95rem;font-weight:600;color:#8a6a0d;margin:.2rem 0 0}
+.zangli-be{color:#8a6a0d;font-weight:400;font-size:.82em;margin-left:.15rem}
 .zangli-fchip{display:inline-block;border-radius:6px;padding:.14rem .55rem;margin:.25rem .45rem 0 0;font-size:.88rem;font-weight:600}
 .zangli-fchip-off{background:#7a5aa6;color:#fff}
 .zangli-fchip-work{background:#ded2ec;color:#3d2a55}
@@ -5726,8 +5726,8 @@ ZANGLI_CSS_BODY = r"""
 .zl-dot-h{background:#7a5aa6}
 .zangli-cell-f{display:block;font-size:.62em;color:#b08d2f;line-height:1.2;overflow-wrap:anywhere;max-width:100%}
 .zangli-cell-fp{display:block;font-size:.62em;color:#2f6f8a;line-height:1.2;overflow-wrap:anywhere;max-width:100%}
-/* 2026-09-25（小谦指示）：格内汉传佛教节日名（朱红，佛节图层）——与藏历金/农历靛并列第三种 */
-.zangli-cell-fb{display:block;font-size:.62em;color:#b0342c;line-height:1.2;overflow-wrap:anywhere;max-width:100%}
+/* 2026-09-25（小谦指示，同日第二轮改橘）：格内汉传佛教节日名（深橘 #c2571a，佛节图层）——藏历金/农历靛/佛节橘三种分明 */
+.zangli-cell-fb{display:block;font-size:.62em;color:#c2571a;line-height:1.2;overflow-wrap:anywhere;max-width:100%}
 .zangli-cell-today{box-shadow:inset 0 0 0 2px var(--accent)}
 .zangli-cell-sel{background:var(--surface-soft);outline:1px solid var(--accent)}
 .zangli-cell-hasfest .zangli-cell-t{color:var(--accent);font-weight:700}
@@ -5738,7 +5738,7 @@ ZANGLI_CSS_BODY = r"""
 .zangli-cell-f.zangli-cell-hui{color:var(--accent);font-weight:700}
 /* 本月佛教节日清单（2026-09-25 新增，佛节图层开启且有节日时显示） */
 .zangli-blist{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:.9rem 1.1rem;margin:.9rem 0 0;font-size:.92rem;overflow-wrap:break-word}
-.zangli-blist-t{font-weight:700;color:#b0342c;margin-bottom:.35rem}
+.zangli-blist-t{font-weight:700;color:#c2571a;margin-bottom:.35rem}
 .zangli-blist ul{margin:0;padding-left:1.1rem;list-style:disc}
 .zangli-blist li{margin:.3rem 0;line-height:1.6}
 .zangli-blist .zbd{font-weight:600;color:var(--ink)}
@@ -5753,8 +5753,7 @@ ZANGLI_CSS_BODY = r"""
 .zangli-querybar input[type=date]{padding:.5rem .7rem;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--ink);font-family:inherit;max-width:42vw}
 .zangli-querybar button{padding:.5rem .9rem;border:1px solid var(--accent);background:var(--accent);color:#fff;border-radius:8px;cursor:pointer;font-family:inherit}
 .zl-layers{display:flex;flex-wrap:wrap;gap:.5rem;align-items:center;margin:.95rem 0 .1rem}
-.zl-chip{display:inline-flex;align-items:center;gap:.42rem;border:1px solid var(--line);background:var(--surface);color:var(--ink-soft);border-radius:999px;padding:.42rem .85rem;font-family:inherit;font-size:.86rem;line-height:1;cursor:pointer;white-space:nowrap}
-.zl-chip .zl-sw{border:1px solid var(--line);width:10px;height:10px;border-radius:3px;flex:none}
+.zl-chip{display:inline-flex;align-items:center;justify-content:center;gap:.42rem;border:1px solid var(--line);background:var(--surface);color:var(--ink-soft);border-radius:999px;padding:.42rem .85rem;font-family:inherit;font-size:.86rem;line-height:1;cursor:pointer;white-space:nowrap}
 .zl-chip-on{color:#fff;font-weight:600;border-color:transparent}
 /* 2026-09-22（小谦指示）：阳历为「基准层」，永不可关（始终显示）。
    此前它与三颗真开关是**同款胶囊**（仅加 cursor:default + opacity:.9），
@@ -5762,22 +5761,16 @@ ZANGLI_CSS_BODY = r"""
    （《网站功能设计规则总纲》V 系列：说法与实现不符，既不报错也不被任何门禁抓到）。
    现把视觉语言彻底分开：
      · 虚线边框（三颗真开关＝实线）——一眼可辨「这不是按钮」
-     · 不放 .zl-sw 方块（方块本身就是「可勾选开关」的暗示）
+     · 2026-09-25 起全站开关去方块（文字居中、选中整底变色），基准层同样无方块
      · 次级文字色 + cursor:default，且语义上仍是非交互的 <span>
    「始终显示」四个字由 .zl-base-tag 以细分隔线承接，替代原「（常显）」。 */
 .zl-chip-base{display:inline-flex;align-items:center;gap:.42rem;border:1px dashed var(--line);background:transparent;color:var(--ink-soft);border-radius:999px;padding:.42rem .72rem;font-family:inherit;font-size:.86rem;line-height:1;white-space:nowrap;cursor:default}
 .zl-base-tag{font-size:.78em;opacity:.8;border-left:1px solid var(--line);padding-left:.4rem;letter-spacing:.02em}
-.zl-chip[data-layer=t] .zl-sw{background:var(--accent);border-color:var(--accent)}
-.zl-chip[data-layer=l] .zl-sw{background:#2f6f8a;border-color:#2f6f8a}
-.zl-chip[data-layer=h] .zl-sw{background:#7a5aa6;border-color:#7a5aa6}
 .zl-chip[data-layer=t].zl-chip-on{background:var(--accent)}
-.zl-chip[data-layer=b] .zl-sw{background:#b0342c;border-color:#b0342c}
-.zl-chip[data-layer=f] .zl-sw{background:#b0342c;border-color:#b0342c}
-.zl-chip[data-layer=b].zl-chip-on{background:#b0342c}
+.zl-chip[data-layer=b].zl-chip-on{background:#8a6a0d}
 .zl-chip[data-layer=l].zl-chip-on{background:#2f6f8a}
-.zl-chip[data-layer=f].zl-chip-on{background:#b0342c}
+.zl-chip[data-layer=f].zl-chip-on{background:#c2571a}
 .zl-chip[data-layer=h].zl-chip-on{background:#7a5aa6}
-.zl-chip:not(.zl-chip-on) .zl-sw{opacity:.35}
 .zl-tip{color:var(--ink-soft);font-size:.78rem;margin:.45rem 0 .1rem;line-height:1.65}
 .zangli-qr{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:1rem;margin-top:1.1rem;text-align:center}
 .zangli-qrbox{display:inline-block;margin:.4rem 0}
@@ -5846,7 +5839,7 @@ ZANGLI_BODY_HTML = """
 <li><span class="zl-key" style="background:var(--accent)"></span>红框＝今天。</li>
 <li><span class="zl-key" style="background:#f1e9db;border:1px solid var(--accent)"></span>灰底＝当前选中的日子。</li>
 <li><span class="zl-key" style="background:#b08d2f"></span>金色小字＝藏历节日名；靛蓝小字＝农历传统节日名。</li>
-<li><span class="zl-key" style="background:#b0342c"></span>朱红小字＝汉传佛教节日（佛节图层）。</li>
+<li><span class="zl-key" style="background:#c2571a"></span>橙色小字＝汉传佛教节日（佛节图层）。</li>
 <li>点月历里任意一天，即在上方大卡中查看该日详情。</li>
 </ul>
 <h4 style="color:var(--accent)">「藏历」图层（默认开启）</h4>
@@ -5856,10 +5849,10 @@ ZANGLI_BODY_HTML = """
 <li><span class="zl-key" style="background:var(--accent);border-radius:50%"></span>右上角红点＝理发吉祥日，含藏历日序吉日与「八吉同聚」日。</li>
 <li>大卡中显示该日理发的吉凶与出处。</li>
 </ul>
-<h4 style="color:#b0342c">「佛历」「佛节」图层（默认开启）</h4>
+<h4 style="color:#8a6a0d">「佛历」「佛节」图层（默认开启）</h4>
 <ul>
-<li>佛历＝以佛涅槃之年为纪元的佛教纪年，佛历年＝公历年＋543（通行简化式，全年不跨年）；显示在月历标题与大卡中。</li>
-<li><span class="zl-key" style="background:#b0342c"></span>朱红字＝汉传佛教节日，依农历逐日标注：四月初八释迦牟尼佛圣诞、六月十九观音菩萨成道日、九月十九观音菩萨出家日、腊月初八释迦牟尼佛成道日等 22 个。</li>
+<li><span class="zl-key" style="background:#8a6a0d"></span>佛黄字＝佛历纪年。佛历＝以佛涅槃之年为纪元的佛教纪年，佛历年＝公历年＋543（通行简化式，全年不跨年）；显示在月历标题与大卡中。</li>
+<li><span class="zl-key" style="background:#c2571a"></span>橙色字＝汉传佛教节日，依农历逐日标注：四月初八释迦牟尼佛圣诞、六月十九观音菩萨成道日、九月十九观音菩萨出家日、腊月初八释迦牟尼佛成道日等 22 个。</li>
 <li>闰月不重复过节；农历小月无三十日时，「三十」的节日并至廿九并注明（小月）。</li>
 <li>月历下方附「本月佛教节日」清单，进页即可一览本月殊胜日。</li>
 </ul>
@@ -5976,7 +5969,7 @@ function zlRenderChips(){
         + ' aria-pressed="' + (on ? 'true' : 'false') + '"'
         + ' title="点击' + (on ? '隐藏' : '显示') + '「' + zlEsc(d.n) + '」"'
         + ' onclick="zlToggleLayer(\'' + d.k + '\')">'
-        + '<span class="zl-sw"></span>' + zlEsc(d.n) + '</button>';
+        + zlEsc(d.n) + '</button>';
     }
   });
   box.innerHTML = html;
