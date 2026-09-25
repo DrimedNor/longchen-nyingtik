@@ -5715,9 +5715,11 @@ ZANGLI_CSS_BODY = r"""
 .zangli-hairdot{position:absolute;top:3px;right:4px;width:6px;height:6px;border-radius:50%;background:var(--accent)}
 .zl-badge{display:inline-block;font-size:.62em;line-height:1.15;padding:0 2px;margin-right:2px;border-radius:3px;font-weight:600;vertical-align:.08em}
 .zl-badge-work{background:#ded2ec;color:#3d2a55}
-/* 2026-09-25 第三轮：法定连休＝日期下紫横线（相邻格相连成一线）＋「XX休假」小字，取代单枚「休」角标 */
-.zangli-cell-off .zangli-cell-g{display:block;width:calc(100% + 6px);max-width:none;margin:0 -3px;border-bottom:3px solid #7a5aa6;padding-bottom:1px}/* width=100%+6px、负边距外扩 3px：跨过 1px 格内边距＋2px 格间距，相邻连休格横线连成一线。⚠️ max-width:none 必须显式写——主站有通用规则 *{max-width:100%}（独立页没有），不写它 94px 会被压回 88px、横线断成两截（2026-09-25 第四轮实测）。小谦指示 */
-.zangli-cell-fh{display:block;font-size:.62em;color:#7a5aa6;font-weight:600;line-height:1.2;overflow-wrap:anywhere;max-width:100%}
+/* 2026-09-25 第五轮（小谦指示）：法定连休＝紫底白字加宽色块（相邻格外扩相接成一条带），取代原 3px 细横线＋紫色小字。
+   每行（每周）只在第一个放假的格显示节日名，其余放假日只留纯紫块，更简洁。色块用 flex order:99 压到格底对齐成带。 */
+.zangli-cell-off .zangli-cell-g{border-bottom:0;margin:0;width:auto;max-width:100%;padding-bottom:0}
+.zangli-cell-fh{display:block;overflow-wrap:anywhere;max-width:100%}
+.zangli-cell-off .zangli-cell-fh{order:99;background:#7a5aa6;color:#fff;font-weight:600;font-size:.66em;text-align:center;border-radius:5px;padding:.16rem .2rem;margin:auto -3px 1px;width:calc(100% + 6px);max-width:none;line-height:1.15;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;box-shadow:0 1px 2px rgba(0,0,0,.18)}
 .zangli-cell-g{font-size:.82em;color:var(--ink-soft);line-height:1.2}
 .zangli-cell-r{display:flex;align-items:center;justify-content:center;gap:3px;max-width:100%;line-height:1.2}
 .zangli-cell-t{font-size:.9em;color:var(--ink);line-height:1.2}
@@ -5777,7 +5779,7 @@ ZANGLI_CSS_BODY = r"""
 .zangli-qr{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:1rem;margin-top:1.1rem;text-align:center}
 .zangli-qrbox{display:inline-block;margin:.4rem 0}
 .zangli-qrhint{color:var(--ink-soft);font-size:.8rem;line-height:1.7;overflow-wrap:anywhere}
-@media(max-width:768px){.zangli-cell{padding:.18rem 1px}.zangli-cell-g{font-size:.72em}.zangli-cell-t{font-size:.78em}.zangli-cell-n{font-size:.68em}.zangli-cell-f,.zangli-cell-fb,.zangli-cell-fp,.zangli-cell-fh{display:none}.zangli-today{padding:.9rem .9rem}.zangli-tib{font-size:1.12rem}.zangli-lun{font-size:1rem}.zangli-fest{font-size:.95rem}.zangli-cal{padding:.7rem}.zl-chip{padding:.38rem .7rem;font-size:.8rem}.zl-chip-base{padding:.38rem .62rem;font-size:.8rem}.zl-badge{font-size:.46em}.zl-dot{width:3px;height:3px}.zangli-cell-r{gap:2px}}
+@media(max-width:768px){.zangli-cell{padding:.18rem 1px}.zangli-cell-g{font-size:.72em}.zangli-cell-t{font-size:.78em}.zangli-cell-n{font-size:.68em}.zangli-cell-f,.zangli-cell-fb,.zangli-cell-fp{display:none}/* 2026-09-25 第五轮：.zangli-cell-fh（紫底白字放假带）不再隐藏，窄屏也显示（原先手机端看不到是哪个节） */.zangli-today{padding:.9rem .9rem}.zangli-tib{font-size:1.12rem}.zangli-lun{font-size:1rem}.zangli-fest{font-size:.95rem}.zangli-cal{padding:.7rem}.zl-chip{padding:.38rem .7rem;font-size:.8rem}.zl-chip-base{padding:.38rem .62rem;font-size:.8rem}.zl-badge{font-size:.46em}.zl-dot{width:3px;height:3px}.zangli-cell-r{gap:2px}}
 /* 2026-09-22（小谦指示 · 方案 B）：窄屏隐藏格子内的节日名（.zangli-cell-f 藏历金 / .zangli-cell-fp 农历靛蓝）。
    沿革：此前用 font-size:.54em 硬压 —— 320px 下实测仅 9.72px（不可读），
    而渲染门禁量的是**几何**、不量**字号**，照样报「0 问题」（教训：不溢出 ≠ 可读）。
@@ -6205,6 +6207,7 @@ function _zRenderMain(){
   var cells = '';
   var budList = [];   // 本月佛节（供月历下方清单）
   var i;
+  var rowLabeled = false;
   for (i = 0; i < lead; i++) cells += '<div><div class="zangli-cell zangli-empty"></div></div>';
   for (var d0 = 1; d0 <= dim; d0++){
     var d = new Date(v.y, v.m, d0, 0, 0, 0);
@@ -6212,6 +6215,8 @@ function _zRenderMain(){
     if (zz && zz.value === 'error') zz = null;
     var ll = zlLunar(d);
     var hh = zlCNHoliday(d);
+    var col = (lead + (d0 - 1)) % 7;
+    if (col === 0) rowLabeled = false;
     var isHui = !!(onT && zz && zz.extraInfo && String(zz.extraInfo).indexOf('荟供') >= 0);
     var isNew = !!(onT && zz && zz.day === '初一' && zz.month === '正');
     var isToday = (zlKey(d) === zlKey(today));
@@ -6243,11 +6248,13 @@ function _zRenderMain(){
       var hn = hh.name;
       var hnShort = (hn === '春节' || hn === '元旦' || hn === '劳动节') ? hn : hn.replace(/节$/, '');
       offName = hnShort + '休假';
+      var offLabel = !rowLabeled;
+      rowLabeled = true;
     }
     // 第 1 行：阳历日（基准层，始终显示）；荟供日仅加粗黑（2026-09-25 第三轮去红）
     var inner = '<span class="zangli-cell-g"' + (isHui ? ' style="font-weight:700"' : '') + '>' + badgeHtml + d0 + '</span>';
     // 法定休假（2026-09-25 第三轮）：日期下紫横线由 CSS .zangli-cell-off 承担，格内加节日休假小字
-    if (offName) inner += '<span class="zangli-cell-fh">' + zlEsc(offName) + '</span>';
+    if (offName) inner += '<span class="zangli-cell-fh">' + (offLabel ? zlEsc(offName) : '') + '</span>';
     // 第 2 行：藏历日
     if (onT){
       inner += '<span class="zangli-cell-r">'
