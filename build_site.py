@@ -5693,6 +5693,10 @@ ZANGLI_CSS_BODY = r"""
 .zangli-fest{margin-top:.55rem;font-size:1.02rem;color:var(--ink);line-height:1.65}
 .zangli-fest-name{display:inline-block;background:var(--accent);color:#fff;border-radius:6px;padding:.12rem .55rem;margin-right:.45rem;font-weight:600}
 .zangli-fest-name-lun{background:#2f6f8a}
+.zangli-fest-name-bud{background:#b0342c}
+/* 佛历（2026-09-25 新增）：大卡第四行＝佛涅槃纪年；月历标题里的 .zangli-be 同色 */
+.zangli-fob{font-size:.95rem;font-weight:600;color:#b0342c;margin:.2rem 0 0}
+.zangli-be{color:#b0342c;font-weight:400;font-size:.82em;margin-left:.15rem}
 .zangli-fchip{display:inline-block;border-radius:6px;padding:.14rem .55rem;margin:.25rem .45rem 0 0;font-size:.88rem;font-weight:600}
 .zangli-fchip-off{background:#7a5aa6;color:#fff}
 .zangli-fchip-work{background:#ded2ec;color:#3d2a55}
@@ -5722,6 +5726,8 @@ ZANGLI_CSS_BODY = r"""
 .zl-dot-h{background:#7a5aa6}
 .zangli-cell-f{display:block;font-size:.62em;color:#b08d2f;line-height:1.2;overflow-wrap:anywhere;max-width:100%}
 .zangli-cell-fp{display:block;font-size:.62em;color:#2f6f8a;line-height:1.2;overflow-wrap:anywhere;max-width:100%}
+/* 2026-09-25（小谦指示）：格内汉传佛教节日名（朱红，佛节图层）——与藏历金/农历靛并列第三种 */
+.zangli-cell-fb{display:block;font-size:.62em;color:#b0342c;line-height:1.2;overflow-wrap:anywhere;max-width:100%}
 .zangli-cell-today{box-shadow:inset 0 0 0 2px var(--accent)}
 .zangli-cell-sel{background:var(--surface-soft);outline:1px solid var(--accent)}
 .zangli-cell-hasfest .zangli-cell-t{color:var(--accent);font-weight:700}
@@ -5730,6 +5736,12 @@ ZANGLI_CSS_BODY = r"""
    写成双类选择器（0,2,0）而非单类（0,1,0）——与 .zangli-cell-f 同特异性时会变成
    「后定义者胜」的声明顺序依赖，一旦有人调整顺序即静默失效。双类在此保证顺序无关。 */
 .zangli-cell-f.zangli-cell-hui{color:var(--accent);font-weight:700}
+/* 本月佛教节日清单（2026-09-25 新增，佛节图层开启且有节日时显示） */
+.zangli-blist{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:.9rem 1.1rem;margin:.9rem 0 0;font-size:.92rem;overflow-wrap:break-word}
+.zangli-blist-t{font-weight:700;color:#b0342c;margin-bottom:.35rem}
+.zangli-blist ul{margin:0;padding-left:1.1rem;list-style:disc}
+.zangli-blist li{margin:.3rem 0;line-height:1.6}
+.zangli-blist .zbd{font-weight:600;color:var(--ink)}
 .zangli-legend{color:var(--ink-soft);font-size:.82rem;margin-top:.9rem;line-height:1.6;overflow-wrap:break-word}
 .zangli-legend h3{font-size:.92rem;color:var(--ink);margin:1.1rem 0 .35rem;font-weight:700}
 .zangli-legend h4{font-size:.84rem;color:var(--ink);margin:.75rem 0 .25rem;font-weight:700}
@@ -5759,14 +5771,18 @@ ZANGLI_CSS_BODY = r"""
 .zl-chip[data-layer=l] .zl-sw{background:#2f6f8a;border-color:#2f6f8a}
 .zl-chip[data-layer=h] .zl-sw{background:#7a5aa6;border-color:#7a5aa6}
 .zl-chip[data-layer=t].zl-chip-on{background:var(--accent)}
+.zl-chip[data-layer=b] .zl-sw{background:#b0342c;border-color:#b0342c}
+.zl-chip[data-layer=f] .zl-sw{background:#b0342c;border-color:#b0342c}
+.zl-chip[data-layer=b].zl-chip-on{background:#b0342c}
 .zl-chip[data-layer=l].zl-chip-on{background:#2f6f8a}
+.zl-chip[data-layer=f].zl-chip-on{background:#b0342c}
 .zl-chip[data-layer=h].zl-chip-on{background:#7a5aa6}
 .zl-chip:not(.zl-chip-on) .zl-sw{opacity:.35}
 .zl-tip{color:var(--ink-soft);font-size:.78rem;margin:.45rem 0 .1rem;line-height:1.65}
 .zangli-qr{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:1rem;margin-top:1.1rem;text-align:center}
 .zangli-qrbox{display:inline-block;margin:.4rem 0}
 .zangli-qrhint{color:var(--ink-soft);font-size:.8rem;line-height:1.7;overflow-wrap:anywhere}
-@media(max-width:768px){.zangli-cell{padding:.18rem 1px}.zangli-cell-g{font-size:.72em}.zangli-cell-t{font-size:.78em}.zangli-cell-n{font-size:.68em}.zangli-cell-f,.zangli-cell-fp{display:none}.zangli-today{padding:.9rem .9rem}.zangli-tib{font-size:1.12rem}.zangli-lun{font-size:1rem}.zangli-fest{font-size:.95rem}.zangli-cal{padding:.7rem}.zl-chip{padding:.38rem .7rem;font-size:.8rem}.zl-chip-base{padding:.38rem .62rem;font-size:.8rem}.zl-badge{font-size:.46em}.zl-dot{width:3px;height:3px}.zangli-cell-r{gap:2px}}
+@media(max-width:768px){.zangli-cell{padding:.18rem 1px}.zangli-cell-g{font-size:.72em}.zangli-cell-t{font-size:.78em}.zangli-cell-n{font-size:.68em}.zangli-cell-f,.zangli-cell-fb,.zangli-cell-fp{display:none}.zangli-today{padding:.9rem .9rem}.zangli-tib{font-size:1.12rem}.zangli-lun{font-size:1rem}.zangli-fest{font-size:.95rem}.zangli-cal{padding:.7rem}.zl-chip{padding:.38rem .7rem;font-size:.8rem}.zl-chip-base{padding:.38rem .62rem;font-size:.8rem}.zl-badge{font-size:.46em}.zl-dot{width:3px;height:3px}.zangli-cell-r{gap:2px}}
 /* 2026-09-22（小谦指示 · 方案 B）：窄屏隐藏格子内的节日名（.zangli-cell-f 藏历金 / .zangli-cell-fp 农历靛蓝）。
    沿革：此前用 font-size:.54em 硬压 —— 320px 下实测仅 9.72px（不可读），
    而渲染门禁量的是**几何**、不量**字号**，照样报「0 问题」（教训：不溢出 ≠ 可读）。
@@ -5783,26 +5799,23 @@ ZANGLI_CSS_BODY = r"""
 /* 格子窄：理发红点占着右上角，日期行用外边距让出这一角（用 margin 不用 padding，
    这样元素自身的盒子不会伸到红点下方，视觉与几何都干净） */
 .zangli-cell-hair .zangli-cell-g{margin-right:9px}
-/* 2026-09-22（小谦指示）：窄屏四颗开关的列位/换行由 Grid 显式声明，**不用 flex 自动换行**——
-   自动换行的换行点会随机型宽度临时决定（375/390/414/430 各不相同）→ 长短行错位，
-   甚至把「法定节假日」挤到第三行。
-   列宽用 max-content 按内容给（不留等宽空白），实测四颗自然宽合计 303px：
-     · ≥375px：容器 343px 起，装得下（余量 20px）✅ → 四颗一行
-     · ≤374px：320px 容器仅 288px、360px 仅 328px（余量 5.8px，跨浏览器字宽不稳）❌
-       → 见下方 @media(max-width:374px) 明确降级为 2×2，仍不使用自动换行。
-   沿革：同日更早的版本曾让「显示日历」标签独占第一行（四颗按钮在第 2 行）；
-   当日 23:5x 小谦指示**删掉该标签行**（下方 .zl-tip 已把「四层可自由叠加 + 默认只开阳历与藏历」
-   说清，属重复），故 `.zl-layers-label` 的三条规则（基础/grid/≤374px）一并删除，
-   标签语义改由 `role=group` + `aria-describedby="zLayersTip"` 承担。
-      第 1 行现为「1 个基准层标识（.zl-chip-base，不可点）＋ 3 颗真开关（.zl-chip，<button>）」。 */
-.zl-layers{display:grid;grid-template-columns:repeat(4,max-content);justify-content:space-between;gap:.42rem .4rem;align-items:stretch}
+/* 2026-09-25（小谦指示）：开关扩为六颗（阳历/藏历/佛历/佛节/农历/法定节假日），
+   窄屏列位/换行仍由 Grid 显式声明，**不用 flex 自动换行**——自动换行的换行点会随机型
+   宽度临时决定（375/390/414/430 各不相同）→ 长短行错位。
+   六颗按 3 列两行声明（第一行 阳历·藏历·佛历，第二行 佛节·农历·法定节假日），
+   列宽 max-content 按内容给：三列最宽合计约 253px，375 容器 343px、360 容器 328px，余量充足 ✅
+     · ≥375px：3×2 两行
+     · ≤374px：降级 2×3 三行（见下方 @media(max-width:374px)），仍不使用自动换行。
+   沿革：2026-09-22 曾为四颗做「一行 4 列 / ≤374px 2×2」，并删掉「显示日历」标签行
+   （标签语义改由 role=group + aria-describedby="zLayersTip" 承担，此约定不变）；
+   2026-09-25 应小谦指示增「佛历」「佛节」两颗，由 4 列改 3 列。 */
+.zl-layers{display:grid;grid-template-columns:repeat(3,max-content);justify-content:space-between;gap:.42rem .4rem;align-items:stretch}
 /* min-width:0 防「法定节假日」5 字撑破列宽；white-space:nowrap 保留——宁可列宽不均也不折字 */
 .zl-chip{justify-content:center;padding:.42rem .3rem;font-size:.78rem;min-width:0}
 .zl-chip-base{justify-content:center;padding:.42rem .5rem;font-size:.78rem;min-width:0}
 }
-/* 极窄屏（≤374px，典型 320/360）：四颗一行需 303+3×6.4≈322px > 可用宽 288/328px
-   → 明确降级为 2×2（第二行 阳历|藏历，第三行 农历|法定节假日），依旧是声明式、不靠自动换行。
-   注：不靠缩字号硬塞——320px 下把字号压到可读下限也只剩不到 5px 余量，跨浏览器必翻车。 */
+/* 极窄屏（≤374px，典型 320/360）：六颗 3 列约 253px 虽可容纳，但 320 容器 288px 余量过薄
+   （跨浏览器字宽不稳），明确降级为 2×3 三行，依旧是声明式、不靠自动换行。 */
 @media(max-width:374px){
 .zl-layers{grid-template-columns:repeat(2,minmax(0,1fr))}
 }
@@ -5817,13 +5830,13 @@ ZANGLI_BODY_HTML = """
 <div class="zangli-wrap">
 <h1 style="font-size:1.3rem">修行日历</h1>
 <div class="zl-layers" id="zLayers" role="group" aria-label="显示哪些日历" aria-describedby="zLayersTip"></div>
-<p class="zl-tip" id="zLayersTip">阳历为基准层、始终显示；藏历、农历、法定节假日三层可自由叠加——藏历默认打开，农历与法定节假日按需打开。</p>
+<p class="zl-tip" id="zLayersTip">阳历为基准层、始终显示；藏历、佛历、佛节、农历、法定节假日五层可自由叠加——藏历、佛历与佛节默认打开，农历与法定节假日按需打开。</p>
 <div class="zangli-querybar"><input type="date" id="zangliDate" min="1951-01-08" max="2051-02-11"><button type="button" onclick="zangliGoto()">查这一天</button><button type="button" style="background:var(--surface-soft);color:var(--ink);border:1px solid var(--line)" onclick="zangliToday()">今天</button></div>
 <div id="zangliMain"></div>
 <div class="zangli-legend">
 <h3>关于本页</h3>
 <ul>
-<li>公历日期、藏历日期与佛教节日同一视图对照。</li>
+<li>公历、藏历、佛历、农历同视图对照，并标注汉传佛教节日与法定节假日。</li>
 <li>可查指定日期，也可逐月浏览。</li>
 <li>换算数据依《藏历、公历、农历对照百年历书（1951-2050）》，支持 1951-01-08 至 2051-02-11。</li>
 </ul>
@@ -5832,7 +5845,8 @@ ZANGLI_BODY_HTML = """
 <ul>
 <li><span class="zl-key" style="background:var(--accent)"></span>红框＝今天。</li>
 <li><span class="zl-key" style="background:#f1e9db;border:1px solid var(--accent)"></span>灰底＝当前选中的日子。</li>
-<li><span class="zl-key" style="background:#b08d2f"></span>金色小字＝该日所属日历的节日名。</li>
+<li><span class="zl-key" style="background:#b08d2f"></span>金色小字＝藏历节日名；靛蓝小字＝农历传统节日名。</li>
+<li><span class="zl-key" style="background:#b0342c"></span>朱红小字＝汉传佛教节日（佛节图层）。</li>
 <li>点月历里任意一天，即在上方大卡中查看该日详情。</li>
 </ul>
 <h4 style="color:var(--accent)">「藏历」图层（默认开启）</h4>
@@ -5841,6 +5855,13 @@ ZANGLI_BODY_HTML = """
 <li><span class="zl-key" style="background:var(--accent)"></span>红字＝荟供日，即每月藏历初十「莲师荟供日」、廿五「空行母荟供日」。</li>
 <li><span class="zl-key" style="background:var(--accent);border-radius:50%"></span>右上角红点＝理发吉祥日，含藏历日序吉日与「八吉同聚」日。</li>
 <li>大卡中显示该日理发的吉凶与出处。</li>
+</ul>
+<h4 style="color:#b0342c">「佛历」「佛节」图层（默认开启）</h4>
+<ul>
+<li>佛历＝以佛涅槃之年为纪元的佛教纪年，佛历年＝公历年＋543（通行简化式，全年不跨年）；显示在月历标题与大卡中。</li>
+<li><span class="zl-key" style="background:#b0342c"></span>朱红字＝汉传佛教节日，依农历逐日标注：四月初八释迦牟尼佛圣诞、六月十九观音菩萨成道日、九月十九观音菩萨出家日、腊月初八释迦牟尼佛成道日等 22 个。</li>
+<li>闰月不重复过节；农历小月无三十日时，「三十」的节日并至廿九并注明（小月）。</li>
+<li>月历下方附「本月佛教节日」清单，进页即可一览本月殊胜日。</li>
 </ul>
 <h4 style="color:#2f6f8a">「农历」图层（默认关闭）</h4>
 <ul>
@@ -5870,6 +5891,7 @@ ZANGLI_BODY_HTML = """
 <li>藏历换算库：<a href="https://github.com/stonelf/zangli" target="_blank" rel="noopener">stonelf/zangli</a>（MIT 许可），本站已原样内嵌、离线可用。</li>
 <li>农历换算库：<a href="https://github.com/yize/solarlunar" target="_blank" rel="noopener">solarlunar</a>（ISC 许可），农历日期与传统农历节日在 1951–2051 全范围可查。</li>
 <li>法定放假与调休：<a href="https://github.com/NateScarlet/holiday-cn" target="_blank" rel="noopener">holiday-cn</a>（MIT 许可），依据国务院办公厅历年放假安排通知整理，本页收录 2007–2026 年。</li>
+<li>佛教节日：依汉传佛教通行佛历表内置（22 个，按农历对照由 solarlunar 本地换算），闰月不计。</li>
 <li>2027 年及以后官方尚未公布放假安排，故该年份之后只显示农历日期与传统农历节日，不显示「休」「班」标记。</li>
 <li>本页所有换算均在你的浏览器本地完成，不发送任何网络请求。</li>
 </ul>
@@ -5921,8 +5943,9 @@ function zlKey(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,
 function zlMonthName(n){ return ['','正','二','三','四','五','六','七','八','九','十','十一','十二'][n] || ''; }
 function zlNumName(n){ return ['','初一','初二','初三','初四','初五','初六','初七','初八','初九','初十','十一','十二','十三','十四','十五','十六','十七','十八','十九','二十','廿一','廿二','廿三','廿四','廿五','廿六','廿七','廿八','廿九','三十'][n] || ''; }
 
-// —— 图层状态：藏历默认开；农历、法定节假日默认关；阳历为基准层（始终显示，不可关）——
-if (!window._zLayers) window._zLayers = { t: true, l: false, h: false };
+// —— 图层状态：藏历/佛历/佛节默认开；农历、法定节假日默认关；阳历为基准层（始终显示，不可关）——
+//   2026-09-25（小谦指示）：新增佛历（纪年）与佛节（汉传佛教节日提醒）两层
+if (!window._zLayers) window._zLayers = { t: true, b: true, f: true, l: false, h: false };
 function zlIsOn(k){ return !!window._zLayers[k]; }
 function zlToggleLayer(k){
   if (k === 'g') return;                      // 阳历为基础层，不可关闭
@@ -5933,7 +5956,7 @@ function zlToggleLayer(k){
 function zlRenderChips(){
   var box = document.getElementById('zLayers');
   if (!box) return;
-  var defs = [ {k:'g', n:'阳历'}, {k:'t', n:'藏历'}, {k:'l', n:'农历'}, {k:'h', n:'法定节假日'} ];
+  var defs = [ {k:'g', n:'阳历'}, {k:'t', n:'藏历'}, {k:'b', n:'佛历'}, {k:'f', n:'佛节'}, {k:'l', n:'农历'}, {k:'h', n:'法定节假日'} ];
   /* 2026-09-22（小谦指示）：不再插入「显示日历」这一行——它只是开关组的可见标签，
      而下方 .zl-tip 已把「四层可自由叠加 + 默认只开阳历与藏历」说清楚，属重复。
      标签的语义改由 role=group + aria-describedby="zLayersTip" 承担（无障碍不丢）。 */
@@ -5981,6 +6004,39 @@ function zlLunarFest(d, l){
   var nd = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1);   // 除夕＝次日为正月初一
   var nl = zlSolarLunar(nd);
   if (nl && !nl.isLeap && nl.lMonth === 1 && nl.lDay === 1) return '除夕';
+  return '';
+}
+
+// —— 汉传佛教节日（佛节图层，2026-09-25 小谦指示新增）——
+// 依农历逐日查表；闰月不计（不重复过节）；小月无三十日时，「三十」的节日并至廿九并注明。
+var ZL_BUDDHIST = {
+  1:[[1,'弥勒菩萨圣诞']],
+  2:[[8,'释迦牟尼佛出家日'],[15,'释迦牟尼佛涅槃日'],[19,'观音菩萨圣诞'],[21,'普贤菩萨圣诞']],
+  3:[[16,'准提菩萨圣诞']],
+  4:[[4,'文殊菩萨圣诞'],[8,'释迦牟尼佛圣诞'],[15,'卫塞节（佛吉祥日）']],
+  5:[[13,'伽蓝菩萨圣诞']],
+  6:[[3,'韦驮菩萨圣诞'],[19,'观音菩萨成道日']],
+  7:[[13,'大势至菩萨圣诞'],[15,'盂兰盆节·佛欢喜日'],[24,'龙树菩萨圣诞'],[30,'地藏菩萨圣诞']],
+  8:[[22,'燃灯古佛圣诞']],
+  9:[[19,'观音菩萨出家日'],[30,'药师佛圣诞']],
+  10:[[5,'达摩祖师圣诞']],
+  11:[[17,'阿弥陀佛圣诞']],
+  12:[[8,'释迦牟尼佛成道日'],[29,'华严菩萨圣诞']]
+};
+function zlBuddhistFest(d){
+  if (!zlIsOn('f')) return '';
+  var l = zlSolarLunar(d);
+  if (!l || l.isLeap) return '';
+  var hit = (ZL_BUDDHIST[l.lMonth] || []).filter(function(x){ return x[0] === l.lDay; })
+            .map(function(x){ return x[1]; });
+  if (hit.length) return hit.join('·');
+  if (l.lDay === 29){   // 次日即换月 ⇒ 本月是小月、无三十：把「三十」的节日并到廿九
+    var nl = zlSolarLunar(new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1));
+    if (nl && nl.lMonth !== l.lMonth){
+      var h30 = (ZL_BUDDHIST[l.lMonth] || []).filter(function(x){ return x[0] === 30; });
+      if (h30.length) return h30[0][1] + '（小月）';
+    }
+  }
   return '';
 }
 
@@ -6072,6 +6128,7 @@ function _zRenderMain(){
   var v = window._zView;
   var today = new Date(); today.setHours(0,0,0,0);
   var onT = zlIsOn('t'), onL = zlIsOn('l'), onH = zlIsOn('h');
+  var onB = zlIsOn('b'), onF = zlIsOn('f');   // 佛历（纪年）/ 佛节（汉传佛教节日）
   var bothLunar = onT && onL;      // 两个农历系图层同时开启时，行首加层色小方块
 
   // ===== 主卡 =====
@@ -6088,6 +6145,7 @@ function _zRenderMain(){
     rows.push('<div class="zangli-lun">农历 ' + zlEsc(lv.gzYear) + '（' + zlEsc(lv.animal) + '）年 '
       + zlEsc(lv.monthCn) + zlEsc(lv.dayCn) + '</div>');
   }
+  if (onB) rows.push('<div class="zangli-fob">佛历 ' + (selD.getFullYear() + 543) + ' 年</div>');
 
   // 节日标签
   var chips = [];
@@ -6101,6 +6159,10 @@ function _zRenderMain(){
   if (onL && lv){
     var lfm = zlLunarFest(selD, lv);
     if (lfm) chips.push('<span class="zangli-fest-name zangli-fest-name-lun">' + zlEsc(lfm) + '</span>');
+  }
+  if (onF){
+    var bf = zlBuddhistFest(selD);
+    if (bf) chips.push('<span class="zangli-fest-name zangli-fest-name-bud">' + zlEsc(bf) + '</span>');
   }
   var chipHtml = chips.length ? '<div class="zangli-fest">' + chips.join('') + '</div>'
     : '<div class="zangli-fest"><span style="color:var(--ink-soft)">本日无特定节日</span></div>';
@@ -6152,6 +6214,7 @@ function _zRenderMain(){
   var dim = new Date(v.y, v.m + 1, 0).getDate();
   var lead = first.getDay();
   var cells = '';
+  var budList = [];   // 本月佛节（供月历下方清单）
   var i;
   for (i = 0; i < lead; i++) cells += '<div><div class="zangli-cell zangli-empty"></div></div>';
   for (var d0 = 1; d0 <= dim; d0++){
@@ -6169,6 +6232,8 @@ function _zRenderMain(){
       try { var hz = zHaircut(zz); hairGood = !!(hz.item && (hz.item[1] === '吉' || hz.j8)); } catch (e) {}
     }
     var lfest = (onL && ll) ? zlLunarFest(d, ll) : '';
+    var bfest = zlBuddhistFest(d);
+    if (bfest) budList.push({ d: d, name: bfest });
 
     var cls = 'zangli-cell';
     if (isNew || (onT && zz && zz.extraInfo)) cls += ' zangli-cell-hasfest';
@@ -6211,6 +6276,7 @@ function _zRenderMain(){
       if (tf) inner += '<span class="zangli-cell-f' + (isHui ? ' zangli-cell-hui' : '') + '">' + zlEsc(tf) + '</span>';
     }
     if (lfest) inner += '<span class="zangli-cell-fp">' + zlEsc(lfest) + '</span>';
+    if (bfest) inner += '<span class="zangli-cell-fb">' + zlEsc(bfest) + '</span>';
 
     cells += '<div><div class="' + cls + '" onclick="_zCellClick(' + d.getTime() + ')">' + inner + '</div></div>';
   }
@@ -6218,14 +6284,27 @@ function _zRenderMain(){
   var table = '<div class="zangli-cal">'
     + '<div class="zangli-cal-head">'
     + '<button type="button" onclick="zangliShift(0,-1)">‹ 上月</button>'
-    + '<div class="zangli-cal-title">' + v.y + '年' + (v.m+1) + '月 <small>（点任一天查询）</small></div>'
+    + '<div class="zangli-cal-title">' + v.y + '年' + (v.m+1) + '月'
+    + (onB ? '<span class="zangli-be">佛历 ' + (v.y + 543) + ' 年</span>' : '')
+    + ' <small>（点任一天查询）</small></div>'
     + '<button type="button" onclick="zangliShift(0,1)">下月 ›</button>'
     + '<button type="button" onclick="zangliToday()" title="回到今天的日期与本月">◎ 今天</button>'
     + '</div>'
     + '<div class="zangli-week"><div>日</div><div>一</div><div>二</div><div>三</div><div>四</div><div>五</div><div>六</div></div>'
     + '<div class="zangli-grid">' + cells + '</div>'
     + '</div>';
-  box.innerHTML = main + table;
+  var budHtml = '';
+  if (onF && budList.length){
+    var lis = budList.map(function(x){
+      var lx = zlSolarLunar(x.d);
+      var md = lx ? (lx.monthCn + lx.dayCn) : '';
+      return '<li><span class="zbd">' + zlEsc(x.name) + '</span> · 农历 ' + zlEsc(md)
+        + ' · 公历 ' + (x.d.getMonth() + 1) + ' 月 ' + x.d.getDate() + ' 日</li>';
+    }).join('');
+    budHtml = '<div class="zangli-blist"><div class="zangli-blist-t">📿 本月佛教节日（'
+      + (v.m + 1) + ' 月，共 ' + budList.length + ' 个）</div><ul>' + lis + '</ul></div>';
+  }
+  box.innerHTML = main + table + budHtml;
 }
 """
 
