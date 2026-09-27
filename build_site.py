@@ -891,6 +891,15 @@ button:active, .player-launch:active, .search-fab:active{transform:scale(.95)}
 .player .pl-group-head .plg-name{flex:1 1 auto; min-width:0; overflow-wrap:anywhere}
 .player .pl-group-head .plg-count{flex:0 0 auto; color:var(--ink-faint); font-weight:400; font-size:.85em}
 .player .pl-sub .pl-item{padding-left:2.8rem}   /* 二级缩进：曲目行相对组头缩进，体现层级 */
+.player .pl-top-head{display:flex; align-items:center; gap:.6rem; padding:.85rem 1.4rem;
+  cursor:pointer; border-bottom:1px solid var(--line); color:var(--ink); font-weight:700;
+  font-size:1.08em; user-select:none; background:var(--surface-soft)}
+.player .pl-top-head:hover{background:var(--line)}
+.player .pl-top-head[data-cur="1"]{color:var(--accent)}
+.player .pl-top-head .plg-arrow{flex:0 0 auto; color:var(--ink-faint); font-size:.8em; transition:transform .15s}
+.player .pl-top-head.open .plg-arrow{transform:rotate(90deg)}
+.player .pl-top-head .plg-name{flex:1 1 auto; min-width:0; overflow-wrap:anywhere}
+.player .pl-top-head .plg-count{flex:0 0 auto; color:var(--ink-faint); font-weight:400; font-size:.85em}
 /* 悬浮打开播放器按钮 */
 .player-launch{position:fixed !important; right:1.1rem; bottom:1.1rem; z-index:999;
   background:var(--accent); color:#fff; border:none; cursor:grab;
@@ -4716,11 +4725,23 @@ window.addEventListener('mouseup', function(){ pDragging = false; pDragEl = null
 window.addEventListener('touchend', function(){ pDragging = false; pDragEl = null; });
 
 // 播放列表（内嵌于半屏播放器顶部）
-// 播放列表：二级目录（2026-09-27 小谦指示）——按现有专辑分类（构建时的目录分组）分组展示。
+// 播放列表：三级目录（2026-09-27 小谦指示两轮）——顶级＝音频一级分类（「2. 上师法音」为纯容器层，下钻取 2.1/2.2 段；排序＝听法音页分组序），其下＝专辑（构建时目录分组），再下＝曲目；顶级显示名去掉「N. 」序号前缀。
 // 队列恒为全站列表：data-idx 存全局索引，点任意一集即从该集起跨专辑顺序连播；
 // 续播记忆（longchen-audio-cur/pos）用的也是全局索引，两端无缝兼容。
 var plExpanded = {};    // folder -> 是否展开（用户手动操作记录）
 var plSkipForce = false; // 组头手动切换后的一次渲染，跳过「当前组强制展开」（否则当前组收不回去）
+var plTopExpanded = {};  // 顶级分类 -> 是否展开（用户手动操作记录）
+function plTopName(t){
+  // 「2. 上师法音」是纯容器层（自身无曲目）：下钻一级，用 2.1/2.2 段作顶级分类
+  //（2026-09-27 实测顶级实为 3 段，小谦要求的四类＝此下钻规则展开后的结果）
+  var seg = (t.folder || '').split('/').filter(Boolean);
+  var top = seg[0] || '未分类';
+  if (top === '2. 上师法音' && seg.length > 1) top = seg[1];
+  return top;
+}
+function plTopLabel(top){
+  return top.replace(/^\d[\d.]*\s+/, '');   // 顶级显示名去掉「N. 」/「N.M 」序号前缀
+}
 function plGroupName(t){
   return t.group || (t.folder || '').split('/').filter(Boolean).pop() || '未分组';
 }
@@ -4736,40 +4757,72 @@ function renderPlist(){
     byFolder[f].items.push({ gi: i, t: t });
   }
   var curFolder = (curIdx >= 0 && AUDIO_TRACKS[curIdx]) ? (AUDIO_TRACKS[curIdx].folder || '') : null;
-  if (curFolder && !plSkipForce) plExpanded[curFolder] = true;   // 换曲时当前播放组自动展开
+  var curTop = curFolder ? plTopName(AUDIO_TRACKS[curIdx]) : null;
+  if (curFolder && !plSkipForce){ plExpanded[curFolder] = true; plTopExpanded[curTop] = true; } // 换曲时当前分类与专辑自动展开
   plSkipForce = false;
   var anyOpen = Object.keys(plExpanded).some(function(k){ return plExpanded[k]; });
-  if (!curFolder && !anyOpen && groups.length) plExpanded[groups[0].folder] = true; // 未播放时默认展开第一组
+  var anyTopOpen = Object.keys(plTopExpanded).some(function(k){ return plTopExpanded[k]; });
+  if (!curFolder && !anyTopOpen && tops.length) plTopExpanded[tops[0].top] = true;   // 未播放时默认展开第一个分类
+  if (!curFolder && !anyOpen && groups.length) plExpanded[groups[0].folder] = true;  // 未播放时默认展开第一组
+  // 顶级分类（folder 第一段＝音频一级目录），保持构建顺序
+  var tops = [];
+  var byTop = {};
+  for (var g2 = 0; g2 < groups.length; g2++){
+    var top = plTopName({ folder: groups[g2].folder });
+    if (!byTop[top]){ byTop[top] = { top: top, groups: [], count: 0 }; tops.push(byTop[top]); }
+    byTop[top].groups.push(groups[g2]);
+    byTop[top].count += groups[g2].items.length;
+  }
+  tops.sort(function(a, b){ return natCmpPath(a.groups[0].folder, b.groups[0].folder); }); // 顶部分类序＝听法音页分组序（natCmpPath，现有分类方式）
   var st = box.scrollTop;   // 重渲染保留滚动位置
   var h = [];
-  for (var g = 0; g < groups.length; g++){
-    var grp = groups[g];
-    var open = !!plExpanded[grp.folder];
-    h.push('<div class="pl-group-head' + (open ? ' open' : '') + '" data-folder="' + esc(grp.folder) + '"'
-      + ' role="button" aria-expanded="' + (open ? 'true' : 'false') + '"'
-      + (grp.folder === curFolder ? ' data-cur="1"' : '') + '>'
+  for (var tt = 0; tt < tops.length; tt++){
+    var tp = tops[tt];
+    var tOpen = !!plTopExpanded[tp.top];
+    h.push('<div class="pl-top-head' + (tOpen ? ' open' : '') + '" data-top="' + esc(tp.top) + '"'
+      + ' role="button" aria-expanded="' + (tOpen ? 'true' : 'false') + '"'
+      + (tp.top === curTop ? ' data-cur="1"' : '') + '>'
       + '<span class="plg-arrow">▶</span>'
-      + '<span class="plg-name">' + esc(grp.name) + '</span>'
-      + '<span class="plg-count">' + grp.items.length + ' 集</span></div>');
-    if (open){
-      h.push('<div class="pl-sub">');
-      for (var k = 0; k < grp.items.length; k++){
-        var gi = grp.items[k].gi, t = grp.items[k].t;
-        var playing = (gi === curIdx);
-        h.push('<div class="pl-item' + (playing ? ' playing' : '') + '" data-idx="' + gi + '">'
-          + '<span class="pl-idx">' + (k + 1) + '</span>'
-          + '<span class="pl-dot"></span>'
-          + '<span class="pl-title">' + esc(t.title) + '</span></div>');
+      + '<span class="plg-name">' + esc(plTopLabel(tp.top)) + '</span>'
+      + '<span class="plg-count">' + tp.count + ' 集</span></div>');
+    if (!tOpen) continue;
+    for (var g = 0; g < tp.groups.length; g++){
+      var grp = tp.groups[g];
+      var open = !!plExpanded[grp.folder];
+      h.push('<div class="pl-group-head' + (open ? ' open' : '') + '" data-folder="' + esc(grp.folder) + '"'
+        + ' role="button" aria-expanded="' + (open ? 'true' : 'false') + '"'
+        + (grp.folder === curFolder ? ' data-cur="1"' : '') + '>'
+        + '<span class="plg-arrow">▶</span>'
+        + '<span class="plg-name">' + esc(grp.name) + '</span>'
+        + '<span class="plg-count">' + grp.items.length + ' 集</span></div>');
+      if (open){
+        h.push('<div class="pl-sub">');
+        for (var k = 0; k < grp.items.length; k++){
+          var gi = grp.items[k].gi, t = grp.items[k].t;
+          var playing = (gi === curIdx);
+          h.push('<div class="pl-item' + (playing ? ' playing' : '') + '" data-idx="' + gi + '">'
+            + '<span class="pl-idx">' + (k + 1) + '</span>'
+            + '<span class="pl-dot"></span>'
+            + '<span class="pl-title">' + esc(t.title) + '</span></div>');
+        }
+        h.push('</div>');
       }
-      h.push('</div>');
     }
   }
-  box.innerHTML = h.join('');
+    box.innerHTML = h.join('');
   box.scrollTop = st;
   box.querySelectorAll('.pl-group-head').forEach(function(head){
     head.onclick = function(){
       var f = head.getAttribute('data-folder');
       plExpanded[f] = !plExpanded[f];
+      plSkipForce = true;
+      renderPlist();
+    };
+  });
+  box.querySelectorAll('.pl-top-head').forEach(function(head){
+    head.onclick = function(){
+      var k = head.getAttribute('data-top');
+      plTopExpanded[k] = !plTopExpanded[k];
       plSkipForce = true;
       renderPlist();
     };
