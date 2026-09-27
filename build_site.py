@@ -833,6 +833,8 @@ button:active, .player-launch:active, .search-fab:active{transform:scale(.95)}
   border-radius:4px; width:0%}
 .player .p-progress .p-thumb{position:absolute; top:50%; width:16px; height:16px; border-radius:50%;
   background:#fff; border:2px solid var(--gold); transform:translate(-50%,-50%); left:0%}
+/* 进度条可键盘操作（2026-09-28 无障碍）：role=slider 可 Tab 聚焦，聚焦时给可见轮廓 */
+.player .p-progress:focus{outline:2px solid var(--accent); outline-offset:3px}
 /* 第4行：播放模式 + 播放列表 同一行（两端对齐，空隙均衡；播放列表按钮不再居中） */
 .player .p-footer{display:flex; align-items:center; justify-content:space-between; gap:.6rem;
   padding:.6rem 1.3rem; flex:0 0 auto; border-top:1px solid var(--line)}
@@ -850,6 +852,23 @@ button:active, .player-launch:active, .search-fab:active{transform:scale(.95)}
 .player .p-close{border:none; background:none; cursor:pointer; color:var(--ink-soft);
   font-size:1.3rem; width:2.3rem; height:2.3rem; border-radius:8px; line-height:1}
 .player .p-close:hover{background:var(--surface-hover)}
+/* 睡眠定时器按钮（2026-09-28 小谦指示：其他师兄也在用，夜里听着入睡需能定时停）
+   位置选状态栏（与「—」「✕」同区）而**不**放进工具行：工具行在 320px 视口已用 255px/291px，
+   再塞一颗必然越界（同 09-22 O-02 的教训：一律减内容量，不让它折行）。 */
+.player .p-timer-wrap{position:relative; display:inline-flex}
+.player .p-timer{border:none; background:none; cursor:pointer; color:var(--ink-soft);
+  font-size:1.15rem; min-width:2.3rem; height:2.3rem; padding:0 .3rem; border-radius:8px; line-height:1;
+  font-variant-numeric:tabular-nums}
+.player .p-timer:hover{background:var(--surface-hover)}
+.player .p-timer.on{color:var(--accent); font-weight:700; background:var(--surface-soft)}
+.player .p-timer-menu{position:absolute; bottom:calc(100% + 6px); right:0; z-index:60;
+  background:var(--surface); border:1px solid var(--line); border-radius:12px; padding:.3rem;
+  box-shadow:0 -6px 20px rgba(59,42,34,.18); min-width:9rem; max-height:60vh; overflow-y:auto}
+.player .p-timer-menu .tm-item{padding:.45rem .7rem; border-radius:8px; font-size:.9rem; color:var(--ink-soft);
+  cursor:pointer; white-space:nowrap; transition:background .15s}
+.player .p-timer-menu .tm-item:hover{background:var(--surface-soft)}
+.player .p-timer-menu .tm-item.active{color:var(--accent); font-weight:600; background:var(--surface-soft)}
+.player .p-timer-menu .tm-sep{height:1px; background:var(--line); margin:.25rem 0}
 /* 播放模式切换按钮（状态栏左侧胶囊）：点击在 顺序/逆序/随机/单曲循环 间循环，并显示当前模式 */
 .player .p-mode{border:1px solid var(--gold); background:var(--surface); color:var(--gold-deep);
   cursor:pointer; font-size:.85rem; padding:.2rem .7rem; border-radius:999px;
@@ -906,6 +925,38 @@ button:active, .player-launch:active, .search-fab:active{transform:scale(.95)}
 .player .pl-cat-item .pl-cat-check{flex:0 0 1.1rem; color:var(--accent)}
 .player .pl-cat-item .plg-name{flex:1 1 auto; min-width:0; overflow-wrap:anywhere}
 .player .pl-cat-item .plg-count{flex:0 0 auto; color:var(--ink-faint); font-weight:400; font-size:.85em}
+/* 播放列表搜索行（2026-09-28 小谦指示）：输入框是**静态节点**，不参与 renderPlist 重渲染，
+   否则每输一个字就重建 input、光标和输入法候选全丢。只在列表展开时显示。 */
+.player .pl-search-row{display:none; flex:0 0 auto; padding:.55rem 1.4rem; border-top:1px solid var(--line)}
+.player.pl-open .pl-search-row{display:block}
+.player .pl-search-input{width:100%; box-sizing:border-box; font-family:inherit; font-size:.95rem;
+  padding:.45rem .7rem; border:1px solid var(--line); border-radius:8px;
+  background:var(--surface); color:var(--ink)}
+.player .pl-search-input::placeholder{color:var(--ink-faint)}
+.player .pl-search-input:focus{outline:none; border-color:var(--accent)}
+.player .pl-search-head{display:flex; align-items:center; gap:.5rem; padding:.7rem 1.4rem;
+  font-size:.88rem; color:var(--ink-faint); border-bottom:1px solid var(--line)}
+.player .pl-search-head .pls-clear{margin-left:auto; cursor:pointer; color:var(--accent); font-weight:600}
+.player .pl-hit-album{color:var(--ink-faint); font-weight:400; font-size:.92em}
+/* 跨专辑连播确认卡（2026-09-28 小谦指示）：居中悬浮、不遮底栏；聚焦「继续播放」便于键盘回车 */
+.album-ask{position:fixed; left:50%; top:50%; transform:translate(-50%,-50%); z-index:9997;
+  background:var(--surface); border:1px solid var(--line-strong); border-radius:12px;
+  padding:1rem; width:min(92vw,360px); box-shadow:0 6px 24px rgba(0,0,0,.20);
+  font-size:.92rem; line-height:1.6; color:var(--ink)}
+.album-ask .aa-title{font-weight:700; margin-bottom:.35rem}
+.album-ask .aa-next{color:var(--accent); font-weight:600; overflow-wrap:anywhere}
+.album-ask .aa-btns{display:flex; gap:.5rem; justify-content:flex-end; margin-top:.85rem}
+.album-ask .aa-btns button{padding:.4rem .9rem; border-radius:8px; font-family:inherit; font-size:.9rem; cursor:pointer}
+.album-ask .aa-stop{border:1px solid var(--line); background:var(--surface); color:var(--ink-soft)}
+.album-ask .aa-go{border:none; background:var(--accent); color:#fff; font-weight:600}
+/* 播放器轻提示条（收起撤销 / 睡眠定时提示共用）——放屏幕上部，绝不压住底部播放器 */
+.p-toast{position:fixed; left:50%; top:14vh; transform:translateX(-50%); z-index:9996;
+  background:var(--surface); border:1px solid var(--line); border-radius:999px;
+  padding:.5rem .7rem .5rem 1rem; display:flex; align-items:center; gap:.6rem; max-width:92vw;
+  box-shadow:0 4px 18px rgba(0,0,0,.16); font-size:.9rem; color:var(--ink)}
+.p-toast span{overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.p-toast button{border:none; background:none; color:var(--accent); font-weight:700; cursor:pointer;
+  font-family:inherit; font-size:.9rem; padding:.15rem .4rem; border-radius:6px; white-space:nowrap}
 /* 悬浮打开播放器按钮 */
 .player-launch{position:fixed !important; right:1.1rem; bottom:1.1rem; z-index:999;
   background:var(--accent); color:#fff; border:none; cursor:grab;
@@ -1539,21 +1590,35 @@ img{height:auto;max-width:100%}
   <!-- 第1行：状态栏（左：当前音频名 / 右：关闭叉号） -->
   <div class="p-status" id="pStatus">
     <span class="p-status-text" id="pStatusText">暂未播放</span>
+    <span class="p-timer-wrap">
+      <button class="p-timer" id="pTimer" title="睡眠定时器：到点自动暂停播放" aria-label="睡眠定时器">⏱</button>
+      <div class="p-timer-menu" id="pTimerMenu" style="display:none">
+        <div class="tm-item" data-min="15">15 分钟后暂停</div>
+        <div class="tm-item" data-min="30">30 分钟后暂停</div>
+        <div class="tm-item" data-min="45">45 分钟后暂停</div>
+        <div class="tm-item" data-min="60">60 分钟后暂停</div>
+        <div class="tm-item" data-min="90">90 分钟后暂停</div>
+        <div class="tm-sep"></div>
+        <div class="tm-item" data-min="track">播完当前这集就暂停</div>
+        <div class="tm-item" id="pTimerOff" style="display:none">关闭定时</div>
+      </div>
+    </span>
     <button class="p-minimize" id="pMinimize" title="最小化到迷你条">—</button>
-    <button class="p-close" id="pClose" title="关闭播放器">✕</button>
+    <button class="p-close" id="pClose" title="收起播放器（音频继续播放）" aria-label="收起播放器，音频继续播放">✕</button>
   </div>
   <!-- 第2行：控制按钮（上一首 / 后退15秒 / 播放 / 下一首 / 前进15秒） -->
   <div class="p-controls">
-    <button class="p-btn" id="pPrev" title="上一首">⏮</button>
-    <button class="p-btn p-skip" id="pBack" title="后退 15 秒">-15</button>
-    <button class="p-btn p-play" id="pPlay" title="播放 / 暂停">▶</button>
-    <button class="p-btn p-skip" id="pFwd" title="前进 15 秒">+15</button>
-    <button class="p-btn" id="pNext" title="下一首">⏭</button>
+    <button class="p-btn" id="pPrev" title="上一首" aria-label="上一首">⏮</button>
+    <button class="p-btn p-skip" id="pBack" title="后退 15 秒" aria-label="后退 15 秒">-15</button>
+    <button class="p-btn p-play" id="pPlay" title="播放 / 暂停" aria-label="播放或暂停">▶</button>
+    <button class="p-btn p-skip" id="pFwd" title="前进 15 秒" aria-label="前进 15 秒">+15</button>
+    <button class="p-btn" id="pNext" title="下一首" aria-label="下一首">⏭</button>
   </div>
   <!-- 第3行：进度条 + 两端分秒数字 -->
   <div class="p-time-row">
     <span class="p-time" id="pTimeCur">0:00</span>
-    <div class="p-progress" id="pProgress"><div class="p-fill" id="pFill"></div><div class="p-thumb" id="pThumb"></div></div>
+    <div class="p-progress" id="pProgress" role="slider" tabindex="0" aria-label="播放进度"
+         aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-valuetext="0:00 / 0:00"><div class="p-fill" id="pFill"></div><div class="p-thumb" id="pThumb"></div></div>
     <span class="p-time" id="pTimeDur">0:00</span>
   </div>
   <!-- 第4行：播放列表(最左) + 播放模式/调整顺序(中) + 倍速(最右) -->
@@ -1571,6 +1636,10 @@ img{height:auto;max-width:100%}
         <div class="sp-item" data-rate="2">2x</div>
       </div>
     </span>
+  </div>
+  <!-- 播放列表搜索（2026-09-28）：静态节点，不随列表重渲染（否则输入时失焦） -->
+  <div class="pl-search-row">
+    <input class="pl-search-input" id="plSearch" type="search" placeholder="搜索曲目 / 专辑名" aria-label="搜索曲目或专辑">
   </div>
   <!-- 完整播放列表（点击开关展开） -->
   <div class="p-playlist" id="pPlaylist"></div>
@@ -4349,12 +4418,15 @@ playerAudio.addEventListener('timeupdate', function(){
     if (!window.__advancing) {
       window.__advancing = true;
       setTimeout(function(){ window.__advancing = false; }, 2000);
-      if (curMode() === '单曲') {
+      if (sleepAfterTrack){
+        // 睡眠定时「播完本集」：iOS 兜底路径同样生效（2026-09-28）
+        clearSleepTimer(true);
+        pauseForSleep();
+      } else if (curMode() === '单曲') {
         playerAudio.currentTime = 0;
         playerAudio.play().catch(function(){});
       } else {
-        var n = autoNext(curIdx);
-        if (n >= 0) playTrack(n);
+        advanceAuto(curIdx);   // 跨专辑同样先确认（2026-09-28）
       }
     }
   }
@@ -4364,6 +4436,155 @@ function fmtTime(s){
   if (!isFinite(s) || s < 0) s = 0;
   var m = Math.floor(s / 60), sec = Math.floor(s % 60);
   return m + ':' + (sec < 10 ? '0' : '') + sec;
+}
+
+// ---- 播放器轻提示条（2026-09-28）：收起撤销 / 睡眠定时提示共用；可带一个操作按钮 ----
+var pToastEl = null, pToastTimer = null;
+function hidePToast(){
+  if (pToastTimer){ clearTimeout(pToastTimer); pToastTimer = null; }
+  if (pToastEl){ pToastEl.remove(); pToastEl = null; }
+}
+function showPToast(text, ms, actionLabel, actionFn){
+  hidePToast();
+  var d = document.createElement('div');
+  d.className = 'p-toast';
+  d.setAttribute('role', 'status');
+  var sp = document.createElement('span');
+  sp.textContent = text;
+  d.appendChild(sp);
+  if (actionLabel && actionFn){
+    var b = document.createElement('button');
+    b.type = 'button';
+    b.textContent = actionLabel;
+    b.onclick = function(){ hidePToast(); actionFn(); };
+    d.appendChild(b);
+  }
+  document.body.appendChild(d);
+  pToastEl = d;
+  if (ms > 0) pToastTimer = setTimeout(hidePToast, ms);
+}
+
+// ---- 睡眠定时器（2026-09-28 小谦指示：其他师兄也在用，夜里听着入睡需能自动停）----
+// 只做「本次会话内有效」：刷新页面即失效（定时器跟着页面走，不符合「跨刷新记住」的直觉预期）。
+var sleepTimerId = null;      // 分钟档的倒计时句柄
+var sleepTickId = null;       // 剩余分钟数刷新句柄
+var sleepDeadline = 0;        // 到点时间戳（毫秒）
+var sleepMinutes = 0;         // 已选分钟档（0＝未启用）
+var sleepAfterTrack = false;  // 「播完当前这集就暂停」
+function sleepActive(){ return sleepAfterTrack || sleepDeadline > 0; }
+function refreshSleepBtn(){
+  var b = document.getElementById('pTimer');
+  if (!b) return;
+  var lab = '';
+  if (sleepAfterTrack) lab = '本集';
+  else if (sleepDeadline) lab = Math.max(0, Math.ceil((sleepDeadline - Date.now()) / 60000)) + '′';
+  b.textContent = lab ? ('⏱' + lab) : '⏱';
+  b.classList.toggle('on', sleepActive());
+  b.title = sleepActive()
+    ? ('睡眠定时：' + (sleepAfterTrack ? '播完当前这集就暂停' : '还有约 ' + sleepMinutes + ' 分钟') + '（点击可修改或关闭）')
+    : '睡眠定时器：到点自动暂停播放';
+  var off = document.getElementById('pTimerOff');
+  if (off) off.style.display = sleepActive() ? '' : 'none';
+  document.querySelectorAll('#pTimerMenu .tm-item[data-min]').forEach(function(it){
+    var v = it.getAttribute('data-min');
+    it.classList.toggle('active', v === 'track' ? sleepAfterTrack : (!!sleepDeadline && String(sleepMinutes) === v));
+  });
+}
+function pauseForSleep(){
+  try{ playerAudio.pause(); }catch(e){}
+  var pb = document.getElementById('pPlay'); if (pb) pb.textContent = '▶';
+  updateMini();
+  showPToast('睡眠定时已到，已暂停播放 🌙', 8000);
+}
+function clearSleepTimer(silent){
+  if (sleepTimerId){ clearTimeout(sleepTimerId); sleepTimerId = null; }
+  if (sleepTickId){ clearInterval(sleepTickId); sleepTickId = null; }
+  sleepDeadline = 0; sleepMinutes = 0; sleepAfterTrack = false;
+  refreshSleepBtn();
+  if (!silent) showPToast('已关闭睡眠定时', 2500);
+}
+function setSleepTimer(min){
+  clearSleepTimer(true);
+  if (!min){ showPToast('已关闭睡眠定时', 2500); return; }
+  sleepMinutes = min;
+  sleepDeadline = Date.now() + min * 60000;
+  sleepTimerId = setTimeout(function(){ clearSleepTimer(true); pauseForSleep(); }, min * 60000);
+  sleepTickId = setInterval(refreshSleepBtn, 20000);   // 20 秒刷一次剩余分钟即可（省电）
+  refreshSleepBtn();
+  showPToast('将在 ' + min + ' 分钟后自动暂停', 2500);
+}
+function setSleepAfterTrack(){
+  clearSleepTimer(true);
+  sleepAfterTrack = true;
+  refreshSleepBtn();
+  showPToast('本集播完就暂停', 2500);
+}
+
+// ---- 跨专辑连播确认（2026-09-28 小谦指示）----
+// 口径：队列仍是全站列表、跨专辑连播照旧（09-27 小谦明确要的），只在**自动连播**要跨到另一个
+// 专辑时先问一句、并把下一个专辑名告知用户。手动切歌（⏭ / 点列表任意一集 / 锁屏 nexttrack）
+// 是明确的用户意图，不弹框；「随机」模式语义本身就是跳着听，也不弹（否则每集都问，模式等于废掉）。
+function trackAlbumKey(t){ return (t && t.folder) ? t.folder : ''; }
+function trackAlbumLabel(t){ return t ? plGroupName(t) : ''; }
+// 对话文案里的专辑名去掉目录序号（「1. 法脉故事」→「法脉故事」）：
+// 列表里那串数字是**目录序号**（沿用 09-27 小谦指定的「现有分类方式」外观，保留不动），
+// 但写进「下一个专辑是《X》」这种句子里就成了怪东西。与锁屏 Media Session 的 album 字段同口径。
+function albumDisplayLabel(t){
+  return (trackAlbumLabel(t) || '').replace(/^\d[\d.]*\s+/, '');
+}
+var albumAskEl = null;
+function closeAlbumAsk(){ if (albumAskEl){ albumAskEl.remove(); albumAskEl = null; } }
+function showAlbumAsk(nextIdx){
+  closeAlbumAsk();
+  var nxt = AUDIO_TRACKS[nextIdx];
+  if (!nxt) return;
+  playerAudio.pause();   // 本集已播完，先停住（也避免 iOS 兜底 timeupdate 反复触发）
+  var d = document.createElement('div');
+  d.className = 'album-ask';
+  d.setAttribute('role', 'dialog');
+  var p1 = document.createElement('div');
+  p1.className = 'aa-title';
+  p1.textContent = '本专辑已播完';
+  var p2 = document.createElement('div');
+  p2.appendChild(document.createTextNode('下一个专辑是：'));
+  var sp = document.createElement('span');
+  sp.className = 'aa-next';
+  sp.textContent = '《' + albumDisplayLabel(nxt) + '》';
+  p2.appendChild(sp);
+  var p3 = document.createElement('div');
+  p3.style.cssText = 'color:var(--ink-faint);font-size:.88em;margin-top:.3rem;';
+  p3.textContent = '下一集：' + nxt.title;
+  var btns = document.createElement('div');
+  btns.className = 'aa-btns';
+  var bStop = document.createElement('button');
+  bStop.type = 'button'; bStop.className = 'aa-stop'; bStop.textContent = '到此为止';
+  var bGo = document.createElement('button');
+  bGo.type = 'button'; bGo.className = 'aa-go'; bGo.textContent = '继续播放';
+  btns.appendChild(bStop); btns.appendChild(bGo);
+  d.appendChild(p1); d.appendChild(p2); d.appendChild(p3); d.appendChild(btns);
+  document.body.appendChild(d);
+  albumAskEl = d;
+  bStop.onclick = function(){
+    closeAlbumAsk();
+    var pb = document.getElementById('pPlay'); if (pb) pb.textContent = '▶';
+    updateMini();
+    showPToast('已停在本专辑末尾 · 想继续可在播放列表里选下一个专辑', 5000);
+  };
+  bGo.onclick = function(){ closeAlbumAsk(); playTrack(nextIdx); };
+  try{ bGo.focus(); }catch(e){}
+}
+// 自动连播统一入口（ended 事件与 iOS 兜底共用）：同专辑直接续、跨专辑先确认
+function advanceAuto(fromIdx){
+  var n = autoNext(fromIdx);
+  if (n < 0) return false;   // 顺序到队尾 / 逆序到队首：停
+  var mode = curMode();
+  if ((mode === '顺序' || mode === '逆序')
+      && trackAlbumKey(AUDIO_TRACKS[n]) !== trackAlbumKey(AUDIO_TRACKS[fromIdx])){
+    showAlbumAsk(n);
+    return true;
+  }
+  playTrack(n);
+  return true;
 }
 
 function showPlayer(){
@@ -4556,8 +4777,16 @@ playerAudio.addEventListener('timeupdate', function(){
   document.getElementById('pTimeCur').textContent = fmtTime(playerAudio.currentTime);
   document.getElementById('pTimeDur').textContent = fmtTime(dur);
   document.getElementById('pmFill').style.width = pct + '%';
+  // 无障碍（2026-09-28）：进度条的语义值同步，读屏方可播报「已播多久 / 共多久」
+  if (pProg){
+    pProg.setAttribute('aria-valuenow', String(Math.round(pct)));
+    pProg.setAttribute('aria-valuetext', fmtTime(playerAudio.currentTime) + ' / ' + fmtTime(dur));
+    pProg.setAttribute('aria-label', '播放进度 ' + fmtTime(playerAudio.currentTime) + ' / ' + fmtTime(dur));
+  }
 });
 playerAudio.addEventListener('ended', function(){
+  // 睡眠定时「播完当前这集就暂停」优先于一切连播逻辑（含单曲循环）——2026-09-28
+  if (sleepAfterTrack){ clearSleepTimer(true); pauseForSleep(); return; }
   // 依据当前播放模式自动连播：单曲循环重播本曲；顺序到末曲停止；逆序到首曲停止；随机取下一首
   if (curMode() === '单曲'){
     playerAudio.currentTime = 0;
@@ -4571,11 +4800,8 @@ playerAudio.addEventListener('ended', function(){
     }
     return;
   }
-  var n = autoNext(curIdx);
-  if (n >= 0) {
-    // 自动连播：使用Promise处理，确保后台也能正常切换
-    playTrack(n);
-  } else {
+  // 自动连播（2026-09-28 改造）：跨专辑先确认，同专辑照旧；到队尾（顺序末曲 / 逆序首曲）则停
+  if (!advanceAuto(curIdx)) {
     document.getElementById('pPlay').textContent = '▶';
     updateMini();
   }
@@ -4729,6 +4955,19 @@ window.addEventListener('mousemove', function(ev){ if (pDragging) seekFromEvent(
 window.addEventListener('touchmove', function(ev){ if (pDragging) seekFromEvent(ev); }, {passive:true});
 window.addEventListener('mouseup', function(){ pDragging = false; pDragEl = null; });
 window.addEventListener('touchend', function(){ pDragging = false; pDragEl = null; });
+// 进度条键盘操作（2026-09-28 无障碍）：Tab 聚焦后 ←/→ 前后 15 秒（与 -15/+15 按钮同口径）、Home/End 首尾。
+// 不做「全局空格播放/暂停」：空格＝翻页是全网通用预期，抢它会让读文章的师兄莫名其妙被切歌；
+// 播放器里的按钮本身就是原生 <button>，Tab + 回车即可操作。
+pProg.addEventListener('keydown', function(ev){
+  if (curIdx < 0 || !playerAudio.duration) return;
+  var dur = playerAudio.duration, handled = true;
+  if (ev.key === 'ArrowLeft')       playerAudio.currentTime = Math.max(0, playerAudio.currentTime - 15);
+  else if (ev.key === 'ArrowRight') playerAudio.currentTime = Math.min(dur, playerAudio.currentTime + 15);
+  else if (ev.key === 'Home')       playerAudio.currentTime = 0;
+  else if (ev.key === 'End')        playerAudio.currentTime = dur;
+  else handled = false;
+  if (handled) ev.preventDefault();
+});
 
 // 播放列表（内嵌于半屏播放器顶部）
 // 播放列表：分类下拉选择器＋两级列表（2026-09-27 小谦指示第四轮）——顶部按钮显示当前分类名（上师亲诵／上师开示／上师赞歌，名称顺序小谦指定），点开下拉勾选即切换；下方＝该分类的两级列表（专辑→曲目）。
@@ -4737,6 +4976,7 @@ window.addEventListener('touchend', function(){ pDragging = false; pDragEl = nul
 var plExpanded = {};    // folder -> 是否展开（用户手动操作记录）
 var plSkipForce = false; // 组头手动切换后的一次渲染，跳过「当前组强制展开」（否则当前组收不回去）
 var plView = { cat: 0, open: false }; // 播放列表：当前分类下标 + 下拉是否展开（2026-09-27 第四轮改为下拉选择器）
+var plQuery = '';   // 播放列表搜索关键词（2026-09-28）：非空时列表切换为跨分类命中结果
 var PL_MENU = [   // 分类菜单（名称与顺序为小谦 2026-09-27 指定；prefix 匹配 folder 首段，2.1/2.2 归并进「上师亲诵」）
   { label: '上师亲诵（仪轨与经文、圣号与明咒）', prefix: '2.' },
   { label: '上师开示（AI 朗读）', prefix: '1.' },
@@ -4774,6 +5014,48 @@ function renderPlist(){
   if (plView.cat < 0 || plView.cat >= PL_MENU.length) plView.cat = 0;
   var st = box.scrollTop;   // 重渲染保留滚动位置
   var h = [];
+  // ---- 搜索模式（2026-09-28）：有关键词时跨分类平铺命中结果，不再显示分类下拉与两级目录 ----
+  var q = (plQuery || '').trim().toLowerCase();
+  if (q){
+    var hits = [];
+    for (var si = 0; si < AUDIO_TRACKS.length; si++){
+      var stt = AUDIO_TRACKS[si];
+      if (stt.title.toLowerCase().indexOf(q) >= 0
+          || trackAlbumLabel(stt).toLowerCase().indexOf(q) >= 0){
+        hits.push({ gi: si, t: stt });
+      }
+    }
+    if (hits.length){
+      h.push('<div class="pl-search-head">找到 ' + hits.length + ' 条 · 「' + esc(plQuery.trim()) + '」'
+        + '<span class="pls-clear" role="button" tabindex="0">清除</span></div>');
+      for (var hi = 0; hi < hits.length; hi++){
+        var hg = hits[hi].gi, ht = hits[hi].t;
+        h.push('<div class="pl-item' + (hg === curIdx ? ' playing' : '') + '" data-idx="' + hg + '">'
+          + '<span class="pl-idx">' + (hi + 1) + '</span>'
+          + '<span class="pl-dot"></span>'
+          + '<span class="pl-title">' + esc(ht.title)
+          + ' <span class="pl-hit-album">· ' + esc(albumDisplayLabel(ht)) + '</span></span></div>');
+      }
+    } else {
+      h.push('<div class="pl-search-head">没有找到匹配的曲目或专辑'
+        + '<span class="pls-clear" role="button" tabindex="0">清除</span></div>');
+    }
+    box.innerHTML = h.join('');
+    box.scrollTop = 0;
+    box.querySelectorAll('.pl-item').forEach(function(it){
+      it.onclick = function(){ playTrack(parseInt(it.dataset.idx, 10)); };
+    });
+    var clr = box.querySelector('.pls-clear');
+    if (clr){
+      clr.onclick = function(){
+        var inp = document.getElementById('plSearch');
+        if (inp) inp.value = '';
+        plQuery = '';
+        renderPlist();
+      };
+    }
+    return;
+  }
   // 分类下拉选择器：按钮显示当前分类名（小谦 2026-09-27 第四轮）
   h.push('<div class="pl-cat-row"><div class="pl-cat-btn" role="button" aria-expanded="' + (plView.open ? 'true' : 'false') + '">'
     + '<span class="pl-cat-label">' + esc(PL_MENU[plView.cat].label) + '</span>'
@@ -4851,6 +5133,23 @@ function renderPlist(){
   });
 }
 
+// 打开列表时把正在播放的那一集滚进可视区（2026-09-28）。
+// ⚠️ 只用列表容器自身的 scrollTop 计算，绝不用 el.scrollIntoView：后者会把**整页**一起滚走
+//    （站点是被嵌在长文阅读流里的）。
+// ⚠️ 不用 offsetTop：.pl-item 的 offsetParent 是 position:fixed 的 .player，不是滚动容器，
+//    offsetTop 与 box.scrollTop 不同源，会算歪；用 rect 差值才同源。
+function scrollPlistToCurrent(){
+  if (curIdx < 0) return;
+  var box = document.getElementById('pPlaylist');
+  if (!box || !box.clientHeight) return;
+  var el = box.querySelector('.pl-item[data-idx="' + curIdx + '"]');
+  if (!el) return;
+  var r = el.getBoundingClientRect(), br = box.getBoundingClientRect();
+  var top = r.top - br.top + box.scrollTop;
+  if (top < box.scrollTop || top + r.height > box.scrollTop + box.clientHeight){
+    box.scrollTop = Math.max(0, top - Math.round(box.clientHeight / 3));   // 略偏上：前后几集都看得见
+  }
+}
 // 播放列表：点击展开 / 收起（默认收起）
 document.getElementById('pPlToggle').onclick = function(){
   var p = document.getElementById('player');
@@ -4863,11 +5162,39 @@ document.getElementById('pPlToggle').onclick = function(){
     if (curIdx >= 0 && AUDIO_TRACKS[curIdx]){ var _c = plCatOf(plTopName(AUDIO_TRACKS[curIdx])); if (_c >= 0) plView.cat = _c; }
     plSkipForce = false;
     renderPlist();
+    scrollPlistToCurrent();
+  } else {
+    // 收起时清空搜索（2026-09-28）：否则下次打开还停在上次的搜索结果上，容易误以为列表就是这些
+    plQuery = '';
+    var _inp = document.getElementById('plSearch');
+    if (_inp) _inp.value = '';
   }
 };
-// 关闭叉号：完全关闭播放器，显示"播放器"悬浮按钮
+// 播放列表搜索框（2026-09-28）：静态节点只绑一次事件；输入即重渲染命中结果
+(function(){
+  var inp = document.getElementById('plSearch');
+  if (!inp) return;
+  if (typeof AUDIO_TRACKS !== 'undefined' && AUDIO_TRACKS.length){
+    inp.placeholder = '搜索曲目 / 专辑名（共 ' + AUDIO_TRACKS.length + ' 集）';
+  }
+  inp.addEventListener('input', function(){ plQuery = inp.value; renderPlist(); });
+  inp.addEventListener('keydown', function(ev){
+    if (ev.key === 'Escape'){ inp.value = ''; plQuery = ''; renderPlist(); }
+    else if (ev.key === 'Enter'){ ev.preventDefault(); }   // 回车不要提交/冒泡干扰其它面板
+  });
+})();
+// 关闭叉号（2026-09-28 小谦指示）：不再直接停播——手机上手滑点到 ✕ 就中断收听、还得重新找回进度，
+// 代价太大。改为「收起为迷你条、音频继续播放」＋ 6 秒撤销（撤销条里放真正的「停止播放」）；
+// 停止路径依然存在：迷你条 ↗ 回展开态再点 ✕（此时已暂停，直接走完全关闭）。
+// 没在播（未开始 / 已暂停）时没有可中断的东西，仍按原来的完全关闭处理。
 document.getElementById('pClose').onclick = function(){
-  hidePlayer();
+  var playing = (curIdx >= 0) && !playerAudio.paused;
+  if (playing){
+    minimizePlayer();
+    showPToast('已收起播放器，音频继续播放', 6000, '停止播放', function(){ hidePlayer(); });
+  } else {
+    hidePlayer();
+  }
 };
 // 最小化按钮：折叠为底部迷你条，音频继续后台播放
 document.getElementById('pMinimize').onclick = function(){
@@ -4915,7 +5242,8 @@ document.querySelectorAll('.p-speed-menu .sp-item, .pm-speed-menu .sp-item').for
   el.addEventListener('click', function(e){
     e.stopPropagation();
     var i = SPEEDS.indexOf(parseFloat(el.getAttribute('data-rate')));
-    if (i >= 0) speedIdx = i;
+    // 倍速记忆（2026-09-28）：选中即写入，刷新/重开浏览器后保持
+    if (i >= 0){ speedIdx = i; try{ localStorage.setItem('longchen-audio-speed', String(SPEEDS[i])); }catch(e){} }
     applySpeed();
     closeAllSpeedMenus();
   });
@@ -4924,9 +5252,42 @@ document.querySelectorAll('.p-speed-menu .sp-item, .pm-speed-menu .sp-item').for
 
 
 );
+// 睡眠定时器菜单（2026-09-28）：点按钮开合；选中档位即生效并收起
+function closeTimerMenu(){ var m = document.getElementById('pTimerMenu'); if (m) m.style.display = 'none'; }
+document.getElementById('pTimer').onclick = function(e){
+  e.stopPropagation();
+  var menu = document.getElementById('pTimerMenu');
+  var open = menu.style.display === 'block';
+  closeAllSpeedMenus();
+  menu.style.display = open ? 'none' : 'block';
+};
+document.querySelectorAll('#pTimerMenu .tm-item[data-min]').forEach(function(el){
+  el.addEventListener('click', function(e){
+    e.stopPropagation();
+    var v = el.getAttribute('data-min');
+    if (v === 'track') setSleepAfterTrack();
+    else setSleepTimer(parseInt(v, 10));
+    closeTimerMenu();
+  });
+});
+document.getElementById('pTimerOff').addEventListener('click', function(e){
+  e.stopPropagation();
+  clearSleepTimer();
+  closeTimerMenu();
+});
 document.addEventListener('click', closeAllSpeedMenus);
-document.addEventListener('keydown', function(e){ if (e.key === 'Escape') closeAllSpeedMenus(); });
-applySpeed();   // 初始化按钮文案与默认高亮
+document.addEventListener('click', closeTimerMenu);
+document.addEventListener('keydown', function(e){ if (e.key === 'Escape'){ closeAllSpeedMenus(); closeTimerMenu(); closeAlbumAsk(); } });
+refreshSleepBtn();   // 初始化定时器按钮形态（无定时＝中性 ⏱）
+// 倍速记忆（2026-09-28）：听 AI 朗读通常固定 1.25x/1.5x，刷新后回到 1x 每次都要重设
+(function(){
+  try{
+    var s = parseFloat(localStorage.getItem('longchen-audio-speed') || '');
+    var i = SPEEDS.indexOf(s);
+    if (i >= 0) speedIdx = i;
+  }catch(e){}
+})();
+applySpeed();   // 初始化按钮文案与默认高亮（含上面恢复的倍速档位）
 // 悬浮按钮：打开播放器（点击事件已在拖动功能中处理）
 // 迷你条：播放/暂停
 document.getElementById('pmPlay').onclick = function(){

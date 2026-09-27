@@ -18,6 +18,9 @@
 覆盖：
   A. 起播：点「▶ 播放全部」→ 播放器展开、audio 进入播放
   B. 自动连播：seek 到结尾 → 是否自动跳下一集（核心，铁律 7 指定）
+     （2026-09-28 起分两条分支，探针会先判定走哪条：① 同专辑 → 直接续播；
+       ② 跨专辑 → 先弹「下一个专辑是《X》，是否继续」确认框并暂停，点「继续播放」后才换集。
+       只用「idx 变了没有」当唯一判据会把分支②误报成「连播失效」。）
   C. 320px 三个底部控件可点且状态生效（模式 / 播放列表 / 倍速），含遮挡诊断
   D. 标识符完整性：needsKeepAlive 已定义（强制为 true 后模拟 timeupdate 不抛错）
   E. 全程 pageerror 去重计数
@@ -317,6 +320,35 @@ async page => {
     }, dur);
     R.chain.seekOk = seekCheck.ok;
     R.chain.seekT = seekCheck.t;
+    // 2026-09-28：跨专辑自动连播改为「先弹确认框」——同专辑直接续播；跨专辑则先出确认框并暂停，
+    // 点「继续播放」后才换集。不先分辨这两条分支，就会把「设计如此」误报成「连播失效」。
+    R.chain.crossAlbum = await page.evaluate(() => {
+      if (typeof curIdx === 'undefined' || curIdx < 0 || typeof AUDIO_TRACKS === 'undefined') return null;
+      const cur = AUDIO_TRACKS[curIdx], nxt = AUDIO_TRACKS[curIdx + 1];
+      if (!cur || !nxt) return 'no-next';
+      return ((cur.folder || '') !== (nxt.folder || '')) ? 'cross' : 'same';
+    });
+    R.chain.dialogOk = true;
+    if (R.chain.crossAlbum === 'cross') {
+      let ask = null;
+      for (let i = 0; i < 16; i++) {
+        await page.waitForTimeout(500);
+        ask = await page.evaluate(() => {
+          const d = document.querySelector('.album-ask');
+          if (!d) return null;
+          return { text: d.textContent.replace(/\s+/g, ' ').trim().slice(0, 100),
+                   paused: (typeof playerAudio !== 'undefined' && playerAudio) ? playerAudio.paused : null,
+                   idx: (typeof curIdx !== 'undefined') ? curIdx : null };
+        });
+        if (ask) break;
+      }
+      R.chain.askDialog = ask;
+      R.chain.dialogOk = !!ask;
+      if (ask) {
+        await page.evaluate(() => { const b = document.querySelector('.album-ask .aa-go'); if (b) b.click(); });
+        await page.waitForTimeout(700);
+      }
+    }
     let p2 = p1;
     for (let i = 0; i < 26; i++) {
       await page.waitForTimeout(500);
@@ -409,6 +441,9 @@ def main():
             print("   seek 前：idx=%s  %r  %s" % (b4["idx"], b4["txt"], b4["file"]))
             print("   seek 后：idx=%s  %r  %s" % (a["idx"], a["title"], a["file"]))
             print("   自动连播：%s" % ("✓ 已跳到下一集" if a["changed"] else "✗ 未跳（连播失效）"))
+            print("   分支：%s%s" % (c.get("crossAlbum"),
+                  ("  跨专辑确认框：%s" % ((c.get("askDialog") or {}).get("text") or "未出现 ✗"))
+                  if c.get("crossAlbum") == "cross" else "  （同专辑，直接续播）"))
             print("   paused=%s  currentTime=%s" % (a["paused"], a["t"]))
             pr = c.get("probe") or {}
             print("   插桩：ended 触发 %s 次   playTrack 调用 %s   autoNext(入参→返回) %s"
@@ -456,7 +491,8 @@ def main():
 
         ok = (c.get("seekOk") and c.get("after", {}).get("changed") and not R["errors"]
               and u.get("mode", {}).get("ok") and u.get("speed", {}).get("ok")
-              and u.get("playlist", {}).get("ok") and ni.get("defined"))
+              and u.get("playlist", {}).get("ok") and ni.get("defined")
+              and c.get("dialogOk", True))
         print("\n结论：%s" % ("端到端通过 ✓" if ok else "不通过 ✗"))
         return 0 if ok else 1
     finally:
