@@ -835,17 +835,41 @@ button:active, .player-launch:active, .search-fab:active{transform:scale(.95)}
   background:#fff; border:2px solid var(--gold); transform:translate(-50%,-50%); left:0%}
 /* 进度条可键盘操作（2026-09-28 无障碍）：role=slider 可 Tab 聚焦，聚焦时给可见轮廓 */
 .player .p-progress:focus{outline:2px solid var(--accent); outline-offset:3px}
-/* 第4行：播放模式 + 播放列表 同一行（两端对齐，空隙均衡；播放列表按钮不再居中） */
-.player .p-footer{display:flex; align-items:center; justify-content:space-between; gap:.6rem;
+/* 第4行：三颗按钮（系列 / 播放模式 / 倍速）同排，间距均分。
+   2026-09-28 小谦指示：播放列表按钮上直接显示当前系列名 + ▾；名字变长时按钮随之变宽，
+   整行自动重排（三颗都 flex:1 1 auto + min-width:0，剩余空间平分，超出用省略号）。 */
+.player .p-footer{position:relative; display:flex; align-items:center; justify-content:space-between; gap:.6rem;
   padding:.6rem 1.3rem; flex:0 0 auto; border-top:1px solid var(--line)}
-.player .p-footer .p-mode{margin:0; flex:0 0 auto}
-.player .p-footer .p-pl-toggle{margin:0; flex:0 0 auto}
-.player .p-pl-toggle{border:1px solid var(--gold); background:var(--surface); color:var(--gold-deep);
-  cursor:pointer; font-size:.92rem; padding:.35rem .9rem; border-radius:999px;
+.player .p-footer > *{flex:1 1 auto; min-width:0}   /* 均分：任一按钮变长，另外两颗同步让位 */
+.player .p-footer .p-mode{margin:0; justify-content:center}
+.player .p-footer .p-speed-wrap{margin:0; justify-content:center}
+.player .p-speed{width:100%; justify-content:center}
+/* 播放列表按钮＝「系列选择器」胶囊：左半区展开/收起列表，右半区 ▾ 切换系列 */
+.player .p-pl-wrap{position:relative; display:inline-flex; align-items:center; overflow:hidden;
+  border:1px solid var(--gold); background:var(--surface); border-radius:999px}
+.player .p-pl-toggle{flex:1 1 auto; min-width:0; border:none; background:none; color:var(--gold-deep);
+  cursor:pointer; font-size:.92rem; padding:.35rem .1rem .35rem .9rem;
   display:inline-flex; align-items:center; gap:.35rem; font-family:inherit; transition:background .15s;
-  white-space:nowrap}
+  white-space:nowrap; overflow:hidden}
 .player .p-pl-toggle:hover{background:var(--surface-soft)}
-.player .p-pl-hint{font-size:.8rem; color:var(--ink-faint)}
+.player .p-pl-label{flex:0 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis}
+.player .p-pl-caret{flex:0 0 auto; border:none; border-left:1px solid var(--line); background:none;
+  color:var(--gold-deep); cursor:pointer; font-size:.85rem; line-height:1; padding:.45rem .6rem;
+  font-family:inherit; transition:background .15s}
+.player .p-pl-caret:hover{background:var(--surface-soft)}
+.player .p-pl-caret[aria-expanded="true"]{background:var(--surface-soft); color:var(--accent)}
+/* 系列下拉菜单：锚在底部行（父级 .p-footer 相对定位），left=行内边距＝胶囊左缘 */
+.player .p-pl-menu{position:absolute; bottom:calc(100% + 6px); left:1.3rem; z-index:60;
+  background:var(--surface); border:1px solid var(--line); border-radius:12px; padding:.3rem;
+  box-shadow:0 -6px 20px rgba(59,42,34,.18); min-width:12rem; max-width:min(20rem, 88vw);
+  max-height:60vh; overflow-y:auto}
+.player .p-pl-menu .pm-item{display:flex; align-items:center; gap:.5rem; padding:.55rem .7rem;
+  border-radius:8px; font-size:.9rem; color:var(--ink-soft); cursor:pointer; transition:background .15s}
+.player .p-pl-menu .pm-item:hover{background:var(--surface-soft)}
+.player .p-pl-menu .pm-item.active{color:var(--accent); font-weight:600; background:var(--surface-soft)}
+.player .p-pl-menu .pm-check{flex:0 0 1.1rem; color:var(--accent)}
+.player .p-pl-menu .pm-name{flex:1 1 auto; min-width:0; overflow-wrap:anywhere}
+.player .p-pl-menu .pm-count{flex:0 0 auto; color:var(--ink-faint); font-weight:400; font-size:.85em}
 .player .p-minimize{border:none; background:none; cursor:pointer; color:var(--ink-soft);
   font-size:1.5rem; width:2.3rem; height:2.3rem; border-radius:8px; line-height:1; margin-left:auto}
 .player .p-minimize:hover{background:var(--surface-hover)}
@@ -863,12 +887,22 @@ button:active, .player-launch:active, .search-fab:active{transform:scale(.95)}
 .player .p-timer.on{color:var(--accent); font-weight:700; background:var(--surface-soft)}
 .player .p-timer-menu{position:absolute; bottom:calc(100% + 6px); right:0; z-index:60;
   background:var(--surface); border:1px solid var(--line); border-radius:12px; padding:.3rem;
-  box-shadow:0 -6px 20px rgba(59,42,34,.18); min-width:9rem; max-height:60vh; overflow-y:auto}
+  box-shadow:0 -6px 20px rgba(59,42,34,.18); min-width:10.5rem; max-height:60vh; overflow-y:auto}
 .player .p-timer-menu .tm-item{padding:.45rem .7rem; border-radius:8px; font-size:.9rem; color:var(--ink-soft);
   cursor:pointer; white-space:nowrap; transition:background .15s}
 .player .p-timer-menu .tm-item:hover{background:var(--surface-soft)}
 .player .p-timer-menu .tm-item.active{color:var(--accent); font-weight:600; background:var(--surface-soft)}
 .player .p-timer-menu .tm-sep{height:1px; background:var(--line); margin:.25rem 0}
+/* 自定义分钟数（2026-09-28 小谦指示：90 分钟档改为自定义） */
+/* ⚠️ 按钮必须 flex:0 0 auto + nowrap：首版让「确定」参与压缩，两个字被挤成竖排两行（实测截图） */
+.player .p-timer-menu .tm-custom{display:flex; align-items:center; flex-wrap:nowrap; gap:.35rem; padding:.35rem .5rem .45rem}
+.player .p-timer-menu .tm-custom input{flex:1 1 auto; width:4.8rem; min-width:0; font:inherit; font-size:.9rem;
+  padding:.3rem .45rem; border:1px solid var(--line); border-radius:8px; background:var(--surface);
+  color:var(--ink); text-align:center}
+.player .p-timer-menu .tm-custom button{flex:0 0 auto; white-space:nowrap; border:1px solid var(--gold);
+  background:var(--surface); color:var(--gold-deep); font:inherit; font-size:.85rem;
+  padding:.3rem .6rem; border-radius:8px; cursor:pointer}
+.player .p-timer-menu .tm-custom button:hover{background:var(--surface-soft)}
 /* 播放模式切换按钮（状态栏左侧胶囊）：点击在 顺序/逆序/随机/单曲循环 间循环，并显示当前模式 */
 .player .p-mode{border:1px solid var(--gold); background:var(--surface); color:var(--gold-deep);
   cursor:pointer; font-size:.85rem; padding:.2rem .7rem; border-radius:999px;
@@ -910,21 +944,8 @@ button:active, .player-launch:active, .search-fab:active{transform:scale(.95)}
 .player .pl-group-head .plg-name{flex:1 1 auto; min-width:0; overflow-wrap:anywhere}
 .player .pl-group-head .plg-count{flex:0 0 auto; color:var(--ink-faint); font-weight:400; font-size:.85em}
 .player .pl-sub .pl-item{padding-left:2.8rem}   /* 二级缩进：曲目行相对组头缩进，体现层级 */
-.player .pl-cat-row{padding:.55rem .9rem .55rem 1.4rem; border-bottom:1px solid var(--line)}
-.player .pl-cat-btn{display:flex; align-items:center; gap:.6rem; cursor:pointer; user-select:none;
-  background:var(--surface-soft); border:1px solid var(--line); border-radius:8px; padding:.55rem .75rem;
-  color:var(--ink); font-weight:700; font-size:1.02em}
-.player .pl-cat-btn:hover{background:var(--line)}
-.player .pl-cat-btn .pl-cat-label{flex:1 1 auto; min-width:0; overflow-wrap:anywhere}
-.player .pl-cat-btn .pl-cat-caret{flex:0 0 auto; color:var(--ink-faint); font-size:.85em}
-.player .pl-cat-menu{border-bottom:1px solid var(--line); background:var(--surface)}
-.player .pl-cat-item{display:flex; align-items:center; gap:.5rem; padding:.75rem 1.4rem;
-  cursor:pointer; user-select:none; color:var(--ink)}
-.player .pl-cat-item:hover{background:var(--surface-soft)}
-.player .pl-cat-item.active{color:var(--accent); font-weight:700}
-.player .pl-cat-item .pl-cat-check{flex:0 0 1.1rem; color:var(--accent)}
-.player .pl-cat-item .plg-name{flex:1 1 auto; min-width:0; overflow-wrap:anywhere}
-.player .pl-cat-item .plg-count{flex:0 0 auto; color:var(--ink-faint); font-weight:400; font-size:.85em}
+/* 列表内分类下拉行的样式已于 2026-09-28 随该行一并删除：
+   分类选择器上移到播放器底部按钮（按钮直接显示系列名 + ▾），此处不再有对应节点。 */
 /* 播放列表搜索行（2026-09-28 小谦指示）：输入框是**静态节点**，不参与 renderPlist 重渲染，
    否则每输一个字就重建 input、光标和输入法候选全丢。只在列表展开时显示。 */
 .player .pl-search-row{display:none; flex:0 0 auto; padding:.55rem 1.4rem; border-top:1px solid var(--line)}
@@ -1315,15 +1336,17 @@ button:active, .player-launch:active, .search-fab:active{transform:scale(.95)}
   .fs-cap{display:none}
   .fs-pill button{width:1.7rem; height:1.7rem; font-size:.9rem}
   .player .p-footer{gap:.4rem; padding:.55rem .9rem}
-  .player .p-pl-toggle{font-size:.82rem; padding:.3rem .7rem}
+  .player .p-pl-toggle{font-size:.82rem; padding:.3rem .1rem .3rem .7rem}
+  .player .p-pl-caret{font-size:.8rem; padding:.4rem .5rem}
+  .player .p-pl-menu{left:.9rem}
   /* 2026-09-22（小谦指示）修播放器窄屏溢出（总纲 §17.3 O-02）：
-     窄屏隐藏播放列表按钮内的长提示语「点击展开播放列表」。
-     根因：.p-footer 三个子项全是 flex:0 0 auto（不可压缩），实测总需 357px，
-     而该按钮 199px 里有 95px 是这条提示语（按钮文案「📋 播放列表」已自明，提示属冗余）。
-     隐藏后总需 ≈255px —— 320px 视口下仍有余量（可用 291px）。
+     原做法＝窄屏隐藏按钮内的长提示语「点击展开播放列表」（该提示 2026-09-28 已移除，
+     按钮改为直接显示系列名，故这条规则一并删除）。
+     根因：.p-footer 三个子项当时全是 flex:0 0 auto（不可压缩），实测总需 357px，
+     而 320px 视口仅 291px 可用。现改为三颗都 flex:1 1 auto 且 min-width:0：
+     系列名变长时三颗等比让位、超出部分走省略号，不再靠「隐藏文案」救场。
      为何不用 flex-wrap:wrap：换行点会随视口宽度临时决定 → 长短行错位（与日历图层区同一教训），
-     故一律「减内容量」，不让它折。实测数据见 _archive/zl/probe_player_geometry.py。 */
-  .player .p-pl-hint{display:none}
+     故一律「可压缩 + 省略号」，不让它折。实测数据见 _archive/zl/probe_player_geometry.py。 */
 }
 /* 极窄屏（≤374px，典型 320/360）播放器控制键：
    .p-controls 原始需 322px，而 320px 视口仅 293px 可用 → 5 颗按钮被 flex-shrink
@@ -1597,7 +1620,12 @@ img{height:auto;max-width:100%}
         <div class="tm-item" data-min="30">30 分钟后暂停</div>
         <div class="tm-item" data-min="45">45 分钟后暂停</div>
         <div class="tm-item" data-min="60">60 分钟后暂停</div>
-        <div class="tm-item" data-min="90">90 分钟后暂停</div>
+        <div class="tm-item" data-min="custom">自定义…</div>
+        <div class="tm-custom" id="pTimerCustom" style="display:none">
+          <input type="number" id="pTimerCustomInput" inputmode="numeric" min="1" max="1440" step="1"
+                 placeholder="分钟" aria-label="自定义定时分钟数">
+          <button type="button" id="pTimerCustomOk">确定</button>
+        </div>
         <div class="tm-sep"></div>
         <div class="tm-item" data-min="track">播完当前这集就暂停</div>
         <div class="tm-item" id="pTimerOff" style="display:none">关闭定时</div>
@@ -1623,7 +1651,11 @@ img{height:auto;max-width:100%}
   </div>
   <!-- 第4行：播放列表(最左) + 播放模式/调整顺序(中) + 倍速(最右) -->
   <div class="p-footer">
-    <button class="p-pl-toggle" id="pPlToggle">📋 播放列表 <span class="p-pl-hint" id="pPlHint">点击展开播放列表</span></button>
+    <span class="p-pl-wrap">
+      <button class="p-pl-toggle" id="pPlToggle" title="展开 / 收起播放列表">📋 <span class="p-pl-label" id="pPlLabel">播放列表</span></button>
+      <button class="p-pl-caret" id="pPlCaret" title="切换系列" aria-label="切换系列" aria-haspopup="listbox" aria-expanded="false">▾</button>
+    </span>
+    <div class="p-pl-menu" id="pPlMenu" style="display:none" role="listbox" aria-label="选择系列"></div>
     <button class="p-mode" id="pMode" title="播放模式：顺序 / 逆序 / 随机 / 单曲循环（点击切换）">🔁 顺序</button>
     <span class="p-speed-wrap">
       <button class="p-speed" id="pSpeed" title="播放速度（点击选择倍速）">倍速 1x</button>
@@ -4485,9 +4517,14 @@ function refreshSleepBtn(){
     : '睡眠定时器：到点自动暂停播放';
   var off = document.getElementById('pTimerOff');
   if (off) off.style.display = sleepActive() ? '' : 'none';
+  var PRESET_MIN = [15, 30, 45, 60];   // 预设档（90 档 2026-09-28 已改为自定义，故不在其中）
   document.querySelectorAll('#pTimerMenu .tm-item[data-min]').forEach(function(it){
     var v = it.getAttribute('data-min');
-    it.classList.toggle('active', v === 'track' ? sleepAfterTrack : (!!sleepDeadline && String(sleepMinutes) === v));
+    var on = false;
+    if (v === 'track') on = sleepAfterTrack;
+    else if (v === 'custom') on = !!sleepDeadline && PRESET_MIN.indexOf(sleepMinutes) < 0;  // 自定义分钟数归入此项
+    else on = !!sleepDeadline && String(sleepMinutes) === v;
+    it.classList.toggle('active', on);
   });
 }
 function pauseForSleep(){
@@ -4978,10 +5015,57 @@ var plSkipForce = false; // 组头手动切换后的一次渲染，跳过「当�
 var plView = { cat: 0, open: false }; // 播放列表：当前分类下标 + 下拉是否展开（2026-09-27 第四轮改为下拉选择器）
 var plQuery = '';   // 播放列表搜索关键词（2026-09-28）：非空时列表切换为跨分类命中结果
 var PL_MENU = [   // 分类菜单（名称与顺序为小谦 2026-09-27 指定；prefix 匹配 folder 首段，2.1/2.2 归并进「上师亲诵」）
-  { label: '上师亲诵（仪轨与经文、圣号与明咒）', prefix: '2.' },
-  { label: '上师开示（AI 朗读）', prefix: '1.' },
-  { label: '上师赞歌', prefix: '3.' }
+  // short＝底部按钮上显示的系列短名（2026-09-28 小谦指示：按钮直接显示系列名 + ▾，全名放不进一行）
+  { label: '上师亲诵（仪轨与经文、圣号与明咒）', short: '上师亲诵', prefix: '2.' },
+  { label: '上师开示（AI 朗读）', short: '上师开示', prefix: '1.' },
+  { label: '上师赞歌', short: '上师赞歌', prefix: '3.' }
 ];
+// 每个分类的曲目数（底部系列菜单用）
+function plCatCount(mi){
+  var n = 0;
+  for (var i = 0; i < AUDIO_TRACKS.length; i++){
+    if (plCatOf(plTopName(AUDIO_TRACKS[i])) === mi) n++;
+  }
+  return n;
+}
+// 底部系列胶囊：左半区＝展开/收起列表，右半区 ▾＝切换系列（2026-09-28 小谦指示）
+function updatePlLabel(){
+  var el = document.getElementById('pPlLabel');
+  if (el) el.textContent = (PL_MENU[plView.cat] && PL_MENU[plView.cat].short) || '播放列表';
+}
+function renderPlCatMenu(){
+  var m = document.getElementById('pPlMenu');
+  var car = document.getElementById('pPlCaret');
+  if (!m) return;
+  if (!plView.open){ m.style.display = 'none'; if (car) car.setAttribute('aria-expanded', 'false'); return; }
+  var h = [];
+  for (var mi = 0; mi < PL_MENU.length; mi++){
+    var act = (mi === plView.cat);
+    h.push('<div class="pm-item' + (act ? ' active' : '') + '" data-cat="' + mi + '" role="option"'
+      + ' aria-selected="' + (act ? 'true' : 'false') + '">'
+      + '<span class="pm-check">' + (act ? '✓' : '') + '</span>'
+      + '<span class="pm-name">' + esc(PL_MENU[mi].label) + '</span>'
+      + '<span class="pm-count">' + plCatCount(mi) + ' 集</span></div>');
+  }
+  m.innerHTML = h.join('');
+  m.style.display = 'block';
+  if (car) car.setAttribute('aria-expanded', 'true');
+  m.querySelectorAll('.pm-item').forEach(function(it){
+    it.onclick = function(e){
+      e.stopPropagation();
+      plView.cat = parseInt(it.getAttribute('data-cat'), 10);
+      plView.open = false;
+      plSkipForce = true;
+      renderPlCatMenu();
+      updatePlLabel();
+      renderPlist();
+      // 列表未展开时顺带展开：否则点了「切换系列」只看见按钮文字变，看不见结果
+      var p = document.getElementById('player');
+      if (p && !p.classList.contains('pl-open')) document.getElementById('pPlToggle').click();
+    };
+  });
+}
+function closePlCatMenu(){ plView.open = false; renderPlCatMenu(); }
 function plTopName(t){
   // 「2. 上师法音」是纯容器层（自身无曲目）：下钻一级，用 2.1/2.2 段作顶级分类
   //（2026-09-27 实测顶级实为 3 段，小谦要求的四类＝此下钻规则展开后的结果）
@@ -5056,25 +5140,7 @@ function renderPlist(){
     }
     return;
   }
-  // 分类下拉选择器：按钮显示当前分类名（小谦 2026-09-27 第四轮）
-  h.push('<div class="pl-cat-row"><div class="pl-cat-btn" role="button" aria-expanded="' + (plView.open ? 'true' : 'false') + '">'
-    + '<span class="pl-cat-label">' + esc(PL_MENU[plView.cat].label) + '</span>'
-    + '<span class="pl-cat-caret">▾</span></div></div>');
-  if (plView.open){
-    h.push('<div class="pl-cat-menu">');
-    for (var mi = 0; mi < PL_MENU.length; mi++){
-      var mcnt = 0;
-      for (var g0 = 0; g0 < groups.length; g0++){
-        if (plCatOf(plTopName({ folder: groups[g0].folder })) === mi) mcnt += groups[g0].items.length;
-      }
-      var act = (mi === plView.cat);
-      h.push('<div class="pl-cat-item' + (act ? ' active' : '') + '" data-cat="' + mi + '" role="button">'
-        + '<span class="pl-cat-check">' + (act ? '✓' : '') + '</span>'
-        + '<span class="plg-name">' + esc(PL_MENU[mi].label) + '</span>'
-        + '<span class="plg-count">' + mcnt + ' 集</span></div>');
-    }
-    h.push('</div>');
-  }
+  // 分类选择器已于 2026-09-28 上移到底部按钮的 ▾（小谦指示：按钮直接显示系列名），列表内不再渲染该行
   // 当前分类的两级列表（专辑 → 曲目）
   var vis = [];
   for (var g1 = 0; g1 < groups.length; g1++){
@@ -5107,17 +5173,7 @@ function renderPlist(){
   }
   box.innerHTML = h.join('');
   box.scrollTop = st;
-  box.querySelectorAll('.pl-cat-btn').forEach(function(el){
-    el.onclick = function(){ plView.open = !plView.open; renderPlist(); };
-  });
-  box.querySelectorAll('.pl-cat-item').forEach(function(it){
-    it.onclick = function(){
-      plView.cat = parseInt(it.getAttribute('data-cat'), 10);
-      plView.open = false;   // 勾选后自动收起，按钮显示所选分类名
-      plSkipForce = true;
-      renderPlist();
-    };
-  });
+  // （分类行与其事件绑定已随行移除，改由底部 ▾ 菜单的 renderPlCatMenu 处理）
   box.querySelectorAll('.pl-group-head').forEach(function(head){
     head.onclick = function(){
       var f = head.getAttribute('data-folder');
@@ -5155,11 +5211,11 @@ document.getElementById('pPlToggle').onclick = function(){
   var p = document.getElementById('player');
   var open = p.classList.toggle('pl-open');
   document.getElementById('pPlaylist').classList.toggle('open', open);
-  document.getElementById('pPlHint').textContent = open ? '点击收起播放列表' : '点击展开播放列表';
+  plView.open = false; renderPlCatMenu();   // 列表与系列菜单互斥：开一个必关另一个（否则两面板叠在一起）
   if (open){
     // 打开时定位（小谦 2026-09-27 指示）：播放中 → 分类选择器定位到该曲目分类；未播放 → 保持当前选择
-    plView.open = false;
     if (curIdx >= 0 && AUDIO_TRACKS[curIdx]){ var _c = plCatOf(plTopName(AUDIO_TRACKS[curIdx])); if (_c >= 0) plView.cat = _c; }
+    updatePlLabel();
     plSkipForce = false;
     renderPlist();
     scrollPlistToCurrent();
@@ -5170,6 +5226,14 @@ document.getElementById('pPlToggle').onclick = function(){
     if (_inp) _inp.value = '';
   }
 };
+// 系列菜单（▾）：与倍速 / 定时菜单同款开合；点外部或 Esc 关闭
+document.getElementById('pPlCaret').onclick = function(e){
+  e.stopPropagation();
+  closeAllSpeedMenus();
+  plView.open = !plView.open;
+  renderPlCatMenu();
+};
+document.addEventListener('click', closePlCatMenu);
 // 播放列表搜索框（2026-09-28）：静态节点只绑一次事件；输入即重渲染命中结果
 (function(){
   var inp = document.getElementById('plSearch');
@@ -5259,17 +5323,52 @@ document.getElementById('pTimer').onclick = function(e){
   var menu = document.getElementById('pTimerMenu');
   var open = menu.style.display === 'block';
   closeAllSpeedMenus();
+  closePlCatMenu();
+  closeSleepCustom();   // 每次开合都复位：否则下次打开还留着上次的输入
   menu.style.display = open ? 'none' : 'block';
 };
 document.querySelectorAll('#pTimerMenu .tm-item[data-min]').forEach(function(el){
   el.addEventListener('click', function(e){
     e.stopPropagation();
     var v = el.getAttribute('data-min');
-    if (v === 'track') setSleepAfterTrack();
-    else setSleepTimer(parseInt(v, 10));
+    if (v === 'track'){ setSleepAfterTrack(); closeTimerMenu(); return; }
+    if (v === 'custom'){ openSleepCustom(); return; }   // 自定义：留在菜单里填分钟数，先不收起
+    setSleepTimer(parseInt(v, 10));
     closeTimerMenu();
   });
 });
+// 自定义分钟数（2026-09-28 小谦指示：90 分钟档改为自定义，想定多久就定多久）
+function openSleepCustom(){
+  var box = document.getElementById('pTimerCustom');
+  var inp = document.getElementById('pTimerCustomInput');
+  if (!box || !inp) return;
+  box.style.display = 'flex';
+  inp.value = sleepMinutes || '';
+  try{ inp.focus(); inp.select(); }catch(e){}
+}
+function closeSleepCustom(){ var box = document.getElementById('pTimerCustom'); if (box) box.style.display = 'none'; }
+function applySleepCustom(){
+  var inp = document.getElementById('pTimerCustomInput');
+  if (!inp) return;
+  var v = parseInt(inp.value, 10);
+  if (!v || v < 1 || v > 1440){ showPToast('请输入 1–1440 之间的分钟数', 3000); try{ inp.focus(); inp.select(); }catch(e){} return; }
+  setSleepTimer(v);            // setSleepTimer 内会刷新按钮与高亮
+  closeSleepCustom();
+  closeTimerMenu();
+}
+(function(){
+  var inp = document.getElementById('pTimerCustomInput');
+  var ok = document.getElementById('pTimerCustomOk');
+  if (ok) ok.addEventListener('click', function(e){ e.stopPropagation(); applySleepCustom(); });
+  if (inp){
+    inp.addEventListener('click', function(e){ e.stopPropagation(); });      // 别让输入冒泡到「点外部关闭菜单」
+    inp.addEventListener('keydown', function(e){
+      e.stopPropagation();
+      if (e.key === 'Enter'){ e.preventDefault(); applySleepCustom(); }
+      else if (e.key === 'Escape'){ e.preventDefault(); closeSleepCustom(); }
+    });
+  }
+})();
 document.getElementById('pTimerOff').addEventListener('click', function(e){
   e.stopPropagation();
   clearSleepTimer();
@@ -5277,8 +5376,9 @@ document.getElementById('pTimerOff').addEventListener('click', function(e){
 });
 document.addEventListener('click', closeAllSpeedMenus);
 document.addEventListener('click', closeTimerMenu);
-document.addEventListener('keydown', function(e){ if (e.key === 'Escape'){ closeAllSpeedMenus(); closeTimerMenu(); closeAlbumAsk(); } });
+document.addEventListener('keydown', function(e){ if (e.key === 'Escape'){ closeAllSpeedMenus(); closeTimerMenu(); closePlCatMenu(); closeAlbumAsk(); } });
 refreshSleepBtn();   // 初始化定时器按钮形态（无定时＝中性 ⏱）
+updatePlLabel();     // 初始化底部系列按钮文案（显示当前系列短名）
 // 倍速记忆（2026-09-28）：听 AI 朗读通常固定 1.25x/1.5x，刷新后回到 1x 每次都要重设
 (function(){
   try{
