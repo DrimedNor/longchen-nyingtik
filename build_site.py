@@ -880,6 +880,17 @@ button:active, .player-launch:active, .search-fab:active{transform:scale(.95)}
 .player .pl-item.playing .pl-idx{color:var(--accent)}
 .player .pl-item .pl-dot{width:7px; height:7px; border-radius:50%; background:var(--turq-soft); flex:0 0 7px}
 .player .pl-item.playing .pl-dot{background:var(--turq)}
+/* 播放列表二级目录（2026-09-27）：按现有专辑分类分组，组头可展开/收起 */
+.player .pl-group-head{display:flex; align-items:center; gap:.6rem; padding:.8rem 1.4rem;
+  cursor:pointer; border-bottom:1px solid var(--line); color:var(--ink); font-weight:600;
+  font-size:1.05em; user-select:none}
+.player .pl-group-head:hover{background:var(--surface-soft)}
+.player .pl-group-head[data-cur="1"]{color:var(--accent)}
+.player .pl-group-head .plg-arrow{flex:0 0 auto; color:var(--ink-faint); font-size:.8em; transition:transform .15s}
+.player .pl-group-head.open .plg-arrow{transform:rotate(90deg)}
+.player .pl-group-head .plg-name{flex:1 1 auto; min-width:0; overflow-wrap:anywhere}
+.player .pl-group-head .plg-count{flex:0 0 auto; color:var(--ink-faint); font-weight:400; font-size:.85em}
+.player .pl-sub .pl-item{padding-left:2.8rem}   /* 二级缩进：曲目行相对组头缩进，体现层级 */
 /* 悬浮打开播放器按钮 */
 .player-launch{position:fixed !important; right:1.1rem; bottom:1.1rem; z-index:999;
   background:var(--accent); color:#fff; border:none; cursor:grab;
@@ -3682,52 +3693,22 @@ function toggleAllAudioGroups(btn){
   // 恢复滚动位置，防止页面跳动
   window.scrollTo(0, scrollPos);
 }
-// 播放全部音频（从第一个开始，按顺序连播）
-// 如果传入 albumName，则只播放该专辑的音频
-var ORIGINAL_AUDIO_TRACKS = null;  // 保存原始播放列表
-var CURRENT_ALBUM = null;  // 当前播放的专辑名称
-
+// 播放全部音频（2026-09-27 重构：队列恒为全站列表，根治「专辑播完即停」的割裂感）
+// ⚠️ 历史登记（铁律13）：旧版在此把 AUDIO_TRACKS 过滤成单专辑（ORIGINAL_AUDIO_TRACKS 保存全局副本、
+//    CURRENT_ALBUM 记录专辑名，均只服务这次过滤、已随之删除），后果＝专辑最后一集播完 autoNext
+//    返回 -1 直接停，专辑互不衔接（小谦 09-27 反馈）。现队列不再被过滤：
+//    「播放专辑」＝从该专辑第一集起、在全站列表里顺序播，自然跨专辑续播；
+//    连播与否仍由播放模式决定（autoNext()）——此处永久禁止给 autoNext 赋值（09-19 教训）。
 function playAllAudio(albumName){
   if (!AUDIO_TRACKS.length) return;
-  // 连播与否由播放模式（顺序/逆序/随机/单曲）决定，具体见 autoNext() 函数；此处不做任何开关赋值。
-  // ⚠️ 2026-09-19 修复：原此处为「autoNext = true」，而 autoNext 是函数名不是开关标志 →
-  // 该赋值把 autoNext 覆盖成布尔值，之后 ended／预加载里调用 autoNext() 抛 TypeError，
-  // 表现为「点过『播放全部』后，播完一集就停、不再自动连播」。此处永久禁止再给 autoNext 赋值。
-  
-  // 保存原始播放列表（只保存一次）
-  if (!ORIGINAL_AUDIO_TRACKS) {
-    ORIGINAL_AUDIO_TRACKS = AUDIO_TRACKS.slice();
-  }
-  
-  if (albumName) {
-    // 停止当前播放
-    // ⚠️ 2026-09-22 修复：原先写的是 document.getElementById('audioPlayer')，而音频元素是
-    //   var playerAudio = document.createElement('audio')（并未设置 id）⇒ 该查询永远返回 null，
-    //   这段「停止当前播放」实际是死代码（点「播放专辑」时不会先停掉正在播的曲目）。
-    //   与下方 needsKeepAlive 同批发现，均属「引用了不存在的标识符/元素」——
-    //   语法、构建、门禁、部署全绿，只有端到端实跑才暴露（类型同 09-19 的 autoNext）。
-    playerAudio.pause();
-    playerAudio.currentTime = 0;
-    
-    // 从原始列表中过滤指定专辑
-    // 专辑名称直接匹配文件夹路径中的任意部分
-    var albumTracks = ORIGINAL_AUDIO_TRACKS.filter(function(t){ 
-      return t.folder && t.folder.indexOf(albumName) >= 0;
-    });
-    if (albumTracks.length > 0) {
-      AUDIO_TRACKS = albumTracks;
-      CURRENT_ALBUM = albumName;
-      playTrack(0);
-      return;
+  var start = 0;
+  if (albumName){
+    // 专辑名＝分组名（group，父文件夹名），与听法音页分组展示同名同序
+    for (var i = 0; i < AUDIO_TRACKS.length; i++){
+      if (AUDIO_TRACKS[i].group === albumName || (AUDIO_TRACKS[i].folder || '').indexOf(albumName) >= 0){ start = i; break; }
     }
-  } else {
-    // 播放全部：恢复原始列表
-    if (ORIGINAL_AUDIO_TRACKS) {
-      AUDIO_TRACKS = ORIGINAL_AUDIO_TRACKS.slice();
-    }
-    CURRENT_ALBUM = null;
   }
-  playTrack(0);
+  playTrack(start);
 }
 // 海报大图查看
 function showPosterBig(src, alt){
@@ -4376,16 +4357,10 @@ function showPlayer(){
   refreshLaunch();
 }
 function hidePlayer(){
-  // 停止音频播放
+  // 停止音频播放（队列恒为全站列表，无需还原——原「恢复原始播放列表」块随专辑过滤一并移除，登记见 playAllAudio）
   if (playerAudio) {
     playerAudio.pause();
     playerAudio.currentTime = 0;
-  }
-  // 恢复原始播放列表
-  if (ORIGINAL_AUDIO_TRACKS) {
-    AUDIO_TRACKS = ORIGINAL_AUDIO_TRACKS.slice();
-    ORIGINAL_AUDIO_TRACKS = null;
-    CURRENT_ALBUM = null;
   }
   curIdx = -1;
   document.getElementById('player').classList.remove('show');
@@ -4741,25 +4716,70 @@ window.addEventListener('mouseup', function(){ pDragging = false; pDragEl = null
 window.addEventListener('touchend', function(){ pDragging = false; pDragEl = null; });
 
 // 播放列表（内嵌于半屏播放器顶部）
+// 播放列表：二级目录（2026-09-27 小谦指示）——按现有专辑分类（构建时的目录分组）分组展示。
+// 队列恒为全站列表：data-idx 存全局索引，点任意一集即从该集起跨专辑顺序连播；
+// 续播记忆（longchen-audio-cur/pos）用的也是全局索引，两端无缝兼容。
+var plExpanded = {};    // folder -> 是否展开（用户手动操作记录）
+var plSkipForce = false; // 组头手动切换后的一次渲染，跳过「当前组强制展开」（否则当前组收不回去）
+function plGroupName(t){
+  return t.group || (t.folder || '').split('/').filter(Boolean).pop() || '未分组';
+}
 function renderPlist(){
   var box = document.getElementById('pPlaylist');
-  var arr = AUDIO_TRACKS.map(function(t, i){
-    var playing = (i === curIdx);
-    return '<div class="pl-item' + (playing ? ' playing' : '') + '" data-idx="' + i + '">'
-      + '<span class="pl-idx">' + (i + 1) + '</span>'
-      + '<span class="pl-dot"></span>'
-      + '<span class="pl-title">' + esc(t.title) + '</span></div>';
+  // 分组（保持构建顺序＝现有分类顺序）
+  var groups = [];
+  var byFolder = {};
+  for (var i = 0; i < AUDIO_TRACKS.length; i++){
+    var t = AUDIO_TRACKS[i];
+    var f = t.folder || '';
+    if (!byFolder[f]){ byFolder[f] = { folder: f, name: plGroupName(t), items: [] }; groups.push(byFolder[f]); }
+    byFolder[f].items.push({ gi: i, t: t });
+  }
+  var curFolder = (curIdx >= 0 && AUDIO_TRACKS[curIdx]) ? (AUDIO_TRACKS[curIdx].folder || '') : null;
+  if (curFolder && !plSkipForce) plExpanded[curFolder] = true;   // 换曲时当前播放组自动展开
+  plSkipForce = false;
+  var anyOpen = Object.keys(plExpanded).some(function(k){ return plExpanded[k]; });
+  if (!curFolder && !anyOpen && groups.length) plExpanded[groups[0].folder] = true; // 未播放时默认展开第一组
+  var st = box.scrollTop;   // 重渲染保留滚动位置
+  var h = [];
+  for (var g = 0; g < groups.length; g++){
+    var grp = groups[g];
+    var open = !!plExpanded[grp.folder];
+    h.push('<div class="pl-group-head' + (open ? ' open' : '') + '" data-folder="' + esc(grp.folder) + '"'
+      + ' role="button" aria-expanded="' + (open ? 'true' : 'false') + '"'
+      + (grp.folder === curFolder ? ' data-cur="1"' : '') + '>'
+      + '<span class="plg-arrow">▶</span>'
+      + '<span class="plg-name">' + esc(grp.name) + '</span>'
+      + '<span class="plg-count">' + grp.items.length + ' 集</span></div>');
+    if (open){
+      h.push('<div class="pl-sub">');
+      for (var k = 0; k < grp.items.length; k++){
+        var gi = grp.items[k].gi, t = grp.items[k].t;
+        var playing = (gi === curIdx);
+        h.push('<div class="pl-item' + (playing ? ' playing' : '') + '" data-idx="' + gi + '">'
+          + '<span class="pl-idx">' + (k + 1) + '</span>'
+          + '<span class="pl-dot"></span>'
+          + '<span class="pl-title">' + esc(t.title) + '</span></div>');
+      }
+      h.push('</div>');
+    }
+  }
+  box.innerHTML = h.join('');
+  box.scrollTop = st;
+  box.querySelectorAll('.pl-group-head').forEach(function(head){
+    head.onclick = function(){
+      var f = head.getAttribute('data-folder');
+      plExpanded[f] = !plExpanded[f];
+      plSkipForce = true;
+      renderPlist();
+    };
   });
-  box.innerHTML = arr.join('');
   box.querySelectorAll('.pl-item').forEach(function(it){
     it.onclick = function(ev){
       playTrack(parseInt(it.dataset.idx, 10));
     };
   });
 }
-
-
-
 
 // 播放列表：点击展开 / 收起（默认收起）
 document.getElementById('pPlToggle').onclick = function(){
