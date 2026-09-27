@@ -891,16 +891,21 @@ button:active, .player-launch:active, .search-fab:active{transform:scale(.95)}
 .player .pl-group-head .plg-name{flex:1 1 auto; min-width:0; overflow-wrap:anywhere}
 .player .pl-group-head .plg-count{flex:0 0 auto; color:var(--ink-faint); font-weight:400; font-size:.85em}
 .player .pl-sub .pl-item{padding-left:2.8rem}   /* 二级缩进：曲目行相对组头缩进，体现层级 */
-.player .pl-menu-item{display:flex; align-items:center; gap:.6rem; padding:.95rem 1.4rem;
-  cursor:pointer; border-bottom:1px solid var(--line); color:var(--ink); font-weight:700;
-  font-size:1.08em; user-select:none; background:var(--surface-soft)}
-.player .pl-menu-item:hover{background:var(--line)}
-.player .pl-menu-item .plg-arrow{flex:0 0 auto; color:var(--ink-faint); font-size:.9em}
-.player .pl-menu-item .plg-name{flex:1 1 auto; min-width:0; overflow-wrap:anywhere}
-.player .pl-menu-item .plg-count{flex:0 0 auto; color:var(--ink-faint); font-weight:400; font-size:.85em}
-.player .pl-back{padding:.7rem 1.4rem; cursor:pointer; color:var(--ink-soft); font-size:.92em;
-  border-bottom:1px solid var(--line); user-select:none}
-.player .pl-back:hover{background:var(--surface-soft)}
+.player .pl-cat-row{padding:.55rem .9rem .55rem 1.4rem; border-bottom:1px solid var(--line)}
+.player .pl-cat-btn{display:flex; align-items:center; gap:.6rem; cursor:pointer; user-select:none;
+  background:var(--surface-soft); border:1px solid var(--line); border-radius:8px; padding:.55rem .75rem;
+  color:var(--ink); font-weight:700; font-size:1.02em}
+.player .pl-cat-btn:hover{background:var(--line)}
+.player .pl-cat-btn .pl-cat-label{flex:1 1 auto; min-width:0; overflow-wrap:anywhere}
+.player .pl-cat-btn .pl-cat-caret{flex:0 0 auto; color:var(--ink-faint); font-size:.85em}
+.player .pl-cat-menu{border-bottom:1px solid var(--line); background:var(--surface)}
+.player .pl-cat-item{display:flex; align-items:center; gap:.5rem; padding:.75rem 1.4rem;
+  cursor:pointer; user-select:none; color:var(--ink)}
+.player .pl-cat-item:hover{background:var(--surface-soft)}
+.player .pl-cat-item.active{color:var(--accent); font-weight:700}
+.player .pl-cat-item .pl-cat-check{flex:0 0 1.1rem; color:var(--accent)}
+.player .pl-cat-item .plg-name{flex:1 1 auto; min-width:0; overflow-wrap:anywhere}
+.player .pl-cat-item .plg-count{flex:0 0 auto; color:var(--ink-faint); font-weight:400; font-size:.85em}
 /* 悬浮打开播放器按钮 */
 .player-launch{position:fixed !important; right:1.1rem; bottom:1.1rem; z-index:999;
   background:var(--accent); color:#fff; border:none; cursor:grab;
@@ -4726,12 +4731,12 @@ window.addEventListener('mouseup', function(){ pDragging = false; pDragEl = null
 window.addEventListener('touchend', function(){ pDragging = false; pDragEl = null; });
 
 // 播放列表（内嵌于半屏播放器顶部）
-// 播放列表：分类菜单＋两级列表（2026-09-27 小谦指示第三轮）——点「播放列表」先弹分类菜单（上师亲诵／上师开示／上师赞歌，名称与顺序小谦指定）；进入分类后＝之前的两级列表（专辑→曲目），顶部「‹ 全部分类」返回。
+// 播放列表：分类下拉选择器＋两级列表（2026-09-27 小谦指示第四轮）——顶部按钮显示当前分类名（上师亲诵／上师开示／上师赞歌，名称顺序小谦指定），点开下拉勾选即切换；下方＝该分类的两级列表（专辑→曲目）。
 // 队列恒为全站列表：data-idx 存全局索引，点任意一集即从该集起跨专辑顺序连播；
 // 续播记忆（longchen-audio-cur/pos）用的也是全局索引，两端无缝兼容。
 var plExpanded = {};    // folder -> 是否展开（用户手动操作记录）
 var plSkipForce = false; // 组头手动切换后的一次渲染，跳过「当前组强制展开」（否则当前组收不回去）
-var plView = { mode: 'menu', cat: -1 }; // 播放列表视图：menu=分类菜单 / cat=某分类的两级列表
+var plView = { cat: 0, open: false }; // 播放列表：当前分类下标 + 下拉是否展开（2026-09-27 第四轮改为下拉选择器）
 var PL_MENU = [   // 分类菜单（名称与顺序为小谦 2026-09-27 指定；prefix 匹配 folder 首段，2.1/2.2 归并进「上师亲诵」）
   { label: '上师亲诵（仪轨与经文、圣号与明咒）', prefix: '2.' },
   { label: '上师开示（AI 朗读）', prefix: '1.' },
@@ -4766,64 +4771,67 @@ function renderPlist(){
   var curFolder = (curIdx >= 0 && AUDIO_TRACKS[curIdx]) ? (AUDIO_TRACKS[curIdx].folder || '') : null;
   if (curFolder && !plSkipForce) plExpanded[curFolder] = true;   // 换曲时当前播放专辑自动展开
   plSkipForce = false;
+  if (plView.cat < 0 || plView.cat >= PL_MENU.length) plView.cat = 0;
   var st = box.scrollTop;   // 重渲染保留滚动位置
   var h = [];
-  if (plView.mode === 'menu'){
-    // 分类菜单（名称与顺序为小谦 2026-09-27 指定）
+  // 分类下拉选择器：按钮显示当前分类名（小谦 2026-09-27 第四轮）
+  h.push('<div class="pl-cat-row"><div class="pl-cat-btn" role="button" aria-expanded="' + (plView.open ? 'true' : 'false') + '">'
+    + '<span class="pl-cat-label">' + esc(PL_MENU[plView.cat].label) + '</span>'
+    + '<span class="pl-cat-caret">▾</span></div></div>');
+  if (plView.open){
+    h.push('<div class="pl-cat-menu">');
     for (var mi = 0; mi < PL_MENU.length; mi++){
-      var cnt = 0;
+      var mcnt = 0;
       for (var g0 = 0; g0 < groups.length; g0++){
-        if (plCatOf(plTopName({ folder: groups[g0].folder })) === mi) cnt += groups[g0].items.length;
+        if (plCatOf(plTopName({ folder: groups[g0].folder })) === mi) mcnt += groups[g0].items.length;
       }
-      h.push('<div class="pl-menu-item" data-cat="' + mi + '" role="button">'
-        + '<span class="plg-arrow">›</span>'
+      var act = (mi === plView.cat);
+      h.push('<div class="pl-cat-item' + (act ? ' active' : '') + '" data-cat="' + mi + '" role="button">'
+        + '<span class="pl-cat-check">' + (act ? '✓' : '') + '</span>'
         + '<span class="plg-name">' + esc(PL_MENU[mi].label) + '</span>'
-        + '<span class="plg-count">' + cnt + ' 集</span></div>');
+        + '<span class="plg-count">' + mcnt + ' 集</span></div>');
     }
-  } else {
-    h.push('<div class="pl-back" data-back="1" role="button">‹ 全部分类</div>');
-    var vis = [];
-    for (var g1 = 0; g1 < groups.length; g1++){
-      if (plCatOf(plTopName({ folder: groups[g1].folder })) === plView.cat) vis.push(groups[g1]);
-    }
-    vis.sort(function(a, b){ return natCmpPath(a.folder, b.folder); }); // 专辑序＝听法音页分组序（现有分类方式）
-    var anyVisOpen = vis.some(function(g){ return plExpanded[g.folder]; });
-    if (!curFolder && !anyVisOpen && vis.length) plExpanded[vis[0].folder] = true; // 未播放时默认展开第一个专辑
-    for (var g = 0; g < vis.length; g++){
-      var grp = vis[g];
-      var open = !!plExpanded[grp.folder];
-      h.push('<div class="pl-group-head' + (open ? ' open' : '') + '" data-folder="' + esc(grp.folder) + '"'
-        + ' role="button" aria-expanded="' + (open ? 'true' : 'false') + '"'
-        + (grp.folder === curFolder ? ' data-cur="1"' : '') + '>'
-        + '<span class="plg-arrow">▶</span>'
-        + '<span class="plg-name">' + esc(grp.name) + '</span>'
-        + '<span class="plg-count">' + grp.items.length + ' 集</span></div>');
-      if (open){
-        h.push('<div class="pl-sub">');
-        for (var k = 0; k < grp.items.length; k++){
-          var gi = grp.items[k].gi, t = grp.items[k].t;
-          var playing = (gi === curIdx);
-          h.push('<div class="pl-item' + (playing ? ' playing' : '') + '" data-idx="' + gi + '">'
-            + '<span class="pl-idx">' + (k + 1) + '</span>'
-            + '<span class="pl-dot"></span>'
-            + '<span class="pl-title">' + esc(t.title) + '</span></div>');
-        }
-        h.push('</div>');
+    h.push('</div>');
+  }
+  // 当前分类的两级列表（专辑 → 曲目）
+  var vis = [];
+  for (var g1 = 0; g1 < groups.length; g1++){
+    if (plCatOf(plTopName({ folder: groups[g1].folder })) === plView.cat) vis.push(groups[g1]);
+  }
+  vis.sort(function(a, b){ return natCmpPath(a.folder, b.folder); }); // 专辑序＝听法音页分组序（现有分类方式）
+  var anyVisOpen = vis.some(function(g){ return plExpanded[g.folder]; });
+  if (!curFolder && !anyVisOpen && vis.length) plExpanded[vis[0].folder] = true; // 未播放时默认展开第一个专辑
+  for (var g = 0; g < vis.length; g++){
+    var grp = vis[g];
+    var open = !!plExpanded[grp.folder];
+    h.push('<div class="pl-group-head' + (open ? ' open' : '') + '" data-folder="' + esc(grp.folder) + '"'
+      + ' role="button" aria-expanded="' + (open ? 'true' : 'false') + '"'
+      + (grp.folder === curFolder ? ' data-cur="1"' : '') + '>'
+      + '<span class="plg-arrow">▶</span>'
+      + '<span class="plg-name">' + esc(grp.name) + '</span>'
+      + '<span class="plg-count">' + grp.items.length + ' 集</span></div>');
+    if (open){
+      h.push('<div class="pl-sub">');
+      for (var k = 0; k < grp.items.length; k++){
+        var gi = grp.items[k].gi, t = grp.items[k].t;
+        var playing = (gi === curIdx);
+        h.push('<div class="pl-item' + (playing ? ' playing' : '') + '" data-idx="' + gi + '">'
+          + '<span class="pl-idx">' + (k + 1) + '</span>'
+          + '<span class="pl-dot"></span>'
+          + '<span class="pl-title">' + esc(t.title) + '</span></div>');
       }
+      h.push('</div>');
     }
   }
   box.innerHTML = h.join('');
   box.scrollTop = st;
-  box.querySelectorAll('.pl-menu-item').forEach(function(it){
-    it.onclick = function(){
-      plView = { mode: 'cat', cat: parseInt(it.getAttribute('data-cat'), 10) };
-      plSkipForce = true;
-      renderPlist();
-    };
+  box.querySelectorAll('.pl-cat-btn').forEach(function(el){
+    el.onclick = function(){ plView.open = !plView.open; renderPlist(); };
   });
-  box.querySelectorAll('.pl-back').forEach(function(it){
+  box.querySelectorAll('.pl-cat-item').forEach(function(it){
     it.onclick = function(){
-      plView = { mode: 'menu', cat: -1 };
+      plView.cat = parseInt(it.getAttribute('data-cat'), 10);
+      plView.open = false;   // 勾选后自动收起，按钮显示所选分类名
       plSkipForce = true;
       renderPlist();
     };
@@ -4850,8 +4858,9 @@ document.getElementById('pPlToggle').onclick = function(){
   document.getElementById('pPlaylist').classList.toggle('open', open);
   document.getElementById('pPlHint').textContent = open ? '点击收起播放列表' : '点击展开播放列表';
   if (open){
-    // 打开时定位（小谦 2026-09-27 指示）：播放中 → 直接进入该曲目分类；未播放 → 分类菜单
-    plView = (curIdx >= 0 && AUDIO_TRACKS[curIdx]) ? { mode: 'cat', cat: plCatOf(plTopName(AUDIO_TRACKS[curIdx])) } : { mode: 'menu', cat: -1 };
+    // 打开时定位（小谦 2026-09-27 指示）：播放中 → 分类选择器定位到该曲目分类；未播放 → 保持当前选择
+    plView.open = false;
+    if (curIdx >= 0 && AUDIO_TRACKS[curIdx]){ var _c = plCatOf(plTopName(AUDIO_TRACKS[curIdx])); if (_c >= 0) plView.cat = _c; }
     plSkipForce = false;
     renderPlist();
   }
