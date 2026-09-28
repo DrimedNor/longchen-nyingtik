@@ -812,6 +812,25 @@ button:active, .player-launch:active, .search-fab:active{transform:scale(.95)}
 .player .p-status-text{flex:1; min-width:0; text-align:left; white-space:nowrap;
   overflow:hidden; text-overflow:ellipsis; font-weight:500}
 .player .p-status b{color:var(--accent); font-weight:600}
+/* 第1.5行：工具行（2026-09-28 第8轮重排，小谦指示）：☰列表 / ⏱定时 / 🔁模式 / 倍速 四颗带文字胶囊同排。
+   ① 睡眠定时从状态栏上移到这里＝更显眼（旧版只露一个 ⏱ 图标，被小谦点名「太隐蔽」）；
+   ② 列表开合独立成键（pListToggle），与系列切换（底行胶囊 ▾）彻底分离——
+      旧版同键两职，想切专辑时一点把列表折上、再点又折开，被点名「跳脱」。
+   （早间注释「工具行 320px 塞不下定时器」的顾虑随重排失效：状态栏整行让给曲名后空间足够，
+     以 verify_player7 L 段 320px 实测几何为准，超限走省略号不让折行。） */
+.player .p-tools{display:flex; align-items:center; gap:.6rem; padding:.45rem 1.3rem; flex:0 0 auto}
+.player .p-tools > *{flex:1 1 auto; min-width:0}   /* 四颗均分：任一变长其余让位，超出走省略号 */
+/* ⚠️ 直接子项（.p-tool/.p-mode）不许写 width:100%：它会变成 flex-basis 撑满容器，
+   压缩期把嵌套项（.p-timer-wrap 里的胶囊）挤到 21px、文字全被省略号裁掉（首版实测）。
+   width:100% 只给嵌套在 wrap 里的按钮（.p-timer/.p-speed），用于撑满各自 wrap。 */
+.player .p-tool{border:1px solid var(--gold); background:var(--surface); color:var(--gold-deep);
+  cursor:pointer; font-size:.85rem; padding:.2rem .7rem; border-radius:999px;
+  display:inline-flex; align-items:center; justify-content:center; gap:.3rem; font-family:inherit;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis; transition:background .15s}
+.player .p-tool:hover{background:var(--surface-soft)}
+.player .p-tool.on{color:var(--accent); background:var(--surface-soft)}
+.player .p-tools .p-mode{margin:0; justify-content:center}
+.player .p-tools .p-speed{margin:0; width:100%; justify-content:center}
 /* 第2行：控制按钮（上一首 ⏮ / 后退15秒 -15 / 播放 ▶ / 下一首 ⏭ / 前进15秒 +15） */
 .player .p-controls{display:flex; align-items:center; justify-content:center; gap:1rem;
   padding:.9rem; flex:0 0 auto}
@@ -835,15 +854,16 @@ button:active, .player-launch:active, .search-fab:active{transform:scale(.95)}
   background:#fff; border:2px solid var(--gold); transform:translate(-50%,-50%); left:0%}
 /* 进度条可键盘操作（2026-09-28 无障碍）：role=slider 可 Tab 聚焦，聚焦时给可见轮廓 */
 .player .p-progress:focus{outline:2px solid var(--accent); outline-offset:3px}
-/* 第4行：三颗按钮（系列 / 播放模式 / 倍速）同排，间距均分。
-   2026-09-28 小谦指示：播放列表按钮上直接显示当前系列名 + ▾；名字变长时按钮随之变宽，
-   整行自动重排（三颗都 flex:1 1 auto + min-width:0，剩余空间平分，超出用省略号）。 */
-.player .p-footer{position:relative; display:flex; align-items:center; justify-content:space-between; gap:.6rem;
+/* 第4行：系列选择器整行（2026-09-28 第8轮重排：模式/倍速/定时/列表开合已上移工具行）。
+   胶囊＝「系列名 + ▾」，点击只弹系列菜单、不再兼任列表开合（职责分离，见工具行注释）；
+   列表展开时行尾出现第二收起入口「▴ 收起」。旧 .p-footer > * 三颗均分规则
+   随该布局一并退役——底行只剩一颗主件，改用显式 flex 指定。 */
+.player .p-footer{position:relative; display:flex; align-items:center; gap:.6rem;
   padding:.6rem 1.3rem; flex:0 0 auto; border-top:1px solid var(--line)}
-.player .p-footer > *{flex:1 1 auto; min-width:0}   /* 均分：任一按钮变长，另外两颗同步让位 */
-.player .p-footer .p-mode{margin:0; justify-content:center}
-.player .p-footer .p-speed-wrap{margin:0; justify-content:center}
-.player .p-speed{width:100%; justify-content:center}
+.player .p-pl-wrap{flex:1 1 auto; min-width:0}
+.player .p-pl-collapse{flex:0 0 auto; border:none; background:none; color:var(--ink-faint); cursor:pointer;
+  font-size:.82rem; padding:.4rem .6rem; border-radius:8px; font-family:inherit; white-space:nowrap}
+.player .p-pl-collapse:hover{background:var(--surface-soft); color:var(--accent)}
 /* 播放列表按钮＝「系列选择器」胶囊：左半区展开/收起列表，右半区 ▾ 切换系列 */
 .player .p-pl-wrap{position:relative; display:inline-flex; align-items:center; overflow:hidden;
   border:1px solid var(--gold); background:var(--surface); border-radius:999px}
@@ -876,14 +896,17 @@ button:active, .player-launch:active, .search-fab:active{transform:scale(.95)}
 .player .p-close{border:none; background:none; cursor:pointer; color:var(--ink-soft);
   font-size:1.3rem; width:2.3rem; height:2.3rem; border-radius:8px; line-height:1}
 .player .p-close:hover{background:var(--surface-hover)}
-/* 睡眠定时器按钮（2026-09-28 小谦指示：其他师兄也在用，夜里听着入睡需能定时停）
-   位置选状态栏（与「—」「✕」同区）而**不**放进工具行：工具行在 320px 视口已用 255px/291px，
-   再塞一颗必然越界（同 09-22 O-02 的教训：一律减内容量，不让它折行）。 */
-.player .p-timer-wrap{position:relative; display:inline-flex}
-.player .p-timer{border:none; background:none; cursor:pointer; color:var(--ink-soft);
-  font-size:1.15rem; min-width:2.3rem; height:2.3rem; padding:0 .3rem; border-radius:8px; line-height:1;
-  font-variant-numeric:tabular-nums}
-.player .p-timer:hover{background:var(--surface-hover)}
+/* 睡眠定时器按钮（2026-09-28 小谦指示：其他师兄也在用，夜里听着入睡需能定时停）。
+   第8轮重排后上移工具行、改为带文字胶囊：「⏱ 定时」／有定时显示剩余「⏱ 25′」＝更显眼；
+   旧版只露一个 ⏱ 图标藏在状态栏，被小谦点名「太隐蔽」。（早间「工具行塞不下」的顾虑
+   随重排失效，几何以 verify_player7 L 段 320px 实测为准。） */
+.player .p-timer-wrap{position:relative; display:inline-flex; flex:1 1 auto; min-width:0}
+.player .p-timer{border:1px solid var(--gold); background:var(--surface); color:var(--gold-deep);
+  cursor:pointer; font-size:.85rem; padding:.2rem .7rem; border-radius:999px; width:100%;
+  display:inline-flex; align-items:center; justify-content:center; gap:.3rem; font-family:inherit;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  font-variant-numeric:tabular-nums; transition:background .15s}
+.player .p-timer:hover{background:var(--surface-soft)}
 .player .p-timer.on{color:var(--accent); font-weight:700; background:var(--surface-soft)}
 .player .p-timer-menu{position:absolute; bottom:calc(100% + 6px); right:0; z-index:60;
   background:var(--surface); border:1px solid var(--line); border-radius:12px; padding:.3rem;
@@ -949,7 +972,11 @@ button:active, .player-launch:active, .search-fab:active{transform:scale(.95)}
 /* 播放列表搜索行（2026-09-28 小谦指示）：输入框是**静态节点**，不参与 renderPlist 重渲染，
    否则每输一个字就重建 input、光标和输入法候选全丢。只在列表展开时显示。 */
 .player .pl-search-row{display:none; flex:0 0 auto; padding:.55rem 1.4rem; border-top:1px solid var(--line)}
-.player.pl-open .pl-search-row{display:block}
+.player.pl-open .pl-search-row{display:flex; align-items:center; gap:.6rem}
+/* 列表内第二收起入口（第8轮重排）：搜索行右侧「▴ 收起」——收起列表不必滚回底行找按钮 */
+.player .pl-collapse-btn{flex:0 0 auto; border:1px solid var(--line); background:var(--surface); color:var(--ink-soft);
+  cursor:pointer; font-size:.82rem; padding:.42rem .7rem; border-radius:999px; font-family:inherit; white-space:nowrap}
+.player .pl-collapse-btn:hover{background:var(--surface-soft); color:var(--accent); border-color:var(--gold)}
 .player .pl-search-input{width:100%; box-sizing:border-box; font-family:inherit; font-size:.95rem;
   padding:.45rem .7rem; border:1px solid var(--line); border-radius:8px;
   background:var(--surface); color:var(--ink)}
@@ -1336,6 +1363,8 @@ button:active, .player-launch:active, .search-fab:active{transform:scale(.95)}
   .fs-cap{display:none}
   .fs-pill button{width:1.7rem; height:1.7rem; font-size:.9rem}
   .player .p-footer{gap:.4rem; padding:.55rem .9rem}
+  .player .p-tools{gap:.4rem; padding:.45rem .9rem}
+  .player .p-tool, .player .p-tools .p-mode, .player .p-tools .p-speed, .player .p-timer{font-size:.78rem; padding:.22rem .5rem}
   .player .p-pl-toggle{font-size:.82rem; padding:.3rem .1rem .3rem .7rem}
   .player .p-pl-caret{font-size:.8rem; padding:.4rem .5rem}
   .player .p-pl-menu{left:.9rem}
@@ -1613,8 +1642,14 @@ img{height:auto;max-width:100%}
   <!-- 第1行：状态栏（左：当前音频名 / 右：关闭叉号） -->
   <div class="p-status" id="pStatus">
     <span class="p-status-text" id="pStatusText">暂未播放</span>
+    <button class="p-minimize" id="pMinimize" title="最小化到迷你条">—</button>
+    <button class="p-close" id="pClose" title="收起播放器（音频继续播放）" aria-label="收起播放器，音频继续播放">✕</button>
+  </div>
+  <!-- 第1.5行：工具行（2026-09-28 第8轮重排）：列表开合(独立键) / 睡眠定时 / 播放模式 / 倍速 -->
+  <div class="p-tools">
+    <button class="p-tool" id="pListToggle" title="展开 / 收起播放列表" aria-expanded="false">☰ 列表</button>
     <span class="p-timer-wrap">
-      <button class="p-timer" id="pTimer" title="睡眠定时器：到点自动暂停播放" aria-label="睡眠定时器">⏱</button>
+      <button class="p-timer" id="pTimer" title="睡眠定时器：到点自动暂停播放" aria-label="睡眠定时器">⏱ 定时</button>
       <div class="p-timer-menu" id="pTimerMenu" style="display:none">
         <div class="tm-item" data-min="15">15 分钟后暂停</div>
         <div class="tm-item" data-min="30">30 分钟后暂停</div>
@@ -1631,8 +1666,18 @@ img{height:auto;max-width:100%}
         <div class="tm-item" id="pTimerOff" style="display:none">关闭定时</div>
       </div>
     </span>
-    <button class="p-minimize" id="pMinimize" title="最小化到迷你条">—</button>
-    <button class="p-close" id="pClose" title="收起播放器（音频继续播放）" aria-label="收起播放器，音频继续播放">✕</button>
+    <button class="p-mode" id="pMode" title="播放模式：顺序 / 逆序 / 随机 / 单曲循环（点击切换）">🔁 顺序</button>
+    <span class="p-speed-wrap">
+      <button class="p-speed" id="pSpeed" title="播放速度（点击选择倍速）">倍速 1x</button>
+      <div class="p-speed-menu" id="pSpeedMenu" style="display:none">
+        <div class="sp-item" data-rate="0.5">0.5x</div>
+        <div class="sp-item" data-rate="0.75">0.75x</div>
+        <div class="sp-item" data-rate="1">1x（默认）</div>
+        <div class="sp-item" data-rate="1.25">1.25x</div>
+        <div class="sp-item" data-rate="1.5">1.5x</div>
+        <div class="sp-item" data-rate="2">2x</div>
+      </div>
+    </span>
   </div>
   <!-- 第2行：控制按钮（上一首 / 后退15秒 / 播放 / 下一首 / 前进15秒） -->
   <div class="p-controls">
@@ -1649,29 +1694,19 @@ img{height:auto;max-width:100%}
          aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-valuetext="0:00 / 0:00"><div class="p-fill" id="pFill"></div><div class="p-thumb" id="pThumb"></div></div>
     <span class="p-time" id="pTimeDur">0:00</span>
   </div>
-  <!-- 第4行：播放列表(最左) + 播放模式/调整顺序(中) + 倍速(最右) -->
+  <!-- 第4行：系列选择器（2026-09-28 第8轮重排：整行胶囊＝系列名 + ▾，只弹系列菜单）＋ 列表展开时行尾「▴ 收起」 -->
   <div class="p-footer">
     <span class="p-pl-wrap">
-      <button class="p-pl-toggle" id="pPlToggle" title="展开 / 收起播放列表">📋 <span class="p-pl-label" id="pPlLabel">播放列表</span></button>
+      <button class="p-pl-toggle" id="pPlToggle" title="切换系列" aria-haspopup="listbox" aria-expanded="false"><span class="p-pl-label" id="pPlLabel">播放列表</span></button>
       <button class="p-pl-caret" id="pPlCaret" title="切换系列" aria-label="切换系列" aria-haspopup="listbox" aria-expanded="false">▾</button>
     </span>
+    <button class="p-pl-collapse" id="pPlCollapse" title="收起播放列表" style="display:none">▴ 收起</button>
     <div class="p-pl-menu" id="pPlMenu" style="display:none" role="listbox" aria-label="选择系列"></div>
-    <button class="p-mode" id="pMode" title="播放模式：顺序 / 逆序 / 随机 / 单曲循环（点击切换）">🔁 顺序</button>
-    <span class="p-speed-wrap">
-      <button class="p-speed" id="pSpeed" title="播放速度（点击选择倍速）">倍速 1x</button>
-      <div class="p-speed-menu" id="pSpeedMenu" style="display:none">
-        <div class="sp-item" data-rate="0.5">0.5x</div>
-        <div class="sp-item" data-rate="0.75">0.75x</div>
-        <div class="sp-item" data-rate="1">1x（默认）</div>
-        <div class="sp-item" data-rate="1.25">1.25x</div>
-        <div class="sp-item" data-rate="1.5">1.5x</div>
-        <div class="sp-item" data-rate="2">2x</div>
-      </div>
-    </span>
   </div>
   <!-- 播放列表搜索（2026-09-28）：静态节点，不随列表重渲染（否则输入时失焦） -->
   <div class="pl-search-row">
     <input class="pl-search-input" id="plSearch" type="search" placeholder="搜索曲目 / 专辑名" aria-label="搜索曲目或专辑">
+    <button class="pl-collapse-btn" id="plCollapseBtn" title="收起播放列表" style="display:none">▴ 收起</button>
   </div>
   <!-- 完整播放列表（点击开关展开） -->
   <div class="p-playlist" id="pPlaylist"></div>
@@ -4510,7 +4545,7 @@ function refreshSleepBtn(){
   var lab = '';
   if (sleepAfterTrack) lab = '本集';
   else if (sleepDeadline) lab = Math.max(0, Math.ceil((sleepDeadline - Date.now()) / 60000)) + '′';
-  b.textContent = lab ? ('⏱' + lab) : '⏱';
+  b.textContent = lab ? ('⏱ ' + lab) : '⏱ 定时';   // 第8轮：工具行胶囊带文字，无定时也写明「定时」＝不再只是一个隐蔽的图标
   b.classList.toggle('on', sleepActive());
   b.title = sleepActive()
     ? ('睡眠定时：' + (sleepAfterTrack ? '播完当前这集就暂停' : '还有约 ' + sleepMinutes + ' 分钟') + '（点击可修改或关闭）')
@@ -5036,8 +5071,9 @@ function updatePlLabel(){
 function renderPlCatMenu(){
   var m = document.getElementById('pPlMenu');
   var car = document.getElementById('pPlCaret');
+  var tg = document.getElementById('pPlToggle');
   if (!m) return;
-  if (!plView.open){ m.style.display = 'none'; if (car) car.setAttribute('aria-expanded', 'false'); return; }
+  if (!plView.open){ m.style.display = 'none'; if (car) car.setAttribute('aria-expanded', 'false'); if (tg) tg.setAttribute('aria-expanded', 'false'); return; }
   var h = [];
   for (var mi = 0; mi < PL_MENU.length; mi++){
     var act = (mi === plView.cat);
@@ -5050,6 +5086,7 @@ function renderPlCatMenu(){
   m.innerHTML = h.join('');
   m.style.display = 'block';
   if (car) car.setAttribute('aria-expanded', 'true');
+  if (tg) tg.setAttribute('aria-expanded', 'true');
   m.querySelectorAll('.pm-item').forEach(function(it){
     it.onclick = function(e){
       e.stopPropagation();
@@ -5061,7 +5098,7 @@ function renderPlCatMenu(){
       renderPlist();
       // 列表未展开时顺带展开：否则点了「切换系列」只看见按钮文字变，看不见结果
       var p = document.getElementById('player');
-      if (p && !p.classList.contains('pl-open')) document.getElementById('pPlToggle').click();
+      if (p && !p.classList.contains('pl-open')) setPlListOpen(true);
     };
   });
 }
@@ -5206,12 +5243,19 @@ function scrollPlistToCurrent(){
     box.scrollTop = Math.max(0, top - Math.round(box.clientHeight / 3));   // 略偏上：前后几集都看得见
   }
 }
-// 播放列表：点击展开 / 收起（默认收起）
-document.getElementById('pPlToggle').onclick = function(){
+// 列表开合（2026-09-28 第8轮重排）：独立的 ☰列表 键（工具行），与系列切换彻底分离。
+// 系列胶囊（pPlToggle/▾）只弹系列菜单；收起入口共三处＝☰列表 键、系列行右「▴ 收起」、搜索行右「▴ 收起」。
+function setPlListOpen(open){
   var p = document.getElementById('player');
-  var open = p.classList.toggle('pl-open');
-  document.getElementById('pPlaylist').classList.toggle('open', open);
+  p.classList.toggle('pl-open', !!open);
+  document.getElementById('pPlaylist').classList.toggle('open', !!open);
   plView.open = false; renderPlCatMenu();   // 列表与系列菜单互斥：开一个必关另一个（否则两面板叠在一起）
+  var tg = document.getElementById('pListToggle');
+  if (tg){ tg.setAttribute('aria-expanded', open ? 'true' : 'false'); tg.classList.toggle('on', open); }
+  var c1 = document.getElementById('pPlCollapse');
+  if (c1) c1.style.display = open ? '' : 'none';
+  var c2 = document.getElementById('plCollapseBtn');
+  if (c2) c2.style.display = open ? '' : 'none';
   if (open){
     // 打开时定位（小谦 2026-09-27 指示）：播放中 → 分类选择器定位到该曲目分类；未播放 → 保持当前选择
     if (curIdx >= 0 && AUDIO_TRACKS[curIdx]){ var _c = plCatOf(plTopName(AUDIO_TRACKS[curIdx])); if (_c >= 0) plView.cat = _c; }
@@ -5225,14 +5269,22 @@ document.getElementById('pPlToggle').onclick = function(){
     var _inp = document.getElementById('plSearch');
     if (_inp) _inp.value = '';
   }
+}
+document.getElementById('pListToggle').onclick = function(){
+  setPlListOpen(!document.getElementById('player').classList.contains('pl-open'));
 };
-// 系列菜单（▾）：与倍速 / 定时菜单同款开合；点外部或 Esc 关闭
-document.getElementById('pPlCaret').onclick = function(e){
+document.getElementById('pPlCollapse').onclick = function(){ setPlListOpen(false); };
+document.getElementById('plCollapseBtn').onclick = function(){ setPlListOpen(false); };
+// 系列菜单（第8轮重排）：胶囊左半区与 ▾ 都只弹它（不再兼任列表开合）；点外部或 Esc 关闭
+function togglePlCatMenu(e){
   e.stopPropagation();
   closeAllSpeedMenus();
+  closeTimerMenu();
   plView.open = !plView.open;
   renderPlCatMenu();
-};
+}
+document.getElementById('pPlToggle').onclick = togglePlCatMenu;
+document.getElementById('pPlCaret').onclick = togglePlCatMenu;
 document.addEventListener('click', closePlCatMenu);
 // 播放列表搜索框（2026-09-28）：静态节点只绑一次事件；输入即重渲染命中结果
 (function(){

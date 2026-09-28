@@ -155,6 +155,18 @@ async page => {
   });
   await page.setViewportSize({ width: 320, height: 780 });
   await page.goto('http://127.0.0.1:@@PORT@@/', { waitUntil: 'load' });
+  // ⚠️ 延迟浮层只能从源头关（09-28 教训）：playwright-cli open 可能给出全新存储分区
+  //（localStorage 全空）→ 首次 playTrack 弹「连播预加载询问」（z-index 9998 裸 div，
+  // fixed bottom:80px 320×180）正好盖住底部控件，C 段点击全部命中它（实测取证：div#.）。
+  // 故起播前先预置：预加载询问＝已答、三处新手引导＝已读。spotlight 分步旅程同理由此切断。
+  await page.evaluate(() => {
+    try {
+      localStorage.setItem('lct-audio-prefetch', '0');
+      localStorage.setItem('lct-hint-menu', '1');
+      localStorage.setItem('lct-hint-ai', '1');
+      localStorage.setItem('lct-hint-player', '1');
+    } catch (e) {}
+  });
   await page.waitForTimeout(1500);
 
   // 关掉新人引导遮罩（z-index:9999 全屏模态，会挡住播放器的所有底部控件）
@@ -244,8 +256,9 @@ async page => {
   R.ui.mode = { hit: hMode, before: m0, after: m1, ok: m1.txt !== m0.txt };
 
   await killSpot();
-  const hToggle = await hit('#pPlToggle');
-  await clickSafe('#pPlToggle');
+  // ⚠️ 第 8 轮重排：列表开合独立成工具行「☰列表」键（pListToggle）；pPlToggle 只弹系列菜单
+  const hToggle = await hit('#pListToggle');
+  await clickSafe('#pListToggle');
   await page.waitForTimeout(480);
   const pl = await page.evaluate(() => ({
     open: document.getElementById('player').classList.contains('pl-open'),
@@ -253,7 +266,7 @@ async page => {
   }));
   R.ui.playlist = { hit: hToggle, open: pl.open, items: pl.items,
                     ok: pl.open && pl.items > 0 };
-  await clickSafe('#pPlToggle');
+  await clickSafe('#pListToggle');
   await page.waitForTimeout(380);
 
   await killSpot();
