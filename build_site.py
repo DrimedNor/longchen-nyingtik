@@ -802,13 +802,13 @@ button:active, .player-launch:active, .search-fab:active{transform:scale(.95)}
 .player{position:fixed; left:0; right:0; bottom:0; z-index:40; background:var(--surface);
   border-top:3px solid var(--gold); box-shadow:0 -6px 24px rgba(59,42,34,.18);
   transform:translateY(100%); transition:transform .28s ease, max-height .28s ease;
-  display:flex; flex-direction:column; height:auto; min-height:33vh; max-height:33vh;
+  display:flex; flex-direction:column; height:auto; min-height:0; max-height:62vh;
   padding-bottom:env(safe-area-inset-bottom,0)}
 .player.show{transform:translateY(0)}
-.player.pl-open{max-height:72vh}   /* 展开播放列表时自动增高，默认仅占据下 1/3 屏 */
+.player.pl-open{max-height:72vh}   /* 展开播放列表时自动增高；折叠态高度改由内容决定（2026-09-29 适老化放大，约 36vh），上限 62vh */
 /* 第1行：状态栏（左：当前音频名 / 右：关闭叉号） */
-.player .p-status{display:flex; align-items:center; gap:.6rem; padding:.85rem 1.3rem;
-  font-size:1rem; color:var(--ink-soft); border-bottom:1px solid var(--line); flex:0 0 auto}
+.player .p-status{display:flex; align-items:center; gap:.6rem; padding:.65rem 1.3rem;
+  font-size:1.08rem; color:var(--ink-soft); border-bottom:1px solid var(--line); flex:0 0 auto}
 .player .p-status-text{flex:1; min-width:0; text-align:left; white-space:nowrap;
   overflow:hidden; text-overflow:ellipsis; font-weight:500}
 .player .p-status b{color:var(--accent); font-weight:600}
@@ -824,7 +824,7 @@ button:active, .player-launch:active, .search-fab:active{transform:scale(.95)}
    压缩期把嵌套项（.p-timer-wrap 里的胶囊）挤到 21px、文字全被省略号裁掉（首版实测）。
    width:100% 只给嵌套在 wrap 里的按钮（.p-timer/.p-speed），用于撑满各自 wrap。 */
 .player .p-tool{border:1px solid var(--gold); background:var(--surface); color:var(--gold-deep);
-  cursor:pointer; font-size:.85rem; padding:.2rem .7rem; border-radius:999px;
+  cursor:pointer; font-size:.95rem; padding:.35rem .7rem; min-height:2.4rem; border-radius:999px;
   display:inline-flex; align-items:center; justify-content:center; gap:.3rem; font-family:inherit;
   white-space:nowrap; overflow:hidden; text-overflow:ellipsis; transition:background .15s}
 .player .p-tool:hover{background:var(--surface-soft)}
@@ -844,57 +844,60 @@ button:active, .player-launch:active, .search-fab:active{transform:scale(.95)}
 .player .p-btn.p-skip:hover{background:var(--surface-soft); border-color:var(--gold)}
 /* 第3行：进度条 + 两端分秒数字 */
 .player .p-time-row{display:flex; align-items:center; gap:.8rem; padding:0 1.3rem; flex:0 0 auto}
-.player .p-time{font-variant-numeric:tabular-nums; font-size:.85rem; color:var(--ink-faint);
+.player .p-time{font-variant-numeric:tabular-nums; font-size:.95rem; color:var(--ink-faint);
   flex:0 0 auto; min-width:3.2em; text-align:center}
-.player .p-progress{flex:1; height:8px; background:var(--line); border-radius:4px;
+.player .p-progress{flex:1; height:10px; background:var(--line); border-radius:5px;
   cursor:pointer; position:relative; touch-action:none}
 .player .p-progress .p-fill{position:absolute; left:0; top:0; bottom:0; background:var(--turq);
   border-radius:4px; width:0%}
-.player .p-progress .p-thumb{position:absolute; top:50%; width:16px; height:16px; border-radius:50%;
+.player .p-progress .p-thumb{position:absolute; top:50%; width:18px; height:18px; border-radius:50%;
   background:#fff; border:2px solid var(--gold); transform:translate(-50%,-50%); left:0%}
 /* 进度条可键盘操作（2026-09-28 无障碍）：role=slider 可 Tab 聚焦，聚焦时给可见轮廓 */
 .player .p-progress:focus{outline:2px solid var(--accent); outline-offset:3px}
 /* 第4行：系列选择器整行（2026-09-28 第8轮重排：模式/倍速/定时/列表开合已上移工具行）。
    胶囊＝「系列名 + ▾」，点击只弹系列菜单、不再兼任列表开合（职责分离，见工具行注释）；
-   列表展开时行尾出现第二收起入口「▴ 收起」。旧 .p-footer > * 三颗均分规则
+   2026-09-30：行尾「▴ 收起」已移除，收起入口只留搜索行右一处。旧 .p-footer > * 三颗均分规则
    随该布局一并退役——底行只剩一颗主件，改用显式 flex 指定。 */
 .player .p-footer{position:relative; display:flex; align-items:center; gap:.6rem;
   padding:.6rem 1.3rem; flex:0 0 auto; border-top:1px solid var(--line)}
 .player .p-pl-wrap{flex:1 1 auto; min-width:0}
-.player .p-pl-collapse{flex:0 0 auto; border:none; background:none; color:var(--ink-faint); cursor:pointer;
-  font-size:.82rem; padding:.4rem .6rem; border-radius:8px; font-family:inherit; white-space:nowrap}
-.player .p-pl-collapse:hover{background:var(--surface-soft); color:var(--accent)}
+/* 系列行尾「▴ 收起」已于 2026-09-30 随该按钮节点一并移除（小谦指示：同屏只留一个收起入口）——
+   保留搜索行右 #plCollapseBtn 一个，符合「一职一行」，也避免两个同名按钮争主入口。 */
 /* 播放列表按钮＝「系列选择器」胶囊：左半区展开/收起列表，右半区 ▾ 切换系列 */
+/* 2026-09-30 小谦指示：系列选择器改「实底」，与工具行四颗描边胶囊拉开层级——
+   底行＝导航类（实底金），工具行＝设置类（描边白底），一眼可分。
+   ⚠️ 文字色 #3b2a22 硬编码的原因：--gold-soft 在明暗两套主题下都是亮底，
+   若用 var(--ink)，暗色模式 --ink 变浅色 → 浅字压浅底对比度不足。 */
 .player .p-pl-wrap{position:relative; display:inline-flex; align-items:center; overflow:hidden;
-  border:1px solid var(--gold); background:var(--surface); border-radius:999px}
-.player .p-pl-toggle{flex:1 1 auto; min-width:0; border:none; background:none; color:var(--gold-deep);
-  cursor:pointer; font-size:.92rem; padding:.35rem .1rem .35rem .9rem;
+  border:1px solid var(--gold); background:var(--gold-soft); border-radius:999px}
+.player .p-pl-toggle{flex:1 1 auto; min-width:0; border:none; background:none; color:#3b2a22;
+  cursor:pointer; font-weight:600; font-size:1.02rem; padding:.5rem .1rem .5rem .9rem;
   display:inline-flex; align-items:center; gap:.35rem; font-family:inherit; transition:background .15s;
   white-space:nowrap; overflow:hidden}
-.player .p-pl-toggle:hover{background:var(--surface-soft)}
+.player .p-pl-toggle:hover{background:var(--gold)}
 .player .p-pl-label{flex:0 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis}
-.player .p-pl-caret{flex:0 0 auto; border:none; border-left:1px solid var(--line); background:none;
-  color:var(--gold-deep); cursor:pointer; font-size:.85rem; line-height:1; padding:.45rem .6rem;
+.player .p-pl-caret{flex:0 0 auto; border:none; border-left:1px solid var(--gold); background:none;
+  color:#3b2a22; cursor:pointer; font-size:1rem; line-height:1; padding:.5rem .75rem;
   font-family:inherit; transition:background .15s}
-.player .p-pl-caret:hover{background:var(--surface-soft)}
-.player .p-pl-caret[aria-expanded="true"]{background:var(--surface-soft); color:var(--accent)}
+.player .p-pl-caret:hover{background:var(--gold)}
+.player .p-pl-caret[aria-expanded="true"]{background:var(--gold); color:#3b2a22}
 /* 系列下拉菜单：锚在底部行（父级 .p-footer 相对定位），left=行内边距＝胶囊左缘 */
 .player .p-pl-menu{position:absolute; bottom:calc(100% + 6px); left:1.3rem; z-index:60;
   background:var(--surface); border:1px solid var(--line); border-radius:12px; padding:.3rem;
   box-shadow:0 -6px 20px rgba(59,42,34,.18); min-width:12rem; max-width:min(20rem, 88vw);
   max-height:60vh; overflow-y:auto}
-.player .p-pl-menu .pm-item{display:flex; align-items:center; gap:.5rem; padding:.55rem .7rem;
-  border-radius:8px; font-size:.9rem; color:var(--ink-soft); cursor:pointer; transition:background .15s}
+.player .p-pl-menu .pm-item{display:flex; align-items:center; gap:.5rem; padding:.6rem .8rem;
+  border-radius:8px; font-size:1rem; color:var(--ink-soft); cursor:pointer; transition:background .15s}
 .player .p-pl-menu .pm-item:hover{background:var(--surface-soft)}
 .player .p-pl-menu .pm-item.active{color:var(--accent); font-weight:600; background:var(--surface-soft)}
 .player .p-pl-menu .pm-check{flex:0 0 1.1rem; color:var(--accent)}
 .player .p-pl-menu .pm-name{flex:1 1 auto; min-width:0; overflow-wrap:anywhere}
 .player .p-pl-menu .pm-count{flex:0 0 auto; color:var(--ink-faint); font-weight:400; font-size:.85em}
 .player .p-minimize{border:none; background:none; cursor:pointer; color:var(--ink-soft);
-  font-size:1.5rem; width:2.3rem; height:2.3rem; border-radius:8px; line-height:1; margin-left:auto}
+  font-size:1.6rem; width:2.75rem; height:2.75rem; border-radius:8px; line-height:1; margin-left:auto}
 .player .p-minimize:hover{background:var(--surface-hover)}
 .player .p-close{border:none; background:none; cursor:pointer; color:var(--ink-soft);
-  font-size:1.3rem; width:2.3rem; height:2.3rem; border-radius:8px; line-height:1}
+  font-size:1.45rem; width:2.75rem; height:2.75rem; border-radius:8px; line-height:1}
 .player .p-close:hover{background:var(--surface-hover)}
 /* 睡眠定时器按钮（2026-09-28 小谦指示：其他师兄也在用，夜里听着入睡需能定时停）。
    第8轮重排后上移工具行、改为带文字胶囊：「⏱ 定时」／有定时显示剩余「⏱ 25′」＝更显眼；
@@ -902,7 +905,7 @@ button:active, .player-launch:active, .search-fab:active{transform:scale(.95)}
    随重排失效，几何以 verify_player7 L 段 320px 实测为准。） */
 .player .p-timer-wrap{position:relative; display:inline-flex; flex:1 1 auto; min-width:0}
 .player .p-timer{border:1px solid var(--gold); background:var(--surface); color:var(--gold-deep);
-  cursor:pointer; font-size:.85rem; padding:.2rem .7rem; border-radius:999px; width:100%;
+  cursor:pointer; font-size:.95rem; padding:.35rem .7rem; min-height:2.4rem; border-radius:999px; width:100%;
   display:inline-flex; align-items:center; justify-content:center; gap:.3rem; font-family:inherit;
   white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
   font-variant-numeric:tabular-nums; transition:background .15s}
@@ -911,7 +914,7 @@ button:active, .player-launch:active, .search-fab:active{transform:scale(.95)}
 .player .p-timer-menu{position:absolute; bottom:calc(100% + 6px); right:0; z-index:60;
   background:var(--surface); border:1px solid var(--line); border-radius:12px; padding:.3rem;
   box-shadow:0 -6px 20px rgba(59,42,34,.18); min-width:10.5rem; max-height:60vh; overflow-y:auto}
-.player .p-timer-menu .tm-item{padding:.45rem .7rem; border-radius:8px; font-size:.9rem; color:var(--ink-soft);
+.player .p-timer-menu .tm-item{padding:.55rem .8rem; border-radius:8px; font-size:1rem; color:var(--ink-soft);
   cursor:pointer; white-space:nowrap; transition:background .15s}
 .player .p-timer-menu .tm-item:hover{background:var(--surface-soft)}
 .player .p-timer-menu .tm-item.active{color:var(--accent); font-weight:600; background:var(--surface-soft)}
@@ -919,7 +922,7 @@ button:active, .player-launch:active, .search-fab:active{transform:scale(.95)}
 /* 自定义分钟数（2026-09-28 小谦指示：90 分钟档改为自定义） */
 /* ⚠️ 按钮必须 flex:0 0 auto + nowrap：首版让「确定」参与压缩，两个字被挤成竖排两行（实测截图） */
 .player .p-timer-menu .tm-custom{display:flex; align-items:center; flex-wrap:nowrap; gap:.35rem; padding:.35rem .5rem .45rem}
-.player .p-timer-menu .tm-custom input{flex:1 1 auto; width:4.8rem; min-width:0; font:inherit; font-size:.9rem;
+.player .p-timer-menu .tm-custom input{flex:1 1 auto; width:4.8rem; min-width:0; font:inherit; font-size:1rem;
   padding:.3rem .45rem; border:1px solid var(--line); border-radius:8px; background:var(--surface);
   color:var(--ink); text-align:center}
 .player .p-timer-menu .tm-custom button{flex:0 0 auto; white-space:nowrap; border:1px solid var(--gold);
@@ -928,19 +931,19 @@ button:active, .player-launch:active, .search-fab:active{transform:scale(.95)}
 .player .p-timer-menu .tm-custom button:hover{background:var(--surface-soft)}
 /* 播放模式切换按钮（状态栏左侧胶囊）：点击在 顺序/逆序/随机/单曲循环 间循环，并显示当前模式 */
 .player .p-mode{border:1px solid var(--gold); background:var(--surface); color:var(--gold-deep);
-  cursor:pointer; font-size:.85rem; padding:.2rem .7rem; border-radius:999px;
+  cursor:pointer; font-size:.95rem; padding:.35rem .7rem; min-height:2.4rem; border-radius:999px;
   display:inline-flex; align-items:center; gap:.3rem; font-family:inherit; white-space:nowrap; transition:background .15s}
 .player .p-mode:hover{background:var(--surface-soft)}
 /* 倍速按钮（位于播放器底部最右侧，与播放模式同款胶囊样式） */
 .player .p-speed-wrap{position:relative; display:inline-flex}
 .player .p-speed{border:1px solid var(--gold); background:var(--surface); color:var(--gold-deep);
-  cursor:pointer; font-size:.85rem; padding:.2rem .7rem; border-radius:999px;
+  cursor:pointer; font-size:.95rem; padding:.35rem .7rem; min-height:2.4rem; border-radius:999px;
   display:inline-flex; align-items:center; gap:.3rem; font-family:inherit; white-space:nowrap; transition:background .15s}
 .player .p-speed:hover{background:var(--surface-soft)}
 .player .p-speed-menu{position:absolute; bottom:calc(100% + 8px); right:0; z-index:50;
   background:var(--surface); border:1px solid var(--line); border-radius:12px; padding:.3rem;
   box-shadow:0 -6px 20px rgba(59,42,34,.18); min-width:7.5rem}
-.player .p-speed-menu .sp-item{padding:.45rem .7rem; border-radius:8px; font-size:.9rem; color:var(--ink-soft);
+.player .p-speed-menu .sp-item{padding:.55rem .8rem; border-radius:8px; font-size:1rem; color:var(--ink-soft);
   cursor:pointer; white-space:nowrap; transition:background .15s}
 .player .p-speed-menu .sp-item:hover{background:var(--surface-soft)}
 .player .p-speed-menu .sp-item.active{color:var(--accent); font-weight:600; background:var(--surface-soft)}
@@ -973,12 +976,12 @@ button:active, .player-launch:active, .search-fab:active{transform:scale(.95)}
    否则每输一个字就重建 input、光标和输入法候选全丢。只在列表展开时显示。 */
 .player .pl-search-row{display:none; flex:0 0 auto; padding:.55rem 1.4rem; border-top:1px solid var(--line)}
 .player.pl-open .pl-search-row{display:flex; align-items:center; gap:.6rem}
-/* 列表内第二收起入口（第8轮重排）：搜索行右侧「▴ 收起」——收起列表不必滚回底行找按钮 */
+/* 列表内唯一收起入口（2026-09-30）：搜索行右侧「▴ 收起」——同屏只此一个，系列行尾那处已移除 */
 .player .pl-collapse-btn{flex:0 0 auto; border:1px solid var(--line); background:var(--surface); color:var(--ink-soft);
-  cursor:pointer; font-size:.82rem; padding:.42rem .7rem; border-radius:999px; font-family:inherit; white-space:nowrap}
+  cursor:pointer; font-size:.95rem; padding:.5rem .8rem; border-radius:999px; font-family:inherit; white-space:nowrap}
 .player .pl-collapse-btn:hover{background:var(--surface-soft); color:var(--accent); border-color:var(--gold)}
-.player .pl-search-input{width:100%; box-sizing:border-box; font-family:inherit; font-size:.95rem;
-  padding:.45rem .7rem; border:1px solid var(--line); border-radius:8px;
+.player .pl-search-input{width:100%; box-sizing:border-box; font-family:inherit; font-size:1.05rem;
+  padding:.6rem .8rem; border:1px solid var(--line); border-radius:8px;
   background:var(--surface); color:var(--ink)}
 .player .pl-search-input::placeholder{color:var(--ink-faint)}
 .player .pl-search-input:focus{outline:none; border-color:var(--accent)}
@@ -1029,17 +1032,17 @@ button:active, .player-launch:active, .search-fab:active{transform:scale(.95)}
 
 /* 底部迷你条：关闭整屏播放器但音频仍在播放时，常驻一行 */
 .player-mini{position:fixed; left:0; right:0; bottom:0; z-index:998; display:none;
-  align-items:center; gap:.7rem; padding:.5rem .9rem;
+  align-items:center; gap:.7rem; padding:.55rem .9rem;
   background:var(--surface); border-top:1px solid var(--line);
   box-shadow:0 -2px 12px rgba(59,42,34,.10)}
 .player-mini.show{display:flex}
 .player-mini .pm-btn{border:none; background:none; cursor:pointer; color:var(--ink);
-  font-size:1.1rem; width:2.4rem; height:2.4rem; border-radius:50%; flex:0 0 auto;
+  font-size:1.25rem; width:2.75rem; height:2.75rem; border-radius:50%; flex:0 0 auto;
   display:flex; align-items:center; justify-content:center}
 .player-mini .pm-btn:hover{background:var(--surface-hover)}
-.player-mini .pm-name{font-size:.92rem; color:var(--ink); font-weight:600;
+.player-mini .pm-name{font-size:1rem; color:var(--ink); font-weight:600;
   white-space:nowrap; overflow:hidden; text-overflow:ellipsis; flex:0 1 auto; max-width:42%}
-.player-mini .pm-progress{flex:1 1 auto; height:6px; background:var(--line);
+.player-mini .pm-progress{flex:1 1 auto; height:8px; background:var(--line);
   border-radius:3px; position:relative; cursor:pointer; overflow:hidden}
 .player-mini .pm-fill{position:absolute; left:0; top:0; bottom:0;
   background:var(--turq); border-radius:3px; width:0}
@@ -1047,13 +1050,13 @@ button:active, .player-launch:active, .search-fab:active{transform:scale(.95)}
 /* 迷你条倍速按钮（紧凑胶囊，位于展开按钮左侧） */
 .player-mini .pm-speed-wrap{position:relative; display:inline-flex}
 .player-mini .pm-speed{border:1px solid var(--gold); background:var(--surface); color:var(--gold-deep);
-  cursor:pointer; font-size:.78rem; padding:.1rem .5rem; border-radius:999px; font-family:inherit;
-  white-space:nowrap; line-height:1.6; flex:0 0 auto}
+  cursor:pointer; font-size:.92rem; padding:.3rem .65rem; min-height:2.25rem; border-radius:999px; font-family:inherit;
+  white-space:nowrap; line-height:1.3; flex:0 0 auto}
 .player-mini .pm-speed:hover{background:var(--surface-soft)}
 .player-mini .pm-speed-menu{position:absolute; bottom:calc(100% + 8px); right:0; z-index:50;
   background:var(--surface); border:1px solid var(--line); border-radius:12px; padding:.3rem;
   box-shadow:0 -6px 20px rgba(59,42,34,.18); min-width:6.5rem}
-.player-mini .pm-speed-menu .sp-item{padding:.4rem .6rem; border-radius:8px; font-size:.85rem; color:var(--ink-soft);
+.player-mini .pm-speed-menu .sp-item{padding:.5rem .7rem; border-radius:8px; font-size:1rem; color:var(--ink-soft);
   cursor:pointer; white-space:nowrap; transition:background .15s}
 .player-mini .pm-speed-menu .sp-item:hover{background:var(--surface-soft)}
 .player-mini .pm-speed-menu .sp-item.active{color:var(--accent); font-weight:600; background:var(--surface-soft)}
@@ -1349,12 +1352,12 @@ button:active, .player-launch:active, .search-fab:active{transform:scale(.95)}
   .welcome{padding:.95rem .9rem .9rem; margin-bottom:.9rem}
   .welcome-hero{margin:-3.05rem calc(50% - 50vw) .8rem; aspect-ratio:4/5; height:auto}
   .welcome .big{display:none}
-  .player{height:auto; min-height:34vh; max-height:34vh}
+  .player{height:auto; min-height:0; max-height:62vh}
   .player.pl-open{max-height:80vh}
-  .player .p-controls{gap:.7rem; padding:.85rem}
-  .player .p-btn{width:3.2rem; height:3.2rem; font-size:1.35rem}
-  .player .p-btn.p-play{width:3.9rem; height:3.9rem; font-size:1.45rem}
-  .player .p-btn.p-skip{width:3.5rem; height:3.5rem; font-size:1.05rem}
+  .player .p-controls{gap:.6rem; padding:.75rem}
+  .player .p-btn{width:3.5rem; height:3.5rem; font-size:1.4rem}
+  .player .p-btn.p-play{width:4.3rem; height:4.3rem; font-size:1.5rem}
+  .player .p-btn.p-skip{width:3.7rem; height:3.7rem; font-size:1.1rem}
   .player-launch{font-size:.9rem; padding:.6rem .9rem}
   /* 移动端：避免右上角字号按钮挤压网站名 —— 整组隐藏字号调节（桌面保留），品牌名省略号 */
   .topbar{gap:.4rem; padding:.6rem .9rem}
@@ -1364,9 +1367,9 @@ button:active, .player-launch:active, .search-fab:active{transform:scale(.95)}
   .fs-pill button{width:1.7rem; height:1.7rem; font-size:.9rem}
   .player .p-footer{gap:.4rem; padding:.55rem .9rem}
   .player .p-tools{gap:.4rem; padding:.45rem .9rem}
-  .player .p-tool, .player .p-tools .p-mode, .player .p-tools .p-speed, .player .p-timer{font-size:.78rem; padding:.22rem .5rem}
-  .player .p-pl-toggle{font-size:.82rem; padding:.3rem .1rem .3rem .7rem}
-  .player .p-pl-caret{font-size:.8rem; padding:.4rem .5rem}
+  .player .p-tool, .player .p-tools .p-mode, .player .p-tools .p-speed, .player .p-timer{font-size:.92rem; padding:.3rem .5rem}
+  .player .p-pl-toggle{font-size:.98rem; padding:.4rem .1rem .4rem .8rem}
+  .player .p-pl-caret{font-size:.95rem; padding:.5rem .6rem}
   .player .p-pl-menu{left:.9rem}
   /* 2026-09-22（小谦指示）修播放器窄屏溢出（总纲 §17.3 O-02）：
      原做法＝窄屏隐藏按钮内的长提示语「点击展开播放列表」（该提示 2026-09-28 已移除，
@@ -1383,10 +1386,20 @@ button:active, .player-launch:active, .search-fab:active{transform:scale(.95)}
    才看得出来——只看 right>vw 会漏掉这一类）。只缩 gap 不够（302px 仍超），须同时缩按钮：
    15.6rem 按钮 + 4×.45rem gap = 278px < 297px ✓ */
 @media(max-width:374px){
-.player .p-controls{gap:.45rem; padding:.7rem}
-.player .p-btn{width:2.9rem; height:2.9rem; font-size:1.25rem}
-.player .p-btn.p-play{width:3.5rem; height:3.5rem; font-size:1.35rem}
-.player .p-btn.p-skip{width:3.15rem; height:3.15rem; font-size:.95rem}
+.player .p-controls{gap:.4rem; padding:.6rem}
+.player .p-btn{width:3.05rem; height:3.05rem; font-size:1.3rem}
+.player .p-btn.p-play{width:3.7rem; height:3.7rem; font-size:1.4rem}
+.player .p-btn.p-skip{width:3.3rem; height:3.3rem; font-size:1rem}
+}
+/* 桌面端（≥1024px）底栏内容收进居中列（2026-09-29 适老化评审）：
+   .p-tools > * 四颗均分在宽屏把胶囊撑到各 300px 宽（1280px 实测）、状态行两端相距 1200px——
+   「四颗均分」定式只在窄屏成立；宽屏改为内容列 720px 居中、胶囊自适应宽并保持大号字。 */
+@media(min-width:1024px){
+.player .p-status, .player .p-tools, .player .p-controls, .player .p-time-row, .player .p-footer{
+  width:100%; max-width:720px; box-sizing:border-box; align-self:center}
+.player .p-tools{justify-content:center; gap:1rem}
+.player .p-tools > *{flex:0 1 auto}
+.player .p-tools .p-speed{width:auto; min-width:4.5rem}
 }
 /* 页脚 */
 .site-footer{border-top:1px solid var(--line); background:var(--surface-soft); padding:1.2rem 1rem; margin-top:2rem}
@@ -1694,13 +1707,13 @@ img{height:auto;max-width:100%}
          aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-valuetext="0:00 / 0:00"><div class="p-fill" id="pFill"></div><div class="p-thumb" id="pThumb"></div></div>
     <span class="p-time" id="pTimeDur">0:00</span>
   </div>
-  <!-- 第4行：系列选择器（2026-09-28 第8轮重排：整行胶囊＝系列名 + ▾，只弹系列菜单）＋ 列表展开时行尾「▴ 收起」 -->
+  <!-- 第4行：系列选择器（2026-09-28 第8轮重排：整行胶囊＝系列名 + ▾，只弹系列菜单；
+       2026-09-30：行尾「▴ 收起」已移除，收起入口统一到搜索行右，同屏只留一个） -->
   <div class="p-footer">
     <span class="p-pl-wrap">
       <button class="p-pl-toggle" id="pPlToggle" title="切换系列" aria-haspopup="listbox" aria-expanded="false"><span class="p-pl-label" id="pPlLabel">播放列表</span></button>
       <button class="p-pl-caret" id="pPlCaret" title="切换系列" aria-label="切换系列" aria-haspopup="listbox" aria-expanded="false">▾</button>
     </span>
-    <button class="p-pl-collapse" id="pPlCollapse" title="收起播放列表" style="display:none">▴ 收起</button>
     <div class="p-pl-menu" id="pPlMenu" style="display:none" role="listbox" aria-label="选择系列"></div>
   </div>
   <!-- 播放列表搜索（2026-09-28）：静态节点，不随列表重渲染（否则输入时失焦） -->
@@ -2655,7 +2668,7 @@ function show(slug){
     }
   }
   // 文章页（非目录 index）不加分享按钮
-  var inner = titleHtml + metaHtml + tocHtml + p.html;
+  var inner = titleHtml + metaHtml + tocHtml + (p.html || '');   /* 2026-09-29 修缺陷：目录页按需加载后 p.html 为 undefined，直接拼接会把字面量 "undefined" 渲染进首屏（冷启动 6/6 栏目实测命中） */
   if (isHome){
     var D_ALTS = ['遍主多智钦·龙洋仁波切', '上师法相（官方名号卡）', '上师笑颜', '上师大笑', '上师笑颜'];
     var M_ALTS = ['上师法相（仪轨）', '上师端坐', '上师传法', '上师端坐', '上师端坐'];
@@ -5252,8 +5265,6 @@ function setPlListOpen(open){
   plView.open = false; renderPlCatMenu();   // 列表与系列菜单互斥：开一个必关另一个（否则两面板叠在一起）
   var tg = document.getElementById('pListToggle');
   if (tg){ tg.setAttribute('aria-expanded', open ? 'true' : 'false'); tg.classList.toggle('on', open); }
-  var c1 = document.getElementById('pPlCollapse');
-  if (c1) c1.style.display = open ? '' : 'none';
   var c2 = document.getElementById('plCollapseBtn');
   if (c2) c2.style.display = open ? '' : 'none';
   if (open){
@@ -5273,7 +5284,6 @@ function setPlListOpen(open){
 document.getElementById('pListToggle').onclick = function(){
   setPlListOpen(!document.getElementById('player').classList.contains('pl-open'));
 };
-document.getElementById('pPlCollapse').onclick = function(){ setPlListOpen(false); };
 document.getElementById('plCollapseBtn').onclick = function(){ setPlListOpen(false); };
 // 系列菜单（第8轮重排）：胶囊左半区与 ▾ 都只弹它（不再兼任列表开合）；点外部或 Esc 关闭
 function togglePlCatMenu(e){
