@@ -440,7 +440,7 @@
 
 <script>
 const API_BASE = 'https://stats.longchen-nyingtik.wiki';
-const ADMIN_PAGE_VERSION = 'v2026-09-21b';
+const ADMIN_PAGE_VERSION = 'v2026-09-30a';
 // ⚠️ 2026-09-20：管理员设备 ID 列表已从本页移除（本页公开可读，硬编码等于泄露白名单）。
 // 设备白名单仅存于 Worker 环境变量 env.ADMIN_DEVICE_IDS，前端只上报自身设备 ID 由后端判定。
 let adminPassword = '';
@@ -1082,7 +1082,10 @@ function onDeviceSearch(q) {
 
 function sortDeviceBy(key) {
   const v = window._deviceView;
-  if (v.sortKey === key) { v.sortDir = -v.sortDir; } else { v.sortKey = key; v.sortDir = -1; }
+  // 字符串列（名称/类型/系统/浏览器/地区）首次点击按「升序」更符合直觉；数值/时间列维持「降序」
+  const STRING_KEYS = ['name', 'visitorType', 'deviceType', 'os', 'browser', 'region'];
+  if (v.sortKey === key) { v.sortDir = -v.sortDir; }
+  else { v.sortKey = key; v.sortDir = STRING_KEYS.indexOf(key) >= 0 ? 1 : -1; }
   renderDeviceTableView();
 }
 
@@ -1168,7 +1171,20 @@ function getFilteredDevices() {
 function sortDeviceList(list) {
   const v = window._deviceView;
   const key = v.sortKey;
+  // 字符串列（2026-09-30 扩展）：名称/类型/设备类型/系统/浏览器/地区 —— 按 localeCompare（数字串按数值序）
+  const STR_GET = {
+    name: d => d.name || '',
+    visitorType: d => d.visitorType || 'unknown',
+    deviceType: d => d.deviceType || '',
+    os: d => d.os || '',
+    browser: d => d.browser || '',
+    region: d => ((d.country || '') + ' ' + (d.region || '') + ' ' + (d.city || '')).trim()
+  };
   return list.slice().sort((a, b) => {
+    if (STR_GET[key]) {
+      const sa = String(STR_GET[key](a)), sb = String(STR_GET[key](b));
+      return sa.localeCompare(sb, 'zh-CN', { numeric: true }) * v.sortDir;
+    }
     let va = 0, vb = 0;
     if (key === 'visitCount') { va = a.visitCount || 0; vb = b.visitCount || 0; }
     else if (key === 'totalDuration') { va = a.totalDuration || 0; vb = b.totalDuration || 0; }
@@ -1176,6 +1192,10 @@ function sortDeviceList(list) {
       const today = new Date().toISOString().split('T')[0];
       va = (a.todayDuration && a.todayDuration[today]) || 0;
       vb = (b.todayDuration && b.todayDuration[today]) || 0;
+    } else if (key === 'lastSession') {
+      // 「最后一次」列：取最近一次会话时长（秒）
+      va = (a.sessionDurations && a.sessionDurations.length) ? a.sessionDurations[a.sessionDurations.length - 1].duration : 0;
+      vb = (b.sessionDurations && b.sessionDurations.length) ? b.sessionDurations[b.sessionDurations.length - 1].duration : 0;
     } else { // lastSeen
       va = a.lastSeen ? new Date(a.lastSeen).getTime() : 0;
       vb = b.lastSeen ? new Date(b.lastSeen).getTime() : 0;
@@ -1202,14 +1222,14 @@ function renderDeviceTableView() {
   const today = new Date().toISOString().split('T')[0];
   const arrow = k => v.sortKey === k ? (v.sortDir < 0 ? ' ▼' : ' ▲') : '';
 
+  const thc = (k, label) => '<th class="sortable" onclick="sortDeviceBy(\'' + k + '\')">' + label + arrow(k) + '</th>';
   let html = '<div style="overflow-x:auto;"><table><tr>' +
-    '<th>设备名称</th><th>类型</th><th>设备类型</th><th>操作系统</th><th>浏览器</th><th>地区</th>' +
-    '<th>最后一次</th>' +
-    '<th class="sortable" onclick="sortDeviceBy(\'totalDuration\')">累计时长' + arrow('totalDuration') + '</th>' +
-    '<th class="sortable" onclick="sortDeviceBy(\'todayDuration\')">今日时长' + arrow('todayDuration') + '</th>' +
-    '<th class="sortable" onclick="sortDeviceBy(\'visitCount\')">访问次数' + arrow('visitCount') + '</th>' +
-    '<th class="sortable" onclick="sortDeviceBy(\'lastSeen\')">最近访问' + arrow('lastSeen') + '</th>' +
-    '<th>操作</th></tr>';
+    thc('name', '设备名称') + thc('visitorType', '类型') + thc('deviceType', '设备类型') +
+    thc('os', '操作系统') + thc('browser', '浏览器') + thc('region', '地区') +
+    thc('lastSession', '最后一次') +
+    thc('totalDuration', '累计时长') + thc('todayDuration', '今日时长') +
+    thc('visitCount', '访问次数') + thc('lastSeen', '最近访问') +
+    '<th data-nosort>操作</th></tr>';
 
   pageList.forEach(d => {
     const totalMins = Math.floor((d.totalDuration || 0) / 60);
@@ -1589,6 +1609,83 @@ async function copyInviteLink(code) {
     });
   }
 }
+
+// ========== 表格通用排序（2026-09-30 新增）==========
+// 规则：点击表头 → 按该列升序；再点同一表头 → 降序；点其他表头 → 该列升序；表头带 ▲/▼ 指示。
+// 覆盖：访客列表 / 文章浏览 / 音频播放 / 点击统计 / 待审核 / AI统计×3 / 邀请码等「整表渲染」的表格。
+// 不覆盖：设备列表（th.sortable）——它有自己的「数据排序＋分页」管线（见 sortDeviceBy/sortDeviceList），
+//         若对它做 DOM 排序只会打乱当前页，且与分页器冲突。
+// 自动跳过：操作列等「单元格里含按钮/输入框/链接」的列（只供操作，无排序意义），以及合并单元格表头。
+(function () {
+  function textOf(el) { return el ? String(el.textContent || '').trim() : ''; }
+
+  function compareCells(a, b) {
+    const clean = s => String(s).replace(/,/g, '').trim();
+    const NUM_RE = /^[-+]?[\d.]+\s*(?:分钟|小时|次|条|个|秒|分|%)?$/;
+    const ca = clean(a), cb = clean(b);
+    const na = parseFloat(ca), nb = parseFloat(cb);
+    const aNum = NUM_RE.test(ca) && !isNaN(na);
+    const bNum = NUM_RE.test(cb) && !isNaN(nb);
+    if (aNum && bNum) return na - nb;                      // 纯数值列按数值比
+    return ca.localeCompare(cb, 'zh-CN', { numeric: true }); // 文本/日期列（数字串按数值序，ISO 日期天然可比较）
+  }
+
+  function clearMarks(headerRow) {
+    Array.prototype.forEach.call(headerRow.cells, function (c) {
+      if (c.dataset && c.dataset.base) c.textContent = c.dataset.base;
+      if (c.removeAttribute) c.removeAttribute('data-sort');
+    });
+  }
+
+  document.addEventListener('click', function (ev) {
+    try {
+      const t = ev.target;
+      if (!t || t.nodeType !== 1 || !t.closest) return;
+      const th = t.closest('th');
+      if (!th) return;
+      if (th.classList.contains('sortable') || th.hasAttribute('data-nosort')) return;
+      if ((th.colSpan || 1) > 1) return;
+      const table = th.closest('table');
+      if (!table) return;
+      const headerRow = th.parentElement;
+      const idx = th.cellIndex;
+      const rows = [];
+      for (let i = 0; i < table.rows.length; i++) {
+        const tr = table.rows[i];
+        if (tr !== headerRow && tr.cells.length > idx) rows.push(tr);
+      }
+      if (!rows.length) return;
+      // 操作列：该列单元格里含可交互元素 → 不排序（也避免排序把按钮挪乱）
+      if (rows[0].cells[idx] && rows[0].cells[idx].querySelector('button,input,select,textarea,a,form')) return;
+
+      const dir = (table.dataset.sortCol === String(idx) && table.dataset.sortDir === 'asc') ? 'desc' : 'asc';
+      table.dataset.sortCol = String(idx);
+      table.dataset.sortDir = dir;
+
+      const mul = (dir === 'asc') ? 1 : -1;
+      rows.sort(function (r1, r2) {
+        return compareCells(textOf(r1.cells[idx]), textOf(r2.cells[idx])) * mul;
+      });
+      // 把数据行按新顺序重新挂回原父节点（tbody 或 table），不破坏表格结构
+      const parent = rows[0].parentNode;
+      rows.forEach(function (r) { parent.appendChild(r); });
+
+      if (!th.dataset.base) th.dataset.base = textOf(th);
+      clearMarks(headerRow);
+      th.textContent = th.dataset.base + (dir === 'asc' ? ' ▲' : ' ▼');
+      th.setAttribute('data-sort', dir);
+    } catch (e) { /* 保底：排序失败不影响后台其他功能 */ }
+  });
+
+  // 表头可点击的视觉提示
+  try {
+    const st = document.createElement('style');
+    st.textContent = 'table th{cursor:pointer;-webkit-user-select:none;user-select:none;}'
+      + 'table th[data-nosort]{cursor:default;}'
+      + 'table th[data-sort="asc"],table th[data-sort="desc"]{opacity:1;}';
+    document.head.appendChild(st);
+  } catch (e) { /* 保底 */ }
+})();
 
 </script>
 </body>
