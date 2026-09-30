@@ -14,8 +14,20 @@
 用法（**默认只读**；写操作必须 --yes）：
     python cf_ops.py status              # 只读：zone / 缓存头 / 限速规则现状
     python cf_ops.py purge --yes         # 清空该 zone 全部缓存（幂等、无副作用）
-    python cf_ops.py ratelimit --yes     # 建/更新 /api/login 限速规则
-    python cf_ops.py verify --run        # 只读探测：连发 8 次错误登录，看是否出现 429
+    python cf_ops.py ratelimit --yes     # 建/更新登录限速规则
+    python cf_ops.py verify --run        # 探测：连发 14 次错误登录，看是否出现 429
+
+2026-09-30 按「网站三件安全收尾」复核后的两处修正（⚠️ 旧写法会写出无效/漏防的规则）：
+  ① **路径错了**：浏览器侧真实登录入口是同站 `/__auth/login`（POST），
+     由 `functions/_middleware.js:356` 代理到 Worker 的 `/api/login`——
+     而**主域上的 `/api/login` 根本不是登录接口**，它落到中间件第 6 段「其余一切」直接 401。
+     旧 LOGIN_PATHS=["/api/login","/login"] 因此完全漏掉了主站登录口。
+     现改为 ["/__auth/login", "/login", "/api/login"]——第三条覆盖
+     `stats.` / `api.` 两个 Worker 域（后台 admin.html 跨域直连）。
+  ② **参数越权**：官方文档（2026-08-25 更新）对 Free 套餐的限流规则限定为
+     **1 条规则 / 表达式只能用 Path 与 Verified Bot 两个字段 / 计数周期仅 10 秒 /
+     拦截时长仅 10 秒**。旧写法带 `http.request.method` 条件、period=60、timeout=60，
+     在 Free 上会被拒。现改为纯路径表达式 ＋ 10s/5 次/10s。
 
 凭据：环境变量 CF_API_TOKEN（或 CLOUDFLARE_API_TOKEN）；缺省时回退 wrangler OAuth（只够 status）。
 本脚本不写入任何凭据、不打印完整 token。
@@ -24,10 +36,11 @@ import io, json, os, re, sys, time
 import urllib.request, urllib.error
 
 ZONE_NAME = "longchen-nyingtik.wiki"
-LOGIN_PATHS = ["/api/login", "/login"]
-LIMIT_PERIOD = 60           # 秒
-LIMIT_REQUESTS = 5          # 每 period 允许次数（对齐后台既有 5/15min 口径的收紧版）
-LIMIT_TIMEOUT = 60          # 触发后拦截时长（秒）
+# 真实登录入口（按路径匹配即可覆盖同 zone 内全部主机名：主域 / stats. / api.）
+LOGIN_PATHS = ["/__auth/login", "/login", "/api/login"]
+LIMIT_PERIOD = 10           # 秒（Free 套餐**仅支持 10s**；Pro 起才放开到 1 分钟以上）
+LIMIT_REQUESTS = 5          # 每 period 允许次数（对齐后台既有 5 次/15min 的收紧版）
+LIMIT_TIMEOUT = 10          # 触发后拦截时长（秒；Free 套餐**仅支持 10s**）
 API = "https://api.cloudflare.com/client/v4"
 
 
@@ -169,7 +182,8 @@ def cmd_ratelimit(argv):
                 "content": '{"success":false,"error":"too many login attempts, retry later"}',
             }
         },
-        "expression": '(http.request.method eq "POST" and http.request.uri.path in {%s})'
+        # Free 套餐表达式字段只放开 Path / Verified Bot ⇒ **不能**写 http.request.method 条件
+        "expression": '(http.request.uri.path in {%s})'
                       % " ".join('"%s"' % p for p in LOGIN_PATHS),
         "description": "longchen: 登录接口限速（同 IP %ds 内 >%d 次即拦）" % (LIMIT_PERIOD, LIMIT_REQUESTS),
         "enabled": True,
@@ -199,7 +213,8 @@ def cmd_ratelimit(argv):
 
 # ------------------------------------------------------------------ verify
 def cmd_verify(argv):
-    url = "https://%s/api/login" % ZONE_NAME
+    # 打真实入口（主站登录表单 POST 到这里），而不是主域上那个只会返回 401 的 /api/login
+    url = "https://%s/__auth/login" % ZONE_NAME
     print("向 %s 连发 14 次「错误凭据」POST，看是否出现 429（每次约 0.15s，约 3 秒）" % url)
     if "--run" not in argv:
         print("（演练模式，不实际发请求；确认后加 --run）")
