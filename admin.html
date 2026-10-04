@@ -440,7 +440,7 @@
 
 <script>
 const API_BASE = 'https://stats.longchen-nyingtik.wiki';
-const ADMIN_PAGE_VERSION = 'v2026-09-30a';
+const ADMIN_PAGE_VERSION = 'v2026-10-05a';
 // ⚠️ 2026-09-20：管理员设备 ID 列表已从本页移除（本页公开可读，硬编码等于泄露白名单）。
 // 设备白名单仅存于 Worker 环境变量 env.ADMIN_DEVICE_IDS，前端只上报自身设备 ID 由后端判定。
 let adminPassword = '';
@@ -941,18 +941,22 @@ function loadPending() {
       return;
     }
     
-    let html = '<table><tr><th>昵称</th><th>申请理由</th><th>联系方式</th><th>IP</th><th>申请时间</th><th>操作</th></tr>';
+    // ⚠️ 2026-10-05：审核入参改为 username（= pending_registrations 里存的值、user_ 键的后缀）。
+    //   原来传的是 r.id（userId），与 Worker 端期望的 username 不是一回事 → 审核永远 404。
+    let html = '<table><tr><th>用户名</th><th>昵称</th><th>申请理由</th><th>邀请码</th><th>IP</th><th>申请时间</th><th>操作</th></tr>';
     regs.forEach(r => {
-      html += `<tr id="reg-${r.id}">
-        <td><strong>${esc(r.nickname)}</strong></td>
+      const uname = String(r.username || '').replace(/'/g, "\\'");
+      html += `<tr id="reg-${esc(r.username || r.id)}">
+        <td style="font-family:monospace;font-size:0.85rem;"><strong>${esc(r.username || '-')}</strong></td>
+        <td>${esc(r.nickname)}</td>
         <td>${esc(r.reason)}</td>
-        <td>${esc(r.contact || '-')}</td>
-        <td style="font-family:monospace;font-size:0.8rem;">${r.ip}</td>
+        <td style="font-family:monospace;font-size:0.85rem;">${esc(r.inviteCode || '-')}</td>
+        <td style="font-family:monospace;font-size:0.8rem;">${r.ip || '-'}</td>
         <td>${formatTime(r.createdAt)}</td>
         <td>
           <div class="action-btns">
-            <button class="btn-approve" onclick="review('${r.id}', 'approve')">通过</button>
-            <button class="btn-reject" onclick="review('${r.id}', 'reject')">拒绝</button>
+            <button class="btn-approve" onclick="review('${uname}', 'approve')">通过</button>
+            <button class="btn-reject" onclick="review('${uname}', 'reject')">拒绝</button>
           </div>
         </td>
       </tr>`;
@@ -965,8 +969,8 @@ function loadPending() {
   });
 }
 
-// 审核（2026-09-07：确认框/toast 替换原生 confirm/alert）
-async function review(regId, action) {
+// 审核（2026-09-07：确认框/toast 替换原生 confirm/alert；2026-10-05 入参改为 username）
+async function review(username, action) {
   const actionText = action === 'approve' ? '通过' : '拒绝';
   const ok = await showConfirm('确定要' + actionText + '这个注册申请吗？', '审核确认', actionText);
   if (!ok) return;
@@ -978,7 +982,7 @@ async function review(regId, action) {
         'Content-Type': 'application/json',
         'X-Admin-Token': adminPassword
       },
-      body: JSON.stringify({ regId, action })
+      body: JSON.stringify({ username: username, action })
     });
     const data = await r.json();
     if (data.success) {

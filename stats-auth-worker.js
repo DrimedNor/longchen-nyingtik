@@ -956,10 +956,11 @@ export default {
         const pendingList = await env.STATS_KV.get('pending_registrations', 'json') || [];
         const registrations = [];
         
-        for (const regId of pendingList) {
-          const reg = await env.STATS_KV.get('reg_' + regId, 'json');
+        for (const username of pendingList) {
+          let reg = await env.STATS_KV.get('user_' + username, 'json');
+          if (!reg) reg = await env.STATS_KV.get('reg_' + username, 'json');
           if (reg && reg.status === 'pending') {
-            registrations.push(reg);
+            registrations.push({ ...reg, username: reg.username || username });
           }
         }
         
@@ -981,30 +982,49 @@ export default {
         if (!auth.ok) return auth.response;
 
         const body = await request.json();
-        const { regId, action } = body; // action: 'approve' or 'reject'
+        const { action } = body; // action: 'approve' or 'reject'
+        // 入参：username（= pending_registrations 里存的值、user_ 键后缀）；
+        // 兼容 regId —— 旧前端传的是 r.id（userId），写入端同时存了 userid_<userId> 镜像，可反查。
+        const given = String(body.username || body.regId || '').trim();
         
-        if (!regId || !action) {
+        if (!given || !action) {
           return new Response(JSON.stringify({ success: false, message: '参数不完整' }), {
             status: 400,
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           });
         }
         
-        const reg = await env.STATS_KV.get('reg_' + regId, 'json');
+        // 解析目标用户：user_ 真相源 → userid_ 镜像反查（兼容旧前端） → 历史 reg_ 键
+        let target = given;
+        let reg = await env.STATS_KV.get('user_' + given, 'json');
         if (!reg) {
-          return new Response(JSON.stringify({ success: false, message: '注册申请不存在' }), {
+          const mirror = await env.STATS_KV.get('userid_' + given, 'json');
+          if (mirror && mirror.username) {
+            target = mirror.username;
+            reg = await env.STATS_KV.get('user_' + target, 'json');
+          }
+        }
+        if (!reg) reg = await env.STATS_KV.get('reg_' + given, 'json');  // 历史 reg_ 键
+        if (!reg) {
+          return new Response(JSON.stringify({ success: false, message: '注册申请不存在（可能已被处理）' }), {
             status: 404,
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           });
         }
+        const fromLegacy = !String(body.username || '').trim();
         
         reg.status = action === 'approve' ? 'approved' : 'rejected';
         reg.reviewedAt = new Date().toISOString();
-        await env.STATS_KV.put('reg_' + regId, JSON.stringify(reg));
+        reg.username = reg.username || target;
+        if (!reg.id) reg.id = 'user_' + Date.now();
+        // 写回：user_ 为真相源（登录/会话放行只看它的 status）
+        await env.STATS_KV.put('user_' + target, JSON.stringify(reg));
+        if (reg.id) await env.STATS_KV.put('userid_' + reg.id, JSON.stringify(reg)).catch(() => {});
+        if (fromLegacy) await env.STATS_KV.put('reg_' + target, JSON.stringify(reg)).catch(() => {});
         
-        // 从待审核列表移除
+        // 从待审核列表移除（按 username 精确匹配；历史脏数据若存的是 userId 也一并清掉）
         const pendingList = await env.STATS_KV.get('pending_registrations', 'json') || [];
-        const newPendingList = pendingList.filter(id => id !== regId);
+        const newPendingList = pendingList.filter(x => x !== target && x !== given && x !== reg.id);
         await env.STATS_KV.put('pending_registrations', JSON.stringify(newPendingList));
         
         return new Response(JSON.stringify({ 
