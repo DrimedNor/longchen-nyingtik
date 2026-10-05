@@ -510,6 +510,58 @@ async function handlePracticeApi(request, url) {
 }
 
 // ---------------------------------------------------------------------------
+// /__api/todo/* 同源代理（2026-10-05）
+//
+// 与 /__api/practice/* 同理：待办是「登录用户的私有数据」，身份认会话。
+// 中间件在服务端把第一方 httpOnly Cookie 读出来、以 {token} 转发给 Worker
+// —— **token 从不出现在浏览器可见处**，前端也不得传任何身份凭据。
+// 刻意放在登录门槛之前：设备免密访问没有会话 Cookie，须由 Worker 用设备身份判（只读）。
+//
+// ⚠️ 不设任何查询串白名单：待办全用 POST + body（不认 GET），
+//    免得开一条「参数从 URL 进来」的通道（那会进浏览器历史/Referer/边缘日志，§3.8）。
+async function handleTodoApi(request, url) {
+  const action = url.pathname.slice('/__api/todo/'.length);
+  if (!/^[a-z]+$/.test(action)) return json({ success: false, message: 'Not found' }, 404);
+
+  const body = {};
+  if (request.method === 'POST') {
+    const parsed = await request.json().catch(() => null);
+    if (parsed && typeof parsed === 'object') {
+      for (const k of Object.keys(parsed)) body[k] = parsed[k];
+    }
+  }
+
+  const token = getCookie(request, COOKIE_NAME);
+  delete body.token;           // 防线：token **只**认服务端从 Cookie 读到的那一个
+  delete body.username;        // 防线：前端传什么都不认
+  if (token) body.token = token;
+
+  const headers = { 'Content-Type': 'application/json' };
+  const dev = request.headers.get('X-Device-ID');
+  if (dev) headers['X-Device-ID'] = dev;   // 设备只走头，绝不走 URL
+
+  let res;
+  try {
+    res = await fetch(WORKER + '/api/todo/' + action, {
+      method: 'POST',
+      headers: headers,
+      body: JSON.stringify(body),
+    });
+  } catch (e) {
+    return json({ success: false, message: '服务暂不可用' }, 503);
+  }
+  const text = await res.text();
+  return new Response(text, {
+    status: res.status,
+    headers: {
+      'Content-Type': res.headers.get('Content-Type') || 'application/json; charset=utf-8',
+      'Cache-Control': 'no-store',
+      'X-Robots-Tag': ROBOTS_HEADER,
+    },
+  });
+}
+
+// ---------------------------------------------------------------------------
 // 中间件入口
 // ---------------------------------------------------------------------------
 export async function onRequest(context) {
@@ -522,6 +574,9 @@ export async function onRequest(context) {
 
   // 1.5) 功课接口代理（含设备免密只读；鉴权在 Worker，见上方说明）
   if (path.startsWith('/__api/practice/')) return handlePracticeApi(request, url);
+
+  // 1.6) 日历待办接口代理（2026-10-05；同为登录用户私有数据，鉴权在 Worker）
+  if (path.startsWith('/__api/todo/')) return handleTodoApi(request, url);
 
   // 2) 登录页（匿名可达，但不含任何站内内容）
   if (path === "/login" || path === "/login/") return html(loginPageHTML(""), 200);

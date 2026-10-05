@@ -596,8 +596,8 @@ button:focus-visible, a:focus-visible{outline:2px solid var(--accent); outline-o
   background:var(--surface); color:var(--ink-soft); border-radius:999px; cursor:pointer; margin-left:.3rem; line-height:1}
 .theme-toggle:hover{background:var(--surface-hover); color:var(--ink)}
 
-/* 布局 */
-.layout{display:flex; min-height:calc(100vh - 53px)}
+/* 常量：.sidebar 宽（hero 定位时要把 .layout 的左边距让出来，见 .welcome-hero 注释） */
+.layout{display:flex; min-height:calc(100vh - 53px); position:relative}
 .sidebar{
   width:300px; flex:0 0 300px; border-right:1px solid var(--line); padding:1.6rem 1.1rem;
   overflow-y:auto; position:sticky; top:53px; height:calc(100vh - 53px); background:var(--bg);
@@ -687,8 +687,8 @@ button:focus-visible, a:focus-visible{outline:2px solid var(--accent); outline-o
 .sidebar-overlay{position:fixed; inset:0; background:rgba(59,42,34,.3); z-index:14; display:none}
 .sidebar-overlay.show{display:block}
 
-/* 内容区 */
-.content{flex:1; min-width:0; padding:2.6rem clamp(1.4rem, 6vw, 4.5rem) 9rem; max-width:820px; margin:0 auto}
+/* 内容区；position:relative 供首页 hero「全出血」定位（见 .welcome-hero 注释） */
+.content{flex:1; min-width:0; position:relative; padding:2.6rem clamp(1.4rem, 6vw, 4.5rem) 9rem; max-width:820px; margin:0 auto}
 .article h1{font-size:1.85em; margin:.1rem 0 .7rem; line-height:1.35; font-weight:700; font-family:var(--serif)}
 .article h2{font-size:1.3em; margin:1.7em 0 .6em; padding-bottom:.35em; border-bottom:1px solid var(--line); font-weight:600}
 .article h3{font-size:1.1em; margin:1.5em 0 .4em; font-weight:600}
@@ -1068,10 +1068,68 @@ button:active, .player-launch:active, .search-fab:active{transform:scale(.95)}
 
 /* 欢迎页 */
 .welcome{text-align:center; padding:2.4rem 1rem 2rem; border-bottom:1px solid var(--line); margin-bottom:1.6rem}
+/* 首页专属：hero 已用 position:absolute 脱离文档流、并挂在 .layout 下（见 .welcome-hero 注释），
+   .welcome 必须把 hero 占的高度让出来，否则标题会横跨在图片上（实测：深红标题压深红图读不出）。
+
+   padding-top 用 JS 实测的 --hero-gap，而不是「heroH − 常量」——
+   因为 hero 与 .welcome 的**起点不同**（hero 从 .layout 顶起算，.welcome 从 .content 的
+   padding-top 之后起算，实测偏移 32 / 35 / 42px 随断点变化），任何固定常量都会在某断点失准。
+   --hero-gap = (hero 底边 − .welcome 顶边) + 8px 安全余量，是与断点无关的充要量。
+   回退值（JS 未执行时）按 21:9 近似，避免首帧跳动。
+   ⚠️ 窄屏断点在「移动端」段另行覆盖（竖幅 4:5）。 */
+.layout:has(> .welcome-hero) .welcome{
+  padding-top:var(--hero-gap, calc(100vw * 9 / 21));
+  min-height:var(--hero-gap, calc(100vw * 9 / 21))}
 /* 首页面包屑只有「主页」一词，全端隐藏 */
 .crumb-home{display:none}
-/* 首页 hero 轮播：全出血铺到视口两边，高度占上 1/3 屏；负 margin 抵消 content(2.6rem)+welcome(2.4rem) 顶距，图片直接顶到顶栏；桌面端左溢出部分被不透明侧栏（z-index:6）遮住 */
-.welcome-hero{position:relative; width:100vw; max-width:none; aspect-ratio:21/9; height:auto; margin:-5rem calc(50% - 50vw) 1.3rem; border-radius:0; overflow:hidden; touch-action:pan-y; background:var(--surface)}
+/* ============ 首页 hero 轮播 · 全出血布局（2026-10-01 定案） ============
+   需求：hero 左右铺满视口（全出血），21:9 横幅，图片顶到顶栏。
+
+   【真根因 · 排查四轮才定位，别再走「换 margin 写法」这条死路】
+   表面上像「50% 取包含块、50vw 取视口」的基准不匹配。做了两组探针实验：
+     ① 在 .welcome 内注入探针测基准 → 50% = 包含块 820 的一半 = 410 ✅
+     ② 注入 width:100vw 探针        → 实测宽度 **820**，不是 1280 ❌
+   ⇒ **元凶是全局重置 `*{max-width:100%}`**：它把任何元素的 max-width 钉死在包含块宽度上，
+      `width:100vw` 写多少都会被**静默砍回 820**。凡依赖「元素比包含块更宽」的写法
+      （100vw+负 margin / calc(100%+N) / left·right 负值外扩）**全部失效**，
+      且失效表现各不相同（被砍宽、或被砍宽后仍左锚定），造成「越改越乱」的假象。
+   ⇒ 第一要务＝给 hero 一个 **max-width 逃逸口**：本规则里的 `max-width:100vw !important`
+      （必须 `!important` 才能压过 `*` 选择器的 `max-width:100%`）。
+
+   【第二根因 · 包含块不等于视口宽】
+   即便宽度逃逸成功，hero 原包含块是 `.welcome` padding 盒（676px），
+   其 `50%`(338px) 与 `50vw`(640px) 不等 ⇒ 水平位置仍偏。
+   而在 .welcome 这一层**算不出**「自身中线到视口中线」的距离（取决于 .content 的 max-width、
+   4 个断点各自覆盖的 padding、及 .welcome 的 1rem padding）。
+   ⇒ 定案：**JS 把 hero 移到 `.layout` 直下**。`.layout` 是 flex 容器、宽度＝视口宽，
+     其包含块的 `50%` 与 `50vw` 恒等 ⇒ hero 只需 `left:0; width:100vw` 即精确全出血，
+     四个断点全部自适应、零特判。JS 仅在渲染后移动一次父节点，**不参与布局计算**。
+
+   【高度】hero 宽度由 vw 决定、运行时才可知，故不能用 `aspect-ratio`（实测：绝对定位 +
+   aspect-ratio + width:auto 会触发「由高度反推宽度」的消解顺序，把 left/right 拉伸降级，
+   盒子塌成 360px）。改为直接给 `height:calc(100vw * 9 / 21)`，JS 再把实测高度写回 `--hero-h`，
+   `.welcome` 用 min-height 占位（见 .welcome 规则）。
+
+   【层级 & 插入位置】hero 绝对定位后脱离文档流，**必须**：
+     ① 用 `insertBefore(box, layout.firstChild)` 插到 `.layout` **首位**（用 appendChild 会排到
+        侧栏与正文之后，实测直接盖住导航栏与「最近更新」列表）；
+     ② `z-index:0`，低于侧栏(6)与正文内容，杜绝遮挡。
+   【历史写法】`width:100vw + margin:calc(50% - 50vw)` 实测 1280：scrollWidth=1752，右溢 472px。
+
+   ⚠️ 修改本规则时务必确认大括号闭合——曾因少一个 `}` 导致后续全部 CSS 失效（导航与正文错乱）。 */
+.welcome-hero{position:absolute; top:0; left:50%; margin-left:-50vw;
+  width:100vw; min-width:100vw; max-width:100vw !important;
+  height:calc(100vw * 9 / 21); aspect-ratio:auto;
+  border-radius:0; overflow:hidden; touch-action:pan-y; background:var(--surface);
+  z-index:0}
+/* 定位基准说明：`.layout` 在窄屏有 `padding:0 16px`（见「移动端」段），
+   若用 left:0 会从 padding box 左内边距处起算 → 实测 375 视口 hero 右边界 391（右溢 16px）。
+   改用 left:50% + margin-left:-50vw：`.layout` 的 50% 恒等于视口中线（其宽度=视口宽），
+   再左移半个视口宽，即精确贴视口左边缘，与 .layout 的 padding 无关。
+   该写法成立的前提＝hero 的包含块是 `.layout`（宽度＝视口宽），故必须由 JS 挂在 .layout 下，见注释。 */
+/* 替换元素（img）在 width:auto 下会按图片固有比例收缩、无视 left/right 拉伸，
+   故把子元素显式撑满盒子（inset:0 + width/height:100% 已在下方 .hc-slide 规则里）。 */
+.welcome-hero > .hc-slide{position:absolute; inset:0; width:100%; height:100%}
 .welcome-hero .hc-slide{position:absolute; inset:0; width:100%; height:100%; object-fit:contain; opacity:0; transition:opacity 1s ease}
 .welcome-hero .hc-m,.welcome-hero .hc-dots-m{display:none}
 @media(max-width:768px){.welcome-hero .hc-d,.hc-dots-d{display:none}.welcome-hero .hc-m{display:block}.welcome-hero .hc-dots-m{display:flex}}
@@ -1079,7 +1137,11 @@ button:active, .player-launch:active, .search-fab:active{transform:scale(.95)}
 .welcome-hero .hc-dots{position:absolute; bottom:10px; left:50%; transform:translateX(-50%); display:flex; gap:8px; z-index:2}
 .welcome-hero .hc-dot{width:8px; height:8px; border-radius:50%; background:rgba(255,255,255,.45); transition:background .3s}
 .welcome-hero .hc-dot.active{background:#fff}
-.welcome .big{font-size:2.2em; color:var(--accent); font-weight:700; margin-bottom:.6rem; letter-spacing:.12em}
+/* 首页大标题。line-height 必须显式收紧：body 的 line-height:1.9 会让行盒比字面高 0.9em，
+   其中上半部约 0.45em（2.2em 字号下≈16px）向上溢出 padding 区，压到 hero 图片上（实测重叠 18~27px）。
+   收紧到 1.25 后溢出量降到 ~4px，配合 .welcome 的 +1.3rem 留白即完全脱离图片。 */
+.welcome .big{font-size:2.2em; color:var(--accent); font-weight:700; margin-bottom:.6rem;
+  letter-spacing:.12em; line-height:1.25}
 .welcome .welcome-sub{display:flex; align-items:center; justify-content:center; gap:.9rem; color:var(--ink-faint); font-size:.95em}
 .welcome .ws-line{display:inline-block; width:3.2em; height:1px; background:var(--line-strong)}
 
@@ -1350,7 +1412,13 @@ button:active, .player-launch:active, .search-fab:active{transform:scale(.95)}
   .content{padding:1.1rem 1.1rem 9rem}
   /* 首页 welcome 紧凑化：标题由顶栏品牌栏承担（welcome .big 移动端隐藏避免重复），「龙钦宁提资料库」保持小字副标题 */
   .welcome{padding:.95rem .9rem .9rem; margin-bottom:.9rem}
-  .welcome-hero{margin:-3.05rem calc(50% - 50vw) .8rem; aspect-ratio:4/5; height:auto}
+  /* 首页 hero 窄屏改竖幅 4:5 以匹配手机专用竖图（carousel-m*，1120x1366）。
+     全出血仍由 position:absolute 承担，只是高度比例随断点变化，见 .welcome-hero 主规则注释。
+     --hero-h 由 JS 实测回写（同样按 4:5 算），--hero-pull 在窄屏为 3.05rem（与旧负 margin 一致），
+     故此处只需给未拿到 JS 变量时的回退公式。 */
+  .welcome-hero{height:calc(100vw * 5 / 4)}
+  .layout:has(> .welcome-hero) .welcome{padding-top:var(--hero-gap, calc(100vw * 5 / 4));
+    min-height:var(--hero-gap, calc(100vw * 5 / 4))}
   .welcome .big{display:none}
   .player{height:auto; min-height:0; max-height:62vh}
   .player.pl-open{max-height:80vh}
@@ -2523,6 +2591,42 @@ function initHeroCarousel(){
   var box = document.getElementById('heroCarousel');
   if (!box) return;
   if (box._timer) clearInterval(box._timer);
+  // 全出血布局：把 hero 从 .welcome 移到 .layout 直下（见 .welcome-hero 注释）。
+  // 关键：.layout 是 flex 容器、宽度＝视口宽 ⇒ 其包含块的 50% 与 50vw 完全等价，
+  // hero 用 left:0 + width:100vw 即可精确全出血，不再有「内容区居中边距」造成的偏移。
+  (function reparentHero(){
+    var layout = document.querySelector('.layout');
+    var content = document.querySelector('.content');
+    if (!layout || box.parentElement === layout) return;
+    // 必须插到 .layout 的**第一个**子节点位置：hero 是绝对定位、
+    // 若用 appendChild 会排在 .sidebar / .content 之后，把两者都盖住（实测导航栏与正文被大图遮）。
+    layout.insertBefore(box, layout.firstChild);
+    // 实测高度写回 --hero-h，供 .welcome 顶部留白使用（hero 已脱离文档流，父级无法预知其高度）。
+    // ⚠️ padding-top 不能只用 heroH − 常量：hero 从 .layout 顶起算、.welcome 从 .content 的
+    //   padding-top 之后起算，起点偏移随断点变化（实测 32~42px），固定常量必在某断点失准。
+    //   故用「hero 底边到 .layout 顶边的绝对距离」作为 padding-top 基准（不随自身 padding 变化，无循环依赖）：
+    //     padding-top = heroBottom(layout 坐标) + 安全余量 8px − .content 的 padding-top
+    var welcome = document.querySelector('.welcome');
+    var content = document.querySelector('.content');
+    var applyH = function(){
+      var hb = box.getBoundingClientRect();
+      if (hb.height > 0 && welcome && content){
+        welcome.style.setProperty('--hero-h', hb.height + 'px');
+        var layoutTop = document.querySelector('.layout').getBoundingClientRect().top;
+        var contentPadTop = parseFloat(getComputedStyle(content).paddingTop) || 0;
+        var gap = Math.max(0, Math.round(hb.bottom - layoutTop - contentPadTop + 8));
+        welcome.style.setProperty('--hero-gap', gap + 'px');
+      }
+    };
+    applyH();
+    // 2026-10-01：会话内重复进出首页时，旧 box 会被 #content.innerHTML 替换销毁，
+    // 而每次回首页都会新建 box 并再注册一份监听 ⇒ resize 回调里累积若干「指向已销毁元素」的闭包。
+    // 最小修法：回调内先按 box 身份守卫（box.isConnected 为 false 即跳过），不再往 window 上塞单例状态。
+    // （不改成「全局单例 RO」：那会引入跨页面共享状态、增加新风险，收益仅是一次多余的 getBoundingClientRect。）
+    var guard = function(){ if (box.isConnected) applyH(); };
+    if (window.ResizeObserver){ new ResizeObserver(guard).observe(box); }
+    window.addEventListener('resize', guard, {passive:true});
+  })();
   var mq = window.matchMedia('(max-width:768px)');
   var sets = { d: Array.prototype.slice.call(box.querySelectorAll('.hc-slide.hc-d')),
                m: Array.prototype.slice.call(box.querySelectorAll('.hc-slide.hc-m')) };
@@ -2562,6 +2666,20 @@ function show(slug){
   }
   pageViewSlug = slug;
   pageViewStartTime = now;
+  // 2026-10-01 修 P0-2 引入的回归（**唯一正确位置＝本函数开头**）：
+  // hero 由 reparentHero() 移到 .layout 直下（.content 的兄弟），而各渲染分支只替换 #content 的 innerHTML
+  // ⇒ 切到非首页时 hero 不随之销毁，会以 z-index:0 / opacity:1 覆盖整个首屏
+  // （实测：日历页、分类页均被首页大图盖住，rect = 视口宽 × 469）。
+  // 改前 hero 在 .welcome（#content 内部），随 innerHTML 一起销毁，故无此问题。
+  // ⚠️ 不能只加在 renderPage()：日历页在 show() 内提前分支并 return，根本走不到 renderPage
+  //   （首版补丁就踩了这个坑——探针复验仍见残留，属铁律 8「验证脚本会骗人」的反向用法：
+  //    脚本没骗人，是我改错了地方）。
+  // 故在此处统一清理：任何非首页进入前先摘掉 .layout 直下的 hero；
+  // 回首页时 inner 里本就含 hero HTML，由 innerHTML 重建并经 initHeroCarousel() 重新挂载。
+  if (slug !== 'index'){
+    var staleHero = document.querySelector('.layout > #heroCarousel');
+    if (staleHero && staleHero.parentElement) staleHero.parentElement.removeChild(staleHero);
+  }
   var p = bySlug[slug];
   if (slug === '__calendar'){
     // 「修行日历」功能页（2026-09-18 新增「藏历查询」；2026-09-20 更名并升级为多日历图层叠加）
@@ -6344,9 +6462,12 @@ ZANGLI_CSS_BODY = r"""
 .cal-fest-name{display:inline-block;background:var(--accent);color:#fff;border-radius:6px;padding:.12rem .55rem;margin-right:.45rem;font-weight:600}
 .cal-fest-name-lun{background:#2f6f8a}
 .cal-fest-name-bud{background:#c2571a}
-/* 佛历（2026-09-25 新增）：大卡第四行＝佛涅槃纪年；月历标题里的 .cal-be 同色 */
-.cal-fob{font-size:.95rem;font-weight:600;color:#b8860b;margin:.2rem 0 0}
-.cal-be{color:#b8860b;font-weight:400;font-size:.82em;margin-left:.15rem}
+/* 佛历（2026-09-25 新增）：大卡第四行＝佛涅槃纪年；月历标题里的 .cal-be 同色。
+   2026-10-01 修对比度：原硬编码 #b8860b 在浅底实测 2.85~3.20（不达 WCAG AA 4.5），
+   改用主题感知变量 --gold-deep（浅色 #8a6320 → 4.73~5.32 ✅ / 深色 #b88830 → 5.65 ✅），零新增变量。
+   ⚠️ 独立页 /calendar.html 的 :root 原本没有此变量，已在 STANDALONE_Z_HEAD 里补齐（见该处注释）。 */
+.cal-fob{font-size:.95rem;font-weight:600;color:var(--gold-deep);margin:.2rem 0 0}
+.cal-be{color:var(--gold-deep);font-weight:400;font-size:.82em;margin-left:.15rem}
 .cal-fchip{display:inline-block;border-radius:6px;padding:.14rem .55rem;margin:.25rem .45rem 0 0;font-size:.88rem;font-weight:600}
 .cal-fchip-off{background:#7a5aa6;color:#fff}
 .cal-fchip-work{background:#ded2ec;color:#3d2a55}
@@ -6360,7 +6481,9 @@ ZANGLI_CSS_BODY = r"""
 .cal-week div{text-align:center;font-size:.78em;color:var(--ink-soft);padding:.3rem 0}
 .cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;align-items:stretch}
 .cal-grid>div{min-height:0}
-.cal-cell{display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding:.25rem 1px;border-radius:8px;cursor:pointer;line-height:1.25;text-align:center;height:100%;overflow-wrap:break-word;word-break:break-word;position:relative}
+/* 2026-10-01 修 P0-1：原仅 height:100%，窄屏实测 44x35（高不足 44）。
+   加 min-height:44px 保证触摸目标；桌面格内空间充裕，不受影响。 */
+.cal-cell{display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding:.25rem 1px;border-radius:8px;cursor:pointer;line-height:1.25;text-align:center;height:100%;min-height:44px;overflow-wrap:break-word;word-break:break-word;position:relative}
 .cal-empty{}
 .cal-hairdot{position:absolute;top:3px;right:4px;width:6px;height:6px;border-radius:50%;background:var(--accent)}
 .zl-badge{display:inline-block;font-size:.62em;line-height:1.15;padding:0 2px;margin-right:2px;border-radius:3px;font-weight:600;vertical-align:.08em}
@@ -6378,7 +6501,8 @@ ZANGLI_CSS_BODY = r"""
 .zl-dot-t{background:var(--accent)}
 .zl-dot-l{background:#2f6f8a}
 .zl-dot-h{background:#7a5aa6}
-.cal-cell-f{display:block;font-size:.62em;color:#b08d2f;line-height:1.2;overflow-wrap:anywhere;max-width:100%}
+/* 2026-10-01 修对比度：原 #b08d2f 在浅底实测 2.74~3.08（不达 AA），改用 --gold-deep（同 .cal-fob） */
+.cal-cell-f{display:block;font-size:.62em;color:var(--gold-deep);line-height:1.2;overflow-wrap:anywhere;max-width:100%}
 .cal-cell-fp{display:block;font-size:.62em;color:#2f6f8a;line-height:1.2;overflow-wrap:anywhere;max-width:100%}
 /* 2026-09-25（小谦指示，同日第二轮改橘）：格内汉传佛教节日名（深橘 #c2571a，佛节图层）——藏历金/农历靛/佛节橘三种分明 */
 .cal-cell-fb{display:block;font-size:.62em;color:#c2571a;line-height:1.2;overflow-wrap:anywhere;max-width:100%}
@@ -6407,7 +6531,12 @@ ZANGLI_CSS_BODY = r"""
 .cal-querybar input[type=date]{padding:.5rem .7rem;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--ink);font-family:inherit;max-width:42vw}
 .cal-querybar button{padding:.5rem .9rem;border:1px solid var(--accent);background:var(--accent);color:#fff;border-radius:8px;cursor:pointer;font-family:inherit}
 .zl-layers{display:flex;flex-wrap:wrap;gap:.5rem;align-items:center;margin:.95rem 0 .1rem}
-.zl-chip{display:inline-flex;align-items:center;justify-content:center;gap:.42rem;border:1px solid var(--line);background:var(--surface);color:var(--ink-soft);border-radius:999px;padding:.42rem .85rem;font-family:inherit;font-size:.86rem;line-height:1;cursor:pointer;white-space:nowrap}
+/* 2026-10-01 修 P0-1（全宽度段）：原规则无 min-height，实测高度＝padding .42rem×2 + 13.76px 行高 ≈ 27px，
+   低于 WCAG 2.5.5 触摸目标 44px。**修复必须落在基础规则**——先前只改 @media(max-width:600px)，
+   导致 601~768（走 6543 那条窄屏覆盖）与 >768（走本规则）仍是 27px，等于同一缺陷只修了最小的一段
+   （铁律 9「门禁假绿＝扫描根太窄」：探针只扫 320~414 就看不见 768 的 FAIL）。
+   min-height/min-width 提到此处后对全部断点生效；窄屏只覆盖字号与内边距，不再重复声明尺寸。 */
+.zl-chip{display:inline-flex;align-items:center;justify-content:center;gap:.42rem;border:1px solid var(--line);background:var(--surface);color:var(--ink-soft);border-radius:999px;padding:.42rem .85rem;font-family:inherit;font-size:.86rem;line-height:1;cursor:pointer;white-space:nowrap;min-height:44px;min-width:44px}
 .zl-chip-on{color:#fff;font-weight:600;border-color:transparent}
 /* 2026-09-22（小谦指示）：阳历为「基准层」，永不可关（始终显示）。
    此前它与三颗真开关是**同款胶囊**（仅加 cursor:default + opacity:.9），
@@ -6418,23 +6547,81 @@ ZANGLI_CSS_BODY = r"""
      · 2026-09-25 起全站开关去方块（文字居中、选中整底变色），基准层同样无方块
      · 次级文字色 + cursor:default，且语义上仍是非交互的 <span>
    「始终显示」四个字由 .zl-base-tag 以细分隔线承接，替代原「（常显）」。 */
-.zl-chip-base{display:inline-flex;align-items:center;gap:.42rem;border:1px dashed var(--line);background:transparent;color:var(--ink-soft);border-radius:999px;padding:.42rem .72rem;font-family:inherit;font-size:.86rem;line-height:1;white-space:nowrap;cursor:default}
+.zl-chip-base{display:inline-flex;align-items:center;gap:.42rem;border:1px dashed var(--line);background:transparent;color:var(--ink-soft);border-radius:999px;padding:.42rem .72rem;font-family:inherit;font-size:.86rem;line-height:1;white-space:nowrap;cursor:default;min-height:44px}
 .zl-base-tag{font-size:.78em;opacity:.8;border-left:1px solid var(--line);padding-left:.4rem;letter-spacing:.02em}
 .zl-chip[data-layer=t].zl-chip-on{background:var(--accent)}
-.zl-chip[data-layer=b].zl-chip-on{background:#b8860b}
+/* 2026-10-01 修对比度：原 #b8860b + 白字实测 3.25（不达 AA 4.5）。
+   改用**固定值 #8a6320**（不用 --gold-deep 变量）：该变量在暗色主题下是亮金 #b88830，
+   配白字仅 3.18 反而不达标；而 chip 是「实心色块 + 白字」的独立视觉单元，
+   与同排另四颗（#8a1f1c / #2f6f8a / #c2571a / #7a5aa6）一样用固定色，
+   白字对比在两种主题下均为 5.40 ✅，且与金色文字 --gold-deep 同色系。 */
+.zl-chip[data-layer=b].zl-chip-on{background:#8a6320}
 .zl-chip[data-layer=l].zl-chip-on{background:#2f6f8a}
 .zl-chip[data-layer=f].zl-chip-on{background:#c2571a}
 .zl-chip[data-layer=h].zl-chip-on{background:#7a5aa6}
-.zl-tip{color:var(--ink-soft);font-size:.78rem;margin:.45rem 0 .1rem;line-height:1.65}
+/* 2026-10-01 修 P0-1：原 .78rem(12.48px) 略低于 13px 舒适线，提到 .8125rem(13px) */
+.zl-tip{color:var(--ink-soft);font-size:.8125rem;margin:.45rem 0 .1rem;line-height:1.65}
 .cal-qr{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:1rem;margin-top:1.1rem;text-align:center}
 .cal-qrbox{display:inline-block;margin:.4rem 0}
 .cal-qrhint{color:var(--ink-soft);font-size:.8rem;line-height:1.7;overflow-wrap:anywhere}
-@media(max-width:768px){.cal-cell{padding:.18rem 1px}.cal-cell-g{font-size:.72em}.cal-cell-t{font-size:.78em}.cal-cell-n{font-size:.68em}.cal-cell-f,.cal-cell-fb,.cal-cell-fp{display:none}/* 2026-09-25 第五轮：.cal-cell-fh（紫底白字放假带）不再隐藏，窄屏也显示（原先手机端看不到是哪个节） */.cal-today{padding:.9rem .9rem}.cal-tib{font-size:1.12rem}.cal-lun{font-size:1rem}.cal-fest{font-size:.95rem}.cal-card{padding:.7rem}.zl-chip{padding:.38rem .7rem;font-size:.8rem}.zl-chip-base{padding:.38rem .62rem;font-size:.8rem}.zl-badge{font-size:.46em}.zl-dot{width:3px;height:3px}.cal-cell-r{gap:2px}}
+@media(max-width:768px){.cal-cell{padding:.18rem 1px}.cal-cell-g{font-size:.72em}.cal-cell-t{font-size:.78em}.cal-cell-n{font-size:.68em}.cal-cell-f,.cal-cell-fb,.cal-cell-fp{display:none}/* 2026-09-25 第五轮：.cal-cell-fh（紫底白字放假带）不再隐藏，窄屏也显示（原先手机端看不到是哪个节） */.cal-today{padding:.9rem .9rem}.cal-tib{font-size:1.12rem}.cal-lun{font-size:1rem}.cal-fest{font-size:.95rem}.cal-card{padding:.7rem}/* 2026-10-01 修 P0-1：字号由 .8rem(12.8px) 提到 .8125rem(13px)，与 ≤600px 段统一；尺寸(min-height/min-width)已由基础规则继承，此处不再声明 */.zl-chip{padding:.38rem .7rem;font-size:.8125rem}.zl-chip-base{padding:.38rem .62rem;font-size:.8125rem}.zl-badge{font-size:.46em}.zl-dot{width:3px;height:3px}.cal-cell-r{gap:2px}}
 /* 2026-09-22（小谦指示 · 方案 B）：窄屏隐藏格子内的节日名（.cal-cell-f 藏历金 / .cal-cell-fp 农历靛蓝）。
    沿革：此前用 font-size:.54em 硬压 —— 320px 下实测仅 9.72px（不可读），
    而渲染门禁量的是**几何**、不量**字号**，照样报「0 问题」（教训：不溢出 ≠ 可读）。
    改为 display:none 后，节日信息由「大卡」（.cal-today / .cal-fest）完整承载；
    格子内仍保留：阳历日 + 藏历日（荟供日红字加粗）+ 农历日 + 休/班角标 + 理发红点。 */
+/* ===========================================================================
+   日历待办（2026-10-05 · 小谦指示「给日历加待办，注册用户可记自己的事」）
+   ---------------------------------------------------------------------------
+   定稿口径（小谦逐条确认）：
+     · 独立页 /calendar.html **不显示**待办（选 A）→ 公开页保持纯净。
+     · 只要「日期+文字」，无时刻、无提醒。
+     · **登录才能写**，设备免密只读（与功课同口径）。
+   ---------------------------------------------------------------------------
+   格内待办标记：**绝对定位**在格子右上角，**绝不新增一行**。
+     原因：.cal-cell 已是 flex column 且内有 4 层内容（阳历日/藏历日/农历日/节日名），
+     min-height 刚补到 44px；再加第 5 行会把格子撑高，破坏 2026-10-01 刚做好的
+     七列网格（实测格宽 43.8px，加行必破）。.cal-cell 已有 position:relative。
+     位置避让：理发红点 .cal-hairdot 已占右上角 → 待办点下移一格（top:12px），
+     与理发红点（top:约 4px）同列不同高，视觉不叠、几何不压。
+   =========================================================================== */
+.cal-todotip{position:absolute;top:13px;right:3px;width:5px;height:5px;border-radius:50%;background:#c2571a;pointer-events:none}
+.cal-todotip.cal-todotip-all{background:transparent;box-shadow:inset 0 0 0 1.2px #c2571a}
+/* 有待办的格子：日期行让出右侧一列（用 margin 不用 padding，避免盒子伸到点下方） */
+.cal-cell-todo .cal-cell-g{margin-right:8px}
+/* ---- 待办面板（选中日，位于月历下方） ---- */
+.cal-todo{margin:1rem 0 .2rem;border:1px solid var(--line);border-radius:12px;background:var(--surface);overflow:hidden}
+/* 2026-10-05：登录判据用 .cal-todo-login 态显示（未登录不发起任何请求） */
+.cal-todo-hd{display:flex;align-items:center;gap:.5rem;padding:.7rem .9rem;border-bottom:1px solid var(--line);background:var(--surface-soft)}
+.cal-todo-hd b{font-size:.95rem;font-weight:700;color:var(--ink)}
+.cal-todo-hd span{font-size:.8125rem;color:var(--ink-soft);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cal-todo-add{display:flex;gap:.5rem;padding:.7rem .9rem;border-bottom:1px solid var(--line)}
+.cal-todo-add input[type=text]{flex:1;min-width:0;min-height:44px;padding:.5rem .7rem;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);font-family:inherit;font-size:.9rem}
+/* 「添加」按钮：与 .cal-querybar button 同款视觉，尺寸补到 44px（2026-10-01 触摸标准） */
+.cal-todo-add button{min-height:44px;min-width:64px;padding:0 .9rem;border:1px solid var(--accent);background:var(--accent);color:#fff;border-radius:8px;cursor:pointer;font-family:inherit;font-size:.9rem}
+.cal-todo-add button:disabled{opacity:.55;cursor:default}
+.cal-todo-list{margin:0;padding:0;list-style:none}
+.cal-todo-list li{display:flex;align-items:flex-start;gap:.6rem;padding:.55rem .9rem;border-bottom:1px solid var(--line)}
+.cal-todo-list li:last-child{border-bottom:0}
+/* 勾选框：直接用原生 checkbox 放大到 44px 触摸区（.td-chk 包裹层负责命中区） */
+.cal-todo-chk{position:relative;flex:none;width:44px;height:44px;margin:-11px 0 -11px -6px;cursor:pointer}
+.cal-todo-chk input{position:absolute;inset:50% auto auto 50%;transform:translate(-50%,-50%);width:22px;height:22px;margin:0;cursor:pointer}
+.cal-todo-txt{flex:1;min-width:0;font-size:.9rem;line-height:1.6;color:var(--ink);overflow-wrap:anywhere}
+.cal-todo-done .cal-todo-txt{text-decoration:line-through;color:var(--ink-faint)}
+/* 删除：44×44 命中区（视觉上只显一个 ×），不额外占列宽 */
+.cal-todo-del{flex:none;width:44px;height:44px;margin:-11px -6px -11px 0;border:0;background:transparent;color:var(--ink-faint);font-size:1.1rem;line-height:1;cursor:pointer;border-radius:8px;font-family:inherit}
+.cal-todo-del:hover{background:var(--surface-soft);color:var(--accent)}
+/* 空态 / 未登录态 / 提示条 */
+.cal-todo-empty,.cal-todo-login{padding:.85rem .9rem;font-size:.8125rem;color:var(--ink-soft);line-height:1.65}
+.cal-todo-msg{padding:.55rem .9rem;font-size:.8125rem;background:var(--surface-soft);color:var(--ink-soft);border-top:1px solid var(--line);line-height:1.6}
+.cal-todo-msg.cal-todo-msg-err{color:var(--accent-deep)}
+/* 2026-10-05：窄屏下格内待办点更小一号（43.8px 宽格子已很挤），但**不禁示**——
+   标了但看不见等于没有，故仅缩到 4px。 */
+@media(max-width:600px){
+.cal-todotip{width:4px;height:4px;top:12px;right:2px}
+.cal-todo-hd{flex-wrap:wrap}
+.cal-todo-hd span{flex:1 1 100%;white-space:normal}
+}
 /* 2026-09-20：窄屏月历头部另起一行，避免「（点任一天查询）」被拦腰折断 */
 @media(max-width:600px){
 .cal-card-head{flex-wrap:wrap}
@@ -6447,17 +6634,35 @@ ZANGLI_CSS_BODY = r"""
    这样元素自身的盒子不会伸到红点下方，视觉与几何都干净） */
 .cal-cell-hair .cal-cell-g{margin-right:9px}
 /* 2026-09-25 第四轮（小谦指示）：手机端六颗压缩为一行。
-   实测：320 容器 288px——基准「阳历」＋五颗（藏历/佛历/佛节/农历/法定节假日），
-   隐藏 .zl-base-tag「始终显示」后，.66rem 字号＋紧凑内边距合计约 250px，一行放得下。
+   2026-10-01 第五轮（P0-1 无障碍修复）：实测「一行」并不需要把字号压到 10.56px——
+   13px + min-height:44 下五颗真开关合计约 250px，320 视口（288px 容器）仍单行放得下。
+   故本轮把字号/触摸目标补回合格，保留单行与 nowrap 语义（小谦要求不变）。
    flex + nowrap 显式单行（不用 wrap 自动换行——换行点会随机型宽度漂移）；
-   overflow-x:auto 仅作跨浏览器字宽异常时的兜底，正常视口不出滚动条。
+   ⚠️ overflow-x:auto 兜底**在 320 极窄视口确实会用到**（不是纯理论兜底）：
+   2026-10-01 实测 320 视口逐颗宽度＝基准标签 40.2 + 四颗真开关 44×4 + 「法定节假日」77.9
+   ＝ 294.1px，加 5×3.2px gap ＝ 310.1px（与容器 scrollWidth 310 精确吻合），
+   容器可用仅 288px ⇒ 超 22.1px。差额几乎全部来自「法定节假日」四个字（比同类多 34px）。
+   要消除需二选一：① 文案缩为「节假日」（省约 40px，够用，但**属产品决策、须小谦定**）；
+   ② 五颗真开关压到 40px（只省 16px 仍不够，且直接违背本次 44px 触摸目标修复目的）⇒ 不采纳。
+   故 320 维持兜底（页面级 body.scrollWidth 仍 = 320，无页面横滚）；360 及以上完全无滚动。
+   验证脚本 check_cal_chip_oneline.py 已把 320 的容器滚动显式标注「已知兜底」，不静默通过。
    沿革：2026-09-22 四颗（一行 4 列/≤374px 2×2）→ 2026-09-25 六颗 3×2＋2×3 降级
-   → 本轮应小谦指示压回一行，≤374px 降级块随之删除。
+   → 2026-09-25 压回一行（过度压缩，字号掉到 10.56）→ 2026-10-01 补回 13px/44px 仍单行。
    标签语义仍由 role=group + aria-describedby="zLayersTip" 承担（约定不变）。 */
-.zl-layers{display:flex;flex-wrap:nowrap;justify-content:space-between;gap:.25rem;align-items:center;overflow-x:auto}
-/* white-space:nowrap 保留——宁可整体微溢出滚动也不折字；min-width:0 配合 flex:none */
-.zl-chip{justify-content:center;padding:.34rem .26rem;font-size:.66rem;min-width:0;flex:none;white-space:nowrap}
-.zl-chip-base{justify-content:center;padding:.34rem .3rem;font-size:.66rem;min-width:0;flex:none;white-space:nowrap}
+.zl-layers{display:flex;flex-wrap:nowrap;justify-content:space-between;gap:.2rem;align-items:center;overflow-x:auto}
+/* white-space:nowrap 保留——宁可整体微溢出滚动也不折字；min-width:0 配合 flex:none
+   2026-10-01 修 P0-1：原 `.66rem`(10.56px) + padding .34rem/.26rem 使 chip 仅 31x23px，
+   既低于触摸目标 44px、字号也低于可读下限（实测 6 颗里 5 颗不合格）。
+   实测重排：13px 字号 + min-height:44 + 紧凑内边距，五颗真开关合计约 250px，
+   在 320 视口的 288px 容器内**仍可单行**（原先压到 10.56px 属过度压缩，无需付此代价）。
+   ⚠️ 尺寸（min-height/min-width:44）**已上提到 .zl-chip / .zl-chip-base 基础规则**，
+   此处只覆盖字号与内边距——否则 601~768 与 >768 会漏修（见基础规则注释）。
+   .zl-chip-base（「阳历·始终显示」，不可点的静态标签）同步加高以对齐基线，
+   其文字「始终显示」仍由 .zl-base-tag 隐藏，不占宽度。
+   注：.zl-chip-base 是 cursor:default 的静态 <span>，**不受 WCAG 2.5.5 触摸目标约束**，
+   故窄屏给 min-width:0（只保证高度对齐），探针亦按「交互/静态」分组判定。 */
+.zl-chip{justify-content:center;padding:0 .34rem;font-size:.8125rem;flex:none;white-space:nowrap}
+.zl-chip-base{justify-content:center;padding:0 .38rem;font-size:.8125rem;min-width:0;flex:none;white-space:nowrap}
 .zl-base-tag{display:none}
 }
 """
@@ -6474,6 +6679,11 @@ ZANGLI_BODY_HTML = """
 <div class="zl-layers" id="zLayers" role="group" aria-label="显示哪些日历" aria-describedby="zLayersTip"></div>
 <p class="zl-tip" id="zLayersTip">阳历为基准层、始终显示；藏历、佛历、佛节、农历、法定节假日五层可自由叠加——藏历、佛历与佛节默认打开，农历与法定节假日按需打开。</p>
 <div id="calMain"></div>
+<!-- 2026-10-05 待办面板：小谦指示「给日历加待办，注册用户可记自己的事」。
+     位置＝月历正下方、说明之前（每天第一眼能看到，不被图例压到页面底部）。
+     独立页 /calendar.html 不显示（选 A）——由 todoEnabled() 判空并整块移除。
+     容器默认空，由 JS 渲染；未登录时 JS 填 .cal-todo-login 提示行，不发任何请求。 -->
+<div id="calTodo"></div>
 <div class="cal-legend">
 <h3>关于本页</h3>
 <ul>
@@ -6486,7 +6696,13 @@ ZANGLI_BODY_HTML = """
 <ul>
 <li><span class="zl-key" style="background:var(--accent)"></span>红框＝今天。</li>
 <li><span class="zl-key" style="background:#f1e9db;border:1px solid var(--accent)"></span>灰底＝当前选中的日子。</li>
-<li><span class="zl-key" style="background:#b08d2f"></span>金色小字＝藏历节日名；靛蓝小字＝农历传统节日名。</li>
+<li id="zTodoLegendHost" hidden></li>
+<!-- 2026-10-05 待办图例说明**不写在 HTML 里**：ZANGLI_BODY_HTML 是主站与独立页 /calendar.html
+     的**同源** HTML，写死在此 ⇒ 独立页（选 A，不提供待办）也会出现「有我的待办」这句私人功能说明。
+     故只留一个空的锚点 <li id="zTodoLegendHost" hidden>，由 JS 在 _zTodoEnabled() 为真时
+     把真正的说明插到它后面（见 _zTodoInsertLegend）。
+     独立页既无面板也无图例 ⇒ 与改动前完全一致（公开页零差异）。 -->
+<li><span class="zl-key" style="background:var(--gold-deep)"></span>金色小字＝藏历节日名；靛蓝小字＝农历传统节日名。</li>
 <li><span class="zl-key" style="background:#c2571a"></span>橙色小字＝汉传佛教节日（佛节图层）。</li>
 <li>点月历里任意一天，即在上方大卡中查看该日详情。</li>
 </ul>
@@ -6497,9 +6713,9 @@ ZANGLI_BODY_HTML = """
 <li><span class="zl-key" style="background:var(--accent);border-radius:50%"></span>右上角红点＝理发吉祥日，含藏历日序吉日与「八吉同聚」日。</li>
 <li>大卡中显示该日理发的吉凶与出处。</li>
 </ul>
-<h4 style="color:#b8860b">「佛历」「佛节」图层（默认开启）</h4>
+<h4 style="color:var(--gold-deep)">「佛历」「佛节」图层（默认开启）</h4>
 <ul>
-<li><span class="zl-key" style="background:#b8860b"></span>金黄字＝佛历纪年。佛历＝以佛涅槃之年为纪元的佛教纪年，佛历年＝公历年＋543（通行简化式，全年不跨年）；显示在月历标题与大卡中。</li>
+<li><span class="zl-key" style="background:var(--gold-deep)"></span>金黄字＝佛历纪年。佛历＝以佛涅槃之年为纪元的佛教纪年，佛历年＝公历年＋543（通行简化式，全年不跨年）；显示在月历标题与大卡中。</li>
 <li><span class="zl-key" style="background:#c2571a"></span>橙色字＝汉传佛教节日，依农历逐日标注：四月初八释迦牟尼佛圣诞、六月十九观音菩萨成道日、九月十九观音菩萨出家日、腊月初八释迦牟尼佛成道日等 22 个。</li>
 <li>闰月不重复过节；农历小月无三十日时，「三十」的节日并至廿九并注明（小月）。</li>
 <li>月历下方附「本月佛教节日」清单，进页即可一览本月殊胜日。</li>
@@ -6728,6 +6944,276 @@ function calFmtG(d){
 
 // —— 页面状态与交互 ——
 if (!window._zView) window._zView = { y: new Date().getFullYear(), m: new Date().getMonth(), sel: null };
+
+// ===========================================================================
+// 待办（2026-10-05 · 小谦指示「给日历加待办，注册用户可记自己的事」）
+//
+// 定稿口径（小谦逐条确认，改动前已定）：
+//   · 独立页 /calendar.html **不显示**待办（选 A）——公开页保持纯净。
+//   · 只要「日期 + 文字」：无时刻、无提醒（推送等有 APP 后再议）。
+//   · **登录才能写**，设备免密只读（与功课页同口径，一视同仁）。
+//
+// 身份：走同源代理 /__api/todo/*，**token 由中间件从 Cookie 注入**。
+//   前端**不传也不存**任何凭据（与 practice-page.js 同款做法）。
+//   设备免密身份由服务端按 X-Device-ID 反查，前端只负责把这个头带上。
+// ===========================================================================
+var _zTodo = { items: [], date: '', msg: '', msgErr: false, enabled: false, loaded: false, viaDevice: false };
+
+/** 本页是否启用待办：仅主站（独立页无 #content，公开页不带私有功能）。 */
+function _zTodoEnabled(){
+  return !!(document.getElementById('content') && document.getElementById('calTodo'));
+}
+
+function _zTodoDeviceId(){
+  try {
+    var id = localStorage.getItem('longchen-device-id');
+    if (!id){
+      id = 'dev_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+      localStorage.setItem('longchen-device-id', id);
+    }
+    return id || '';
+  } catch (e) { return ''; }
+}
+
+function _zTodoApi(action, body){
+  var h = { 'Content-Type': 'application/json' };
+  var d = _zTodoDeviceId();
+  if (d) h['X-Device-ID'] = d;
+  return fetch('/__api/todo/' + action, {
+    method: 'POST', credentials: 'same-origin', headers: h,
+    body: JSON.stringify(body || {})
+  }).then(function (r){
+    return r.json().catch(function () { return { success: false, _status: r.status, message: null }; })
+      .then(function (j) { j._status = r.status; return j; });
+  }).catch(function () {
+    // 网络层失败（离线/服务未起）：给一句人话，不把 fetch 异常抛到 console
+    return { success: false, _status: 0, message: null, _net: true };
+  });
+}
+
+/** 服务端 message 优先；为 401/403/解析失败等情况给一句能懂的话。 */
+function _zTodoErrText(j){
+  if (j && j.message) return j.message;
+  var s = j ? j._status : 0;
+  if (j && j._net) return '连不上服务，请检查网络后再试';
+  if (s === 401) return '请先登录后再记待办';
+  if (s === 403) return '请先登录后再操作待办';
+  if (s === 429) return '操作太频繁了，稍后再试';
+  if (!s) return '待办服务暂不可用，请稍后再试';
+  return '待办加载失败（' + s + '）';
+}
+
+function _zTodoOfDate(key){
+  var out = [];
+  for (var i = 0; i < _zTodo.items.length; i++){
+    if (_zTodo.items[i] && _zTodo.items[i].date === key) out.push(_zTodo.items[i]);
+  }
+  return out;
+}
+
+/** 取某天的标记态：0 无 / 1 有未完成 / 2 全部完成（格内圆点用）。 */
+function _zTodoMark(key){
+  var list = _zTodoOfDate(key);
+  if (!list.length) return 0;
+  for (var i = 0; i < list.length; i++){ if (!list[i].done) return 1; }
+  return 2;
+}
+
+/** 月历格内的待办圆点（绝对定位，不占文档流——见 .cal-todotip 注释）。 */
+function _zTodoDotHtml(key){
+  var m = _zTodoMark(key);
+  if (!m) return '';
+  var t = m === 1 ? '有未完成待办' : '待办已全部完成';
+  return '<span class="cal-todotip' + (m === 2 ? ' cal-todotip-all' : '') + '" title="' + t + '"></span>';
+}
+
+function _zTodoHdHtml(key, d){
+  var wk = ['日','一','二','三','四','五','六'][d.getDay()];
+  return '<div class="cal-todo-hd"><b>待办</b><span>' + zlEsc((d.getMonth()+1) + ' 月 ' + d.getDate() + ' 日 · 星期' + wk) + '</span></div>';
+}
+
+function _zTodoPanelHtml(){
+  if (!_zTodo.enabled){
+    return '<div class="cal-todo"><div class="cal-todo-login">待办是登录用户的私人记录，'
+         + '请先<a href="#/__auth/login" style="color:var(--accent)">登录</a>后再来记。</div></div>';
+  }
+  var key = _zTodo.date;
+  var list = _zTodoOfDate(key);
+  // 写能力 = 已加载成功 且 不是设备免密（免密只读）。加载失败时连添加行都不给，
+  // 否则用户填完提交必然失败——那不是「容错」，是骗人。
+  var canWrite = _zTodo.loaded && !_zTodo.viaDevice;
+  var h = '<div class="cal-todo">' + _zTodoHdHtml(key, _zTodo._d || new Date());
+  h += canWrite ?
+      '<div class="cal-todo-add"><input type="text" id="zTodoText" maxlength="100" placeholder="记一件事…" '
+    + 'autocomplete="off"><button type="button" id="zTodoAdd">添加</button></div>' : '';
+  if (!list.length){
+    h += '<div class="cal-todo-empty">'
+       + ( !_zTodo.loaded ? '待办暂时读不出来，稍后会自动重试。'
+                          : (_zTodo.viaDevice ? '这一天没有待办。' : '这一天还没有待办。') )
+       + '</div>';
+  } else {
+    h += '<ul class="cal-todo-list">';
+    for (var i = 0; i < list.length; i++){
+      var t = list[i];
+      h += '<li' + (t.done ? ' class="cal-todo-done"' : '') + '>'
+        + ( canWrite ?
+            '<label class="cal-todo-chk"><input type="checkbox" data-todo-id="' + zlEsc(t.id) + '"'
+          + (t.done ? ' checked' : '') + ' aria-label="标记完成"></label>' : '' )
+        + '<span class="cal-todo-txt">' + zlEsc(t.text) + '</span>'
+        + ( canWrite ?
+            '<button type="button" class="cal-todo-del" data-todo-del="' + zlEsc(t.id) + '"'
+          + ' aria-label="删除这条待办" title="删除">×</button>' : '' )
+        + '</li>';
+    }
+    h += '</ul>';
+  }
+  if (_zTodo.msg){
+    h += '<div class="cal-todo-msg' + (_zTodo.msgErr ? ' cal-todo-msg-err' : '') + '">' + zlEsc(_zTodo.msg) + '</div>';
+  }
+  h += '</div>';
+  return h;
+}
+
+function _zTodoRender(){
+  var box = document.getElementById('calTodo');
+  if (!box || !_zTodo.enabled) return;
+  box.innerHTML = _zTodoPanelHtml();
+  // 事件绑定（每次重渲染后重挂；用容器级事件委托避免逐项挂）
+  var add = document.getElementById('zTodoAdd');
+  if (add) add.addEventListener('click', _zTodoDoAdd);
+  var inp = document.getElementById('zTodoText');
+  if (inp){
+    inp.addEventListener('keydown', function (e){ if (e.key === 'Enter') _zTodoDoAdd(); });
+  }
+  var ul = box.querySelector('.cal-todo-list');
+  if (ul){
+    ul.addEventListener('change', function (e){
+      var cb = e.target;
+      if (cb && cb.matches('input[type=checkbox]')) _zTodoDoToggle(cb);
+    });
+    ul.addEventListener('click', function (e){
+      var b = e.target.closest ? e.target.closest('[data-todo-del]') : null;
+      if (b) _zTodoDoRemove(b.getAttribute('data-todo-del'));
+    });
+  }
+}
+
+function _zTodoSay(msg, err){
+  _zTodo.msg = msg; _zTodo.msgErr = !!err;
+  _zTodoRender();
+}
+
+function _zTodoSyncDate(){
+  var v = window._zView;
+  // ⚠️ 兜底「今天」：**首次进入日历页时 _zView.sel 是 null**（用户还没点任何一天）。
+  // 若不兜底，_zTodo.date 为空 ⇒ 格内圆点匹配不到任何格子（圆点全消失），
+  // 且新增被「请先在日历上选一天」拦死 ⇒ 用户看到的是「待办功能坏了」。
+  // 月历里今天格已由 isToday 标出，所以「sel 空 ⇒ 看今天」与页面既有语义一致。
+  var d = (v && v.sel) ? v.sel : new Date();
+  _zTodo.date = zlKey(d);
+  _zTodo._d = d;
+}
+
+/** 拉取全部待办（单次全量，后续前端本地按日期筛）。 */
+function _zTodoLoad(cb){
+  if (!_zTodo.enabled){ if (cb) cb(); return; }
+  _zTodoApi('list', {}).then(function (j){
+    if (j && j.success){
+      _zTodo.items = Array.isArray(j.items) ? j.items : [];
+      _zTodo.viaDevice = !!j.viaDevice;
+      _zTodo.loaded = true;
+      _zTodo.msg = ''; _zTodo.msgErr = false;
+    } else {
+      _zTodo.items = [];
+      _zTodo.viaDevice = false;
+      _zTodo.loaded = false;
+      _zTodo.msg = _zTodoErrText(j);
+      _zTodo.msgErr = true;
+    }
+    _zRenderMain();      // 重画月历（格内圆点）
+    _zTodoRender();      // 重画面板
+    if (cb) cb(j);
+  });
+}
+
+function _zTodoDoAdd(){
+  var inp = document.getElementById('zTodoText');
+  if (!inp) return;
+  var text = (inp.value || '').trim();
+  if (!text){ _zTodoSay('请先写点内容', true); return; }
+  _zTodoSyncDate();
+  if (!_zTodo.date){ _zTodoSay('请先在日历上选一天', true); return; }
+  var btn = document.getElementById('zTodoAdd');
+  if (btn) btn.disabled = true;
+  _zTodoApi('save', { date: _zTodo.date, text: text }).then(function (j){
+    if (j && j.success){
+      _zTodo.items = Array.isArray(j.items) ? j.items : _zTodo.items;
+      _zTodo.msg = ''; _zTodo.msgErr = false;
+    } else {
+      _zTodo.msg = _zTodoErrText(j);
+      _zTodo.msgErr = true;
+    }
+    _zRenderMain();
+    _zTodoRender();
+  });
+}
+
+function _zTodoDoToggle(cb){
+  var id = cb.getAttribute('data-todo-id');
+  if (!id) return;
+  _zTodoApi('toggle', { id: id, done: !!cb.checked }).then(function (j){
+    if (j && j.success){
+      _zTodo.items = Array.isArray(j.items) ? j.items : _zTodo.items;
+      _zTodo.msg = ''; _zTodo.msgErr = false;
+    } else {
+      _zTodo.msg = _zTodoErrText(j);
+      _zTodo.msgErr = true;
+    }
+    _zRenderMain();
+    _zTodoRender();
+  });
+}
+
+function _zTodoDoRemove(id){
+  if (!id) return;
+  _zTodoApi('remove', { id: id }).then(function (j){
+    if (j && j.success){
+      _zTodo.items = Array.isArray(j.items) ? j.items : _zTodo.items;
+      _zTodo.msg = ''; _zTodo.msgErr = false;
+    } else {
+      _zTodo.msg = _zTodoErrText(j);
+      _zTodo.msgErr = true;
+    }
+    _zRenderMain();
+    _zTodoRender();
+  });
+}
+
+/** 待办图例说明：仅主站注入（独立页不启用待办 ⇒ 公开页与改动前完全一致）。
+    放在「通用标记」列表里、灰底那条之后 —— 必须由 JS 插入而非写进 ZANGLI_BODY_HTML，
+    因那段 HTML 是主站与独立页同源的，写死会让公开页也出现私人功能说明。 */
+function _zTodoInsertLegend(){
+  var host = document.getElementById('zTodoLegendHost');
+  if (!host || host.getAttribute('data-done')) return;
+  host.setAttribute('data-done', '1');
+  var li = document.createElement('li');
+  li.innerHTML = '<span class="zl-key" style="background:#c2571a;border-radius:50%"></span>'
+    + '橙色小点＝这一天有我的待办（实心＝有未完成，空心＝已全部完成）。'
+    + '待办只保存在你自己的账号里，其他用户看不到。';
+  host.parentNode.insertBefore(li, host.nextSibling);
+}
+
+/** 切页/重渲染后由 initCalPage 调用：先判开关，再拉数据。 */
+function _zTodoInit(){
+  if (!_zTodoEnabled()) return;
+  _zTodo.enabled = true;
+  _zTodoInsertLegend();
+  _zTodoSyncDate();
+  var box = document.getElementById('calTodo');
+  box.innerHTML = '<div class="cal-todo"><div class="cal-todo-empty">待办加载中…</div></div>';
+  _zTodoLoad();
+}
+
 function initCalPage(){
   var input = document.getElementById('calDate');
   if (input){
@@ -6743,6 +7229,11 @@ function initCalPage(){
   }
   zlRenderChips();
   _zRenderMain();
+  // 2026-10-05 待办：独立页不启用（_zTodoEnabled 判 #content 存在），主站在此拉一次全量。
+  // ⚠️ 加载失败（loaded 仍为 false）时**重试**：SPA 切走再回来、或网络恢复后，
+  //    再次进入本页会重新拉一次——文案「稍后会自动重试」因此成立（说法与实现必须一致）。
+  if (_zTodoEnabled() && !_zTodo.loaded) _zTodoInit();
+  else if (_zTodo.enabled){ _zTodoSyncDate(); _zTodoRender(); }
 }
 function calGoto(){
   var el = document.getElementById('calDate');
@@ -6942,7 +7433,12 @@ function _zRenderMain(){
     if (lfest) inner += '<span class="cal-cell-fp">' + zlEsc(lfest) + '</span>';
     if (bfest) inner += '<span class="cal-cell-fb">' + zlEsc(bfest) + '</span>';
 
-    cells += '<div><div class="' + cls + '" onclick="_zCellClick(' + d.getTime() + ')">' + inner + '</div></div>';
+    // 2026-10-05 待办标记：绝对定位在格子右上角（**不占文档流**，见 .cal-todotip 注释）。
+    // 独立页 /calendar.html 不启用待办（_zTodo.enabled 为 false）⇒ _zTodoDotHtml 返回空串，
+    // 格子结构与改动前完全一致（公开页零变化）。
+    var todoDot = _zTodo.enabled ? _zTodoDotHtml(zlKey(d)) : '';
+    if (todoDot) cls += ' cal-cell-todo';
+    cells += '<div><div class="' + cls + '" onclick="_zCellClick(' + d.getTime() + ')">' + inner + todoDot + '</div></div>';
   }
 
   var table = '<div class="cal-card">'
@@ -6969,6 +7465,14 @@ function _zRenderMain(){
       + (v.m + 1) + ' 月，共 ' + budList.length + ' 个）</div><ul>' + lis + '</ul></div>';
   }
   box.innerHTML = main + table + budHtml;
+  // 2026-10-05 待办：选中日变化时同步面板。
+  // 放在 _zRenderMain 末尾统一做，而不是在 calGoto/calToday/calShift/_zCellClick/日期框 onchange
+  // 里各写一遍——那样漏一处就是「切某天面板不更新」的隐 bug（铁律：单一收口）。
+  // 成本可接受：面板渲染只读内存、纯 innerHTML 拼接，不发请求。
+  if (_zTodo.enabled){
+    _zTodoSyncDate();
+    _zTodoRender();
+  }
 }
 """
 
@@ -7751,7 +8255,15 @@ STANDALONE_Z_HEAD = """<!DOCTYPE html>
 <meta name="theme-color" content="#8a1f1c">
 <title>修行日历 · 公历 藏历 农历对照与佛教节日</title>
 <style>
-:root{--bg:#f6f1e6;--surface:#fffdf8;--surface-soft:#f1e9db;--ink:#3b2f28;--ink-soft:#6f6258;--accent:#8a1f1c;--line:#e2d8c4}
+/* --gold-deep：与主站同名同值（主站浅色 :root 亦为 #8a6320）。
+   日历共享样式（ZANGLI_CSS_BODY）里的金色文字/图例已改用 var(--gold-deep)，
+   本独立页是自带 :root 的独立外壳、不继承主站变量，故必须在此补齐，
+   否则变量未定义会降级为继承色（铁律 8：变量迁移必须同批改所有外壳）。
+   ⚠️ 本页无 data-theme 切换（不响应暗色），故只需浅色值。
+   2026-10-05：日历共享样式新增待办面板用到了 --ink-faint / --accent-deep，
+   本页同样补齐（值取主站浅色 :root 同名变量）——**本页当前不显示待办**（小谦选 A），
+   但 CSS 是同源的；补齐是为了日后若放开本页，不会因变量未定义而静默降级。 */
+:root{--bg:#f6f1e6;--surface:#fffdf8;--surface-soft:#f1e9db;--ink:#3b2f28;--ink-soft:#6f6258;--ink-faint:#9a8d82;--accent:#8a1f1c;--accent-deep:#6e1614;--line:#e2d8c4;--gold-deep:#8a6320}
 *{box-sizing:border-box}
 body{margin:0;padding:1.1rem 1rem 3rem;background:var(--bg);color:var(--ink);
   font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Hiragino Sans GB","Microsoft YaHei",serif}
@@ -7761,7 +8273,8 @@ a{color:var(--accent)}
 .cal-qr{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:1rem;margin-top:1.1rem;text-align:center}
 .cal-qrbox{display:inline-block;margin:.4rem 0}
 .cal-qrhint{color:var(--ink-soft);font-size:.8rem;line-height:1.7;overflow-wrap:anywhere}
-.zl-foot{color:var(--ink-soft);font-size:.76rem;margin-top:.9rem;line-height:1.7}
+/* 2026-10-01 修 P0-1：原 .76rem(12.16px) 低于可读下限，提到 .8125rem(13px) */
+.zl-foot{color:var(--ink-soft);font-size:.8125rem;margin-top:.9rem;line-height:1.7}
 </style>
 </head>
 <body>

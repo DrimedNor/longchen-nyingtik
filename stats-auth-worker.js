@@ -2108,3 +2108,170 @@ async function handlePractice(request, env, url, corsHeaders) {
 
   return pjson({ success: false, message: 'Not found' }, 404, corsHeaders);
 }
+      // 路由：日历待办模块（2026-10-05 · 骨架照 handlePractice，仅日期无时刻）
+      if (path.indexOf('/api/todo/') === 0) {
+        return await handleTodo(request, env, url, corsHeaders);
+      }
+
+
+// ---------------------------------------------------------------------------
+// 日历待办（2026-10-05 · 小谦指示「给日历加待办，注册用户可记自己的事」）
+//
+// 设计定稿（小谦 2026-10-05 逐条确认）：
+//  · 独立页 /calendar.html **不显示**待办（选 A）——公开页保持纯净，不做匿名态空面板。
+//  · 只要「日期 + 文字」，**不要时刻、不要提醒**（推送等有 APP 后再议）。
+//  · **登录才能写**，一视同仁（选「登录才能写」）⇒ 与功课同口径：设备免密只读。
+//
+// 存储：**单键** todo_<username> 存全部（不按月分片）。
+//   理由：待办是长期个人数据，分片后「跨月/翻历史」要拼多个键，忘收口就是 bug；
+//   而纯文字待办离 KV 单值 25MB 上限极远（1 万条约 1MB），单键最简单、最不易出错。
+//   ⚠️ 键名与 account/密码/功课同在 STATS_KV 命名空间 —— 数据不落浏览器，
+//     故清缓存/换设备后登录即可见（会话 Cookie 会掉，但数据在服务器）。
+//
+// 鉴权：**完全复用** resolvePracticeIdentity —— token 由中间件从 Cookie 注入，
+//   身份只由服务端反查 user_<username>；前端不得传 username / 不得传凭据（§3.8）。
+// ---------------------------------------------------------------------------
+
+// 写操作白名单：toggle 也算写（改完成态），故一并禁设备免密。
+var TODO_WRITES = { save: 1, toggle: 1, remove: 1 };
+
+var TODO_MAX_ITEMS = 2000;          // 单用户上限，防无限膨胀
+var TODO_TEXT_MAX = 100;             // 单条文字上限（与练习「名称 30 字」同量级，略宽）
+
+function todoGetAll(env, username) {
+  var rec = await env.STATS_KV.get('todo_' + username, 'json');
+  if (!rec || typeof rec !== 'object') rec = {};
+  if (!Array.isArray(rec.items)) rec.items = [];
+  // 读时自愈：逐条过一遍白名单，剔除脏字段（否则前端渲染 undefined 会整列表崩）。
+  // 用 filter + map 而非就地改：不回写，纯内存净化（回写留给用户下次写操作，顺带覆盖）。
+  var clean = [];
+  for (var i = 0; i < rec.items.length; i++) {
+    var it = todoNormalizeItem(rec.items[i]);
+    if (it) clean.push(it);
+  }
+  rec.items = clean;
+  return rec;
+}
+
+function todoNormalizeItem(x) {
+  if (!x || typeof x !== 'object') return null;
+  var id = String(x.id || '').slice(0, 64);
+  var date = pvDate(x.date);
+  var text = String(x.text == null ? '' : x.text).trim();
+  if (!id || !date || !text || text.length > TODO_TEXT_MAX) return null;
+  return {
+    id: id,
+    date: date,
+    text: text,
+    done: !!x.done,
+    createdAt: String(x.createdAt || ''),
+    updatedAt: String(x.updatedAt || ''),
+  };
+}
+
+async function handleTodo(request, env, url, corsHeaders) {
+  var action = url.pathname.replace('/api/todo/', '');
+  var body = {};
+  if (request.method === 'POST') {
+    try { body = await request.json(); } catch (e) { body = {}; }
+  }
+
+  // 身份：与功课同一条线（会话优先，其次设备免密只读）
+  var auth = await resolvePracticeIdentity(request, env, body);
+  if (auth.error) {
+    return pjson({ success: false, message: auth.error === 'disabled' ? '账号状态异常' : '未登录' }, 401, corsHeaders);
+  }
+  var username = auth.username;
+
+  // 「登录才能写」：设备免密身份一律只读
+  if (TODO_WRITES[action] && auth.viaDevice) {
+    return pjson({ success: false, message: '请登录后再操作待办' }, 403, corsHeaders);
+  }
+  // 写接口限流（与功课同款：10 分钟 60 次）
+  if (TODO_WRITES[action] && !(await practiceRateOk(env, 'todo_' + username))) {
+    return pjson({ success: false, message: '操作过于频繁，请稍后再试' }, 429, corsHeaders);
+  }
+
+  // ------------------------------------------------------------------ list
+  if (action === 'list') {
+    var rec = await todoGetAll(env, username);
+    // list 也要设上限：否则上限被绕过（写入有守卫、读取不设＝极端情况下拉超大 JSON）
+    var items = rec.items.slice(0, TODO_MAX_ITEMS);
+    return pjson({
+      success: true, username: username, viaDevice: !!auth.viaDevice,
+      items: items, updatedAt: rec.updatedAt || '',
+    }, 200, corsHeaders);
+  }
+
+  // ------------------------------------------------------------------ save（新增/编辑）
+  if (action === 'save') {
+    var text = String(body.text == null ? '' : body.text).trim();
+    if (!text) return pjson({ success: false, message: '内容不能为空' }, 400, corsHeaders);
+    if (text.length > TODO_TEXT_MAX) {
+      return pjson({ success: false, message: '内容不超过 ' + TODO_TEXT_MAX + ' 字' }, 400, corsHeaders);
+    }
+    var date = pvDate(body.date);
+    // 年份口径跟 pvDate（2000–2100），**不跟日历页日期框的 1951–2051**：
+    // 后者是历法算表边界（藏历/佛历能查到 1951），而待办是「自己的事」，面向当下与未来。
+    // ⚠️ 文案必须与实现一致（铁律 11）：写 1951–2051 会让用户以为能记更早的年份。
+    if (!date) return pjson({ success: false, message: '日期不合法（须 2000–2100 年）' }, 400, corsHeaders);
+
+    var rec2 = await todoGetAll(env, username);
+    var id = body.id ? String(body.id).slice(0, 64)
+                     : ('t_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8));
+    var nowIso = new Date().toISOString();
+    var idx = -1;
+    for (var i = 0; i < rec2.items.length; i++) {
+      if (rec2.items[i] && rec2.items[i].id === id) { idx = i; break; }
+    }
+    var prev = idx >= 0 ? rec2.items[idx] : null;
+    var item = {
+      id: id, date: date, text: text,
+      done: prev ? !!prev.done : false,          // 编辑不改完成态
+      createdAt: prev ? (prev.createdAt || nowIso) : nowIso,
+      updatedAt: nowIso,
+    };
+    if (idx >= 0) rec2.items[idx] = item;
+    else {
+      if (rec2.items.length >= TODO_MAX_ITEMS) {
+        return pjson({ success: false, message: '待办条数已达上限' }, 400, corsHeaders);
+      }
+      rec2.items.push(item);
+    }
+    rec2.schemaVersion = 1;
+    rec2.updatedAt = nowIso;
+    await env.STATS_KV.put('todo_' + username, JSON.stringify(rec2));
+    return pjson({ success: true, todo: item, items: rec2.items }, 200, corsHeaders);
+  }
+
+  // ------------------------------------------------------------------ toggle（勾/取消完成）
+  if (action === 'toggle') {
+    var tid = String(body.id || '');
+    if (!tid) return pjson({ success: false, message: '缺少 id' }, 400, corsHeaders);
+    var rec3 = await todoGetAll(env, username);
+    var hit = null;
+    for (var j = 0; j < rec3.items.length; j++) {
+      if (rec3.items[j] && rec3.items[j].id === tid) { hit = rec3.items[j]; break; }
+    }
+    if (!hit) return pjson({ success: false, message: '待办不存在' }, 404, corsHeaders);
+    hit.done = (body.done === undefined) ? !hit.done : !!body.done;
+    hit.updatedAt = new Date().toISOString();
+    rec3.updatedAt = hit.updatedAt;
+    await env.STATS_KV.put('todo_' + username, JSON.stringify(rec3));
+    return pjson({ success: true, todo: hit, items: rec3.items }, 200, corsHeaders);
+  }
+
+  // ------------------------------------------------------------------ remove
+  if (action === 'remove') {
+    var rid = String(body.id || '');
+    if (!rid) return pjson({ success: false, message: '缺少 id' }, 400, corsHeaders);
+    var rec4 = await todoGetAll(env, username);
+    var before4 = rec4.items.length;
+    rec4.items = rec4.items.filter(function (x) { return !x || x.id !== rid; });
+    rec4.updatedAt = new Date().toISOString();
+    await env.STATS_KV.put('todo_' + username, JSON.stringify(rec4));
+    return pjson({ success: true, removed: before4 - rec4.items.length, items: rec4.items }, 200, corsHeaders);
+  }
+
+  return pjson({ success: false, message: 'Not found' }, 404, corsHeaders);
+}
