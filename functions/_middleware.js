@@ -43,6 +43,12 @@ function isPublicPath(path) {
   if (path === "/practice.html" || path === "/practice" || path === "/practice/") return true;
   // 功课页脚本：与页壳同为公开静态资源（纯界面代码、零数据）；设备免密设备要靠它渲染页面。
   if (path === "/practice.js") return true;
+  // 日历三库脚本（2026-10-05 补漏）：与 /practice.js 同理——纯历表换算代码、零用户数据。
+  // 🔴 此前**漏了这条**，导致未登录（及管理员设备免密）访问 /calendar 独立页时
+  //   calendar-lib.js 被访问门槛拦成 401 ⇒ 独立页日历永远停在「正在加载日历组件…」。
+  //   实测：线上 curl calendar-lib.js 返回 401，而同为按需加载的 practice.js 返回 200。
+  //⚠️ 只放行这一个文件，不放宽整类 .js（见 isPublicPath 顶部注释的口径）。
+  if (path === "/calendar-lib.js") return true;
   return false;
 }
 

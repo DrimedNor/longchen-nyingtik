@@ -1025,6 +1025,21 @@ button:active, .player-launch:active, .search-fab:active{transform:scale(.95)}
 .player-launch .plr-cap{font-size:.68rem; color:var(--ink-faint); line-height:1.35; white-space:nowrap}
 .player-launch .plr-title{font-size:.82rem; font-weight:600; color:var(--ink); line-height:1.4;
   white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%}
+/* 续播确认框（2026-10-05 小谦指示「播之前要提示是否播上一次那个」）：
+   两个按钮均min 44px 触摸目标（沿用 P0-1 的 44px 口径），文案居中、对比度用 ink/accent。 */
+.resume-ask{background:var(--surface); border:1px solid var(--line-strong); border-radius:14px;
+  padding:.9rem 1rem; box-shadow:0 8px 28px rgba(59,42,34,.22); font-size:.92rem; color:var(--ink)}
+.resume-ask .resume-t{font-size:.8rem; color:var(--ink-soft); margin:.35rem 0 .7rem; line-height:1.5;
+  overflow:hidden; text-overflow:ellipsis; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical}
+.resume-ask .resume-btns{display:flex; gap:.55rem; justify-content:flex-end}
+.resume-ask button{min-height:44px; min-width:64px; padding:0 1rem; border-radius:10px; font-size:.88rem;
+  font-family:inherit; cursor:pointer; border:1px solid var(--line-strong); background:var(--surface);
+  color:var(--ink-soft); text-align:center; line-height:1}
+.resume-ask button.resume-yes{border:none; background:var(--accent); color:#fff}
+.resume-ask button.resume-no{background:var(--surface-soft)}
+.resume-ask button:focus-visible{outline:2px solid var(--accent); outline-offset:2px}
+[data-theme="dark"] .resume-ask{background:var(--surface-hover); border-color:var(--ink-faint);
+  box-shadow:0 8px 28px rgba(0,0,0,.5)}
 [data-theme="dark"] .player-launch.resume-mode{background:var(--surface-hover); border-color:var(--ink-faint)}
 .player-launch:active{cursor:grabbing}
 .player-launch.dragging{opacity:.85;box-shadow:0 6px 20px rgba(0,0,0,.4)}
@@ -2446,8 +2461,20 @@ function renderNav(){
     + '<span class="nav-chev nav-chev-none">🔍</span>'
     + '<span class="dir-label">搜索</span></div></div>';
   // 日历入口（2026-09-18 新增功能页；2026-09-20 由「藏历」更名「日历」，与 AI 搜索同为工具入口）
+  //
+  // 🔴 2026-10-05 修「点日历没反应」（小谦报告：首页侧栏与导航栏点日历都无反应）：
+  //   根因是下面 nav.querySelectorAll('.nav-sec-head').forEach 里给**每一个** .nav-sec-head
+  //   都绑定了 `h.onclick = function(){ go(h.dataset.slug); ... }`，
+  //   而**属性赋值会覆盖 HTML 里自带的 onclick 属性** ⇒ 本行原来写的
+  //   onclick="go('__calendar')" 被彻底吃掉，从未执行过。
+  //   而日历入口又没有 data-slug（目录入口都有）⇒ go(undefined)
+  //   ⇒ 第一行 `if (!slug || ...) return;` 静默退出 ⇒ 点了毫无反应、连报错都没有。
+  //   取证铁证：打桩后trace 为 ["go:undefined cur=index iw=390", "go->hash=", "closeSidebar"]。
+  // 正解：给 data-slug="__calendar"，让委托处理器能取到 slug。
+  //   （不选「在 forEach 里 if (h.dataset.slug) 才绑定」——那样搜索入口也会失去绑定，
+  //     属于扩大影响面；也不选「改成 <a href>」——侧栏是 JS 运行时拼的，hash 路由交给 go() 更一致。）
   html += '<div class="nav-sec" data-depth="0">'
-    + '<div class="nav-sec-head" onclick="go(\'__calendar\'); if (window.innerWidth <= 760) closeSidebar();">'
+    + '<div class="nav-sec-head" data-slug="__calendar" onclick="go(\'__calendar\'); if (window.innerWidth <= 760) closeSidebar();">'
     + '<span class="nav-chev nav-chev-none">📅</span>'
     + '<span class="dir-label">日历</span></div></div>';
   html += '<hr style="border:none;border-top:1px solid var(--line);margin:.5rem 0;">';
@@ -2462,13 +2489,16 @@ function renderNav(){
   });
   nav.innerHTML = html;
   // 一级菜单点击：直接进入该目录 Index 页面
+  //
+  // 🔴 2026-10-05 修「点日历没反应」的第二处（前一处在 HTML 侧补 data-slug，此处是防御）：
+  //   `h.onclick = ...` 是**属性赋值**，会覆盖元素 HTML 上原有的 onclick 属性。
+  //   侧栏有两个入口自带 onclick（日历 openCal、搜索 openSearchPanel），
+  //   一旦被这里覆盖就等于功能消失（且 go(undefined) 静默返回，用户看不到任何报错）。
+  //   正解：**只给「没有自带 onclick 且有 data-slug」的项绑委托**，
+  //   已有原生onclick 的（日历/搜索）保持浏览器默认解析行为，不碰。
+  //   这样新增功能页入口时也不必记得data-slug，忘了一样能点。
   nav.querySelectorAll('.nav-sec-head').forEach(function(h){
-    if (h.classList.contains('nav-external')) return;   // 外部链接项不绑定点击，让 <a> 默认跳转
-    h.onclick = function(){
-      go(h.dataset.slug);
-      if (window.innerWidth <= 760) closeSidebar();
-    };
-    // 悬停：按该项文字色生成更深色块并选配对比文字，松开即恢复
+    // 悬停高亮：**所有** nav-sec-head 都要（含日历/搜索），故先绑、不受下面的点击分支影响
     h.addEventListener('mouseenter', function(){
       if (h.classList.contains('active')) return;
       var m = navHoverBg(h).match(/\d+/g);
@@ -2479,6 +2509,13 @@ function renderNav(){
       h.style.background = '';
       h.style.color = '';
     });
+    if (h.classList.contains('nav-external')) return;   // 外部链接项不绑定点击，让 <a> 默认跳转
+    if (h.getAttribute('onclick')) return;            // 自带 onclick：交给浏览器解析，别覆盖（2026-10-05）
+    if (!h.dataset.slug) return;                       // 无 slug 又无自带 onclick：无从跳转，跳过绑定
+    h.onclick = function(){
+      go(h.dataset.slug);
+      if (window.innerWidth <= 760) closeSidebar();
+    };
   });
 }
 
@@ -3535,7 +3572,7 @@ function renderHomeCards(){
     items.push({icon:'🪷', title:'法照', desc:'上师尊容、历代祖师与圣像法物', slug:'5. 瞻法照/index', count:(FAZHAO_IMG_COUNT > 0 ? FAZHAO_IMG_COUNT + ' 张' : '')});
   }
   // 日历（2026-09-19 小谦指示：卡片顺序调到最后，瞻法照之后；2026-09-20 由「藏历」更名）
-  items.push({icon:'📅', title:'日历', desc:'公历、藏历、农历叠加对照（含佛教节日与法定节假日）', slug:'__calendar', count:''});
+  items.push({icon:'📅', title:'日历', desc:'公历、藏历、农历叠加对照（含佛教节日与节假日）', slug:'__calendar', count:''});
   if (!items.length) return '';
   var html = '<nav class="home-cards" aria-label="首页快捷入口">';
   items.forEach(function(it){
@@ -6110,34 +6147,87 @@ if (initSlug && routeWithAlias(initSlug)) {
 } else if (initSlug){ show(initSlug); }
 else { var home = TREE.children && TREE.children.find(function(c){ return c.is_index; }); show(home ? home.slug : PAGES[0].slug); }
 
-// 恢复上次播放的音频：定位到上次进度，并尝试续播（浏览器允许时自动继续；否则显示「继续听」胶囊供一键续播）
+// 恢复上次播放的音频（2026-10-05 小谦指示：**先问再播**）
+//
+// 🔴 本段此前有两处真实缺陷（均为 2026-10-05 取证实测，非推测）：
+//   ① **音频在放、播放器看不见**——本段只更新了 pStatusText，**没调 showPlayer()**
+//      （对比正常播放路径 4904-4906 是有的）。实测播放器 rect.y=844 === 视口高
+//      ⇒ 整块停在视口外下方；而 audio.paused=false、currentTime=127 证明确实在播。
+//      小谦原话「手机端会自动播放，但播放器里又不显示正在播放」即此。
+//   ② **悬浮按钮状态自相矛盾**——refreshLaunch() 在无播放时切成「继续听·已听至 2:00」
+//      胶囊，可此刻正在播。用户点它会重新走 playTrack()，等于重置进度。
+//
+// 改为：只准备状态（**不自动播**），弹确认框问小谦「上次听到…是否继续」；
+//   同意 → 定位进度 + showPlayer() + 播放（此时状态文案是「正在播放」）；
+//   不同意 → 保持不播，播放器仍显示（用户能自己点▶，不被挡在门外）。
+// 首次访问（无播放记忆）⇒ 不提示、不打扰。
 setTimeout(function(){
   try {
     var savedIdx = parseInt(localStorage.getItem('longchen-audio-cur') || '-1', 10);
-    if (savedIdx >= 0 && savedIdx < AUDIO_TRACKS.length) {
-      curIdx = savedIdx;
-      var t = AUDIO_TRACKS[savedIdx];
-      playerAudio.src = t.src;
-      playerAudio.playbackRate = SPEEDS[speedIdx];
-      var savedPos = parseFloat(localStorage.getItem('longchen-audio-pos-' + savedIdx) || '0');
-      var dur = t.duration || 0;
-      var canResume = savedPos > 0 && (dur === 0 || savedPos < dur - 2);
-      document.getElementById('pStatusText').innerHTML = '上次播放：<b>' + esc(t.title) + '</b>' + (canResume ? '（准备续播）' : '');
-      document.getElementById('pPlay').textContent = '▶';
-      renderPlist();
-      updatePlayBtns();
-      refreshLaunch(); // 静默恢复后刷新悬浮按钮形态（切「继续听」胶囊）
-      if (canResume) {
-        // 媒体可定位后再 seek，避免 currentTime 被重置为 0
+    if (!(savedIdx >= 0 && savedIdx < AUDIO_TRACKS.length)) return;
+    var t = AUDIO_TRACKS[savedIdx];
+    var savedPos = parseFloat(localStorage.getItem('longchen-audio-pos-' + savedIdx) || '0');
+    var dur = t.duration || 0;
+    var canResume = savedPos > 0 && (dur === 0 || savedPos < dur - 2);
+    if (!canResume) return;                       // 听完了/无进度 ⇒ 不打扰
+    curIdx = savedIdx;
+    playerAudio.src = t.src;
+    playerAudio.playbackRate = SPEEDS[speedIdx];
+    // 注意：此处**只备好src 与 curIdx，不调 play()**——等用户确认。
+    document.getElementById('pStatusText').innerHTML = '上次播放：<b>' + esc(t.title) + '</b>（已听至 ' + fmtListenSec(savedPos) + '）';
+    document.getElementById('pPlay').textContent = '▶';
+    renderPlist();
+    updatePlayBtns();
+    refreshLaunch();
+
+    var askResume = function(){
+      if (!document.body.contains(document.getElementById('resumeAskBox'))) askResume();
+      var box = document.getElementById('resumeAskBox');
+      var seekAndShow = function(){
         var applyPos = function(){
           try { if (!isNaN(playerAudio.duration) && savedPos > playerAudio.duration - 2) return; playerAudio.currentTime = savedPos; } catch(e){}
         };
         if (playerAudio.readyState >= 1) applyPos();
         else playerAudio.addEventListener('loadedmetadata', applyPos, { once: true });
-        // 尝试自动续播：被自动播放策略阻止时静默失败，保持「继续听」胶囊供手动续播
-        playerAudio.play().catch(function(){});
-      }
-    }
+        // ✅ 修复①：同意播放时才调 showPlayer()，播放器才真正出现在屏幕上
+        showPlayer();
+        document.getElementById('pStatusText').innerHTML = '正在播放：<b>' + esc(t.title) + '</b>';
+        document.getElementById('pPlay').textContent = '⏸';
+        updateMini();
+        var pp = playerAudio.play();
+        if (pp && pp.catch) pp.catch(function(){});
+        refreshLaunch();
+        // 定时器胶囊只在播放中有效：接手续播前先撤掉，否则倒计时会挂在一条暂停的音上
+        if (sleepTimerId) clearSleepTimer(true);
+      };
+      // 不同意：不播，但把播放器显示出来（状态栏留痕，用户可自己点▶）
+      var dismiss = function(){
+        if (box && box.parentElement) box.parentElement.removeChild(box);
+        showPlayer();                              // ✅ 修复②：不同意也可见，只是暂停态
+        document.getElementById('pStatusText').innerHTML = '待播放：<b>' + esc(t.title) + '</b>';
+        document.getElementById('pPlay').textContent = '▶';
+        updateMini();
+        refreshLaunch();
+      };
+      box.innerHTML = '<div class="resume-ask"><b>继续上次播放？</b>'
+        + '<div class="resume-t">《' + esc(t.title) + '》已听至 ' + fmtListenSec(savedPos) + '</div>'
+        + '<div class="resume-btns">'
+        + '<button class="resume-no" type="button">不播</button>'
+        + '<button class="resume-yes" type="button">继续播放</button>'
+        + '</div></div>';
+      box.querySelector('.resume-no').onclick = dismiss;
+      box.querySelector('.resume-yes').onclick = function(){
+        if (box.parentElement) box.parentElement.removeChild(box);
+        seekAndShow();
+      };
+    };
+    // 确认框容器（延迟挂载，避开首屏 1s 内的初始化高峰）
+    var box = document.createElement('div');
+    box.id = 'resumeAskBox';
+    box.style.cssText = 'position:fixed;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom,0px) + 5.5rem);z-index:60;width:min(92vw,22rem);';
+    box.addEventListener('click', function(e){ if (e.target === box) box.parentElement && box.parentElement.removeChild(box); });
+    document.body.appendChild(box);
+    askResume();
   } catch(e){}
 }, 1000);
 
@@ -6638,14 +6728,15 @@ ZANGLI_CSS_BODY = r"""
    13px + min-height:44 下五颗真开关合计约 250px，320 视口（288px 容器）仍单行放得下。
    故本轮把字号/触摸目标补回合格，保留单行与 nowrap 语义（小谦要求不变）。
    flex + nowrap 显式单行（不用 wrap 自动换行——换行点会随机型宽度漂移）；
-   ⚠️ overflow-x:auto 兜底**在 320 极窄视口确实会用到**（不是纯理论兜底）：
+   ⚠️ overflow-x:auto 兜底**在 320 极窄视口曾经用到**（原为纯理论兜底）：
    2026-10-01 实测 320 视口逐颗宽度＝基准标签 40.2 + 四颗真开关 44×4 + 「法定节假日」77.9
    ＝ 294.1px，加 5×3.2px gap ＝ 310.1px（与容器 scrollWidth 310 精确吻合），
    容器可用仅 288px ⇒ 超 22.1px。差额几乎全部来自「法定节假日」四个字（比同类多 34px）。
-   要消除需二选一：① 文案缩为「节假日」（省约 40px，够用，但**属产品决策、须小谦定**）；
-   ② 五颗真开关压到 40px（只省 16px 仍不够，且直接违背本次 44px 触摸目标修复目的）⇒ 不采纳。
-   故 320 维持兜底（页面级 body.scrollWidth 仍 = 320，无页面横滚）；360 及以上完全无滚动。
-   验证脚本 check_cal_chip_oneline.py 已把 320 的容器滚动显式标注「已知兜底」，不静默通过。
+   当时二选一：① 文案缩为「节假日」（属产品决策、须小谦定）；② 压到 40px（违背 44px 目的）⇒ 不采纳。
+   ✅ **2026-10-05 小谦已定：走①**——chip 标签「法定节假日」→「节假日」（省约 40px），
+      图例标题与 .zl-tip 说明文字同步统一口径。**320 视口不再需要容器兜底**。
+   故保留 overflow-x:auto 作跨浏览器字宽异常时的最后兜底，正常视口（含 320）均不出滚动条。
+   验证脚本 check_cal_chip_oneline.py 仍对 320 容器滚动显式断言（真出现即FAIL，不静默通过）。
    沿革：2026-09-22 四颗（一行 4 列/≤374px 2×2）→ 2026-09-25 六颗 3×2＋2×3 降级
    → 2026-09-25 压回一行（过度压缩，字号掉到 10.56）→ 2026-10-01 补回 13px/44px 仍单行。
    标签语义仍由 role=group + aria-describedby="zLayersTip" 承担（约定不变）。 */
@@ -6677,7 +6768,7 @@ ZANGLI_BODY_HTML = """
 <h1 style="font-size:1.3rem">修行日历</h1>
 <div class="cal-querybar"><input type="date" id="calDate" min="1951-01-08" max="2051-02-11"><button type="button" onclick="calGoto()">查这一天</button><button type="button" style="background:var(--surface-soft);color:var(--ink);border:1px solid var(--line)" onclick="calToday()">今天</button></div>
 <div class="zl-layers" id="zLayers" role="group" aria-label="显示哪些日历" aria-describedby="zLayersTip"></div>
-<p class="zl-tip" id="zLayersTip">阳历为基准层、始终显示；藏历、佛历、佛节、农历、法定节假日五层可自由叠加——藏历、佛历与佛节默认打开，农历与法定节假日按需打开。</p>
+<p class="zl-tip" id="zLayersTip">阳历为基准层、始终显示；藏历、佛历、佛节、农历、节假日五层可自由叠加——藏历、佛历与佛节默认打开，农历与节假日按需打开。</p>
 <div id="calMain"></div>
 <!-- 2026-10-05 待办面板：小谦指示「给日历加待办，注册用户可记自己的事」。
      位置＝月历正下方、说明之前（每天第一眼能看到，不被图例压到页面底部）。
@@ -6687,7 +6778,7 @@ ZANGLI_BODY_HTML = """
 <div class="cal-legend">
 <h3>关于本页</h3>
 <ul>
-<li>公历、藏历、佛历、农历同视图对照，并标注汉传佛教节日与法定节假日。</li>
+<li>公历、藏历、佛历、农历同视图对照，并标注汉传佛教节日与节假日。</li>
 <li>可查指定日期，也可逐月浏览。</li>
 <li>换算数据依《藏历、公历、农历对照百年历书（1951-2050）》，支持 1951-01-08 至 2051-02-11。</li>
 </ul>
@@ -6726,7 +6817,7 @@ ZANGLI_BODY_HTML = """
 <li><span class="zl-key" style="background:#2f6f8a"></span>靛蓝字＝传统农历节日：春节、元宵、端午、七夕、中元、中秋、重阳、腊八、小年、除夕。</li>
 <li>「农历」与「藏历」同时开启时，两行行首会出现各自颜色的小方块，便于分辨哪一行属于哪一个日历。</li>
 </ul>
-<h4 style="color:#7a5aa6">「法定节假日」图层（默认关闭）</h4>
+<h4 style="color:#7a5aa6">「节假日」图层（默认关闭）</h4>
 <ul>
 <li><span class="zl-key" style="background:#7a5aa6"></span>日期下紫横线（相邻连成一线）＝法定连休，格内小字标注如「中秋休假」；「班」＝调休上班。</li>
 <li><span class="zl-key" style="background:#ded2ec"></span>日期前带「班」＝调休上班。</li>
@@ -6824,7 +6915,7 @@ function zlToggleLayer(k){
 function zlRenderChips(){
   var box = document.getElementById('zLayers');
   if (!box) return;
-  var defs = [ {k:'g', n:'阳历'}, {k:'t', n:'藏历'}, {k:'b', n:'佛历'}, {k:'f', n:'佛节'}, {k:'l', n:'农历'}, {k:'h', n:'法定节假日'} ];
+  var defs = [ {k:'g', n:'阳历'}, {k:'t', n:'藏历'}, {k:'b', n:'佛历'}, {k:'f', n:'佛节'}, {k:'l', n:'农历'}, {k:'h', n:'节假日'} ];
   /* 2026-09-22（小谦指示）：不再插入「显示日历」这一行——它只是开关组的可见标签，
      而下方 .zl-tip 已把「四层可自由叠加 + 默认只开阳历与藏历」说清楚，属重复。
      标签的语义改由 role=group + aria-describedby="zLayersTip" 承担（无障碍不丢）。 */
