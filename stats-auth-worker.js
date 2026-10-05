@@ -544,6 +544,11 @@ export default {
         return await handlePractice(request, env, url, corsHeaders);
       }
 
+      // 路由：日历待办模块（2026-10-05 · 骨架照 handlePractice，仅日期无时刻）
+      if (path.indexOf('/api/todo/') === 0) {
+        return await handleTodo(request, env, url, corsHeaders);
+      }
+
       // 路由：管理员创建邀请码
       if (path === '/api/admin/invite/create' || path === '/admin/invite/create') {
         if (request.method !== 'POST') {
@@ -956,6 +961,10 @@ export default {
         const pendingList = await env.STATS_KV.get('pending_registrations', 'json') || [];
         const registrations = [];
         
+        // ⚠️ 2026-10-05 修复（后台看不到待审核申请的真凶）：
+        //   /api/register 写入的是 user_<用户名>，而这里原来去读 reg_<用户名>——
+        //   reg_ 键从来没人写过，导致每次都读不到，列表恒为空（且不报错，属静默失败）。
+        //   现统一以 user_ 为唯一真相源，并回退兼容早期可能存在的 reg_ 键。
         for (const username of pendingList) {
           let reg = await env.STATS_KV.get('user_' + username, 'json');
           if (!reg) reg = await env.STATS_KV.get('reg_' + username, 'json');
@@ -1011,13 +1020,14 @@ export default {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           });
         }
+        // 传的是 userId（旧前端）时，同时补一份 reg_ 镜像键，避免留下不一致副本
         const fromLegacy = !String(body.username || '').trim();
         
         reg.status = action === 'approve' ? 'approved' : 'rejected';
         reg.reviewedAt = new Date().toISOString();
         reg.username = reg.username || target;
         if (!reg.id) reg.id = 'user_' + Date.now();
-        // 写回：user_ 为真相源（登录/会话放行只看它的 status）
+        // 写回：user_ 为真相源（登录放行只看它的 status）
         await env.STATS_KV.put('user_' + target, JSON.stringify(reg));
         if (reg.id) await env.STATS_KV.put('userid_' + reg.id, JSON.stringify(reg)).catch(() => {});
         if (fromLegacy) await env.STATS_KV.put('reg_' + target, JSON.stringify(reg)).catch(() => {});
@@ -1027,8 +1037,14 @@ export default {
         const newPendingList = pendingList.filter(x => x !== target && x !== given && x !== reg.id);
         await env.STATS_KV.put('pending_registrations', JSON.stringify(newPendingList));
         
-        return new Response(JSON.stringify({ 
-          success: true, 
+        return new Response(JSON.stringify({
+          success: true,
+          // ⚠️ 2026-10-05 修 ZCode 留下的 ReferenceError：
+          //   原写的是 `username: username`，但本作用域**只有** given / target / reg 三个绑定，
+          //   没有 username ⇒ 审核成功时会抛 ReferenceError，把「已通过审核」变成 500。
+          //   正确值是 target（已由 user_ / userid_ 镜像 / 历史 reg_ 三路解析出的真实用户名）。
+          username: target,
+          status: reg.status,
           message: action === 'approve' ? '已通过审核' : '已拒绝'
         }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -2108,11 +2124,6 @@ async function handlePractice(request, env, url, corsHeaders) {
 
   return pjson({ success: false, message: 'Not found' }, 404, corsHeaders);
 }
-      // 路由：日历待办模块（2026-10-05 · 骨架照 handlePractice，仅日期无时刻）
-      if (path.indexOf('/api/todo/') === 0) {
-        return await handleTodo(request, env, url, corsHeaders);
-      }
-
 
 // ---------------------------------------------------------------------------
 // 日历待办（2026-10-05 · 小谦指示「给日历加待办，注册用户可记自己的事」）
