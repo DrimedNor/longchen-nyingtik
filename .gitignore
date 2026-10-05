@@ -46,6 +46,7 @@ dist-zangli/
 # 凭据与本地配置：永不入库
 .env
 .env.*
+*.env
 *.key
 *.pem
 *.p12
@@ -61,3 +62,14 @@ node_modules/
 _zz_*
 *.bak-*
 .bak/
+
+# ── 凭据兜底（2026-10-05 设备免密泄漏事件后加）────────────────────────
+# 教训：wrangler-stats.toml 里的 [vars] 设备白名单随公开仓库泄漏，
+# 而 checkAdminAuth 命中即免密进后台 ⇒ 等同管理权泄漏。
+# 规则：**任何含凭据值的配置文件都不入库**。
+.env
+.env.*
+*.env
+*.secret.toml
+.dev.vars
+wrangler-*.secret.toml

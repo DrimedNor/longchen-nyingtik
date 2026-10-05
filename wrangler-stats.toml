@@ -14,7 +14,18 @@ id = "6b045a39f30a41bcbdd8eb210a174467"
 # 环境变量（敏感信息只存 Cloudflare Secret，绝不写进本文件）
 # ADMIN_PASSWORD ← npx wrangler secret put ADMIN_PASSWORD --config wrangler-stats.toml
 # IP_THRESHOLD = "10"      # 用 wrangler secret put IP_THRESHOLD --config wrangler-stats.toml 设置
-
-# 管理员设备 ID（这些设备的文章浏览和点击数据不计入全站统计）
-[vars]
-ADMIN_DEVICE_IDS = "dev_1788402850264_bbqjsio7d,dev_1788406478720_6fhwoodmy"
+# ADMIN_DEVICE_IDS_SECRET ← npx wrangler secret put ADMIN_DEVICE_IDS_SECRET --config wrangler-stats.toml
+#
+# 🔴 2026-10-05 设备免密下线（配合小谦「设备免密取消」）：
+#   本文件**曾**在 [vars] 里写 ADMIN_DEVICE_IDS 设备白名单，而本文件被 git 跟踪、
+#   仓库为 public ⇒ 任何人克隆即得这些设备 ID；checkAdminAuth 命中即免密进后台
+#   ⇒ 等同后台管理权泄漏。**已删，且值已轮换**（历史提交里的旧值改不回来，
+#   止损只能靠让旧值失效）。ADMIN_DEVICE_IDS 改名 ADMIN_DEVICE_IDS_SECRET 并
+#   改存 Cloudflare Secret，不再入库。
+#
+#   ⚠️ 设备免密的**统计**用途保留（设备 ID 只是匿名标识，不是凭据）；
+#      下线的只是**鉴权**用途。
+#
+# 本文件现在只剩「非敏感配置」（worker 名、KV id、account_id、域名）。
+# 若日后又要往里加任何**凭据类**值，先确认它绝不会进 git：
+#   git ls-files --error-unmatch <file>   # 有输出 = 已入库 = 当作已泄露处理

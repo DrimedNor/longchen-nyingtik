@@ -227,8 +227,12 @@ ${context}
 async function recordAiAsk(kv, record, env) {
   if (!kv) return;
 
-  // 管理员设备的AI问答不统计
-  const adminDeviceIds = (env && env.ADMIN_DEVICE_IDS || '').split(',').map(s => s.trim()).filter(s => s);
+  // 管理员设备的AI问答不统计。
+  // 🔴 2026-10-05：白名单改读 Secret（ADMIN_DEVICE_IDS_SECRET），不再写进被 git 跟踪的
+  //    wrangler.toml —— 那份 toml 随 public 仓库公开过，等于把自己的设备 ID 公开。
+  //    这里**只用于统计剔除，不是凭据**（本 Worker 不做鉴权），但仍按凭据处置。
+  const list = (env && (env.ADMIN_DEVICE_IDS_SECRET || env.ADMIN_DEVICE_IDS)) || '';
+  const adminDeviceIds = list.split(',').map(s => s.trim()).filter(Boolean);
   if (record.deviceId && adminDeviceIds.includes(record.deviceId)) {
     return;
   }

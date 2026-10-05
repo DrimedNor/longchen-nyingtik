@@ -1278,66 +1278,19 @@ export default {
         }
       }
       
-      // 路由：一次性后台登记（把本机设备写入管理员白名单）——2026-09-20 新增
-      // 这是"免密登录"的入口，故【不校验口令】：凭一次性 token 换设备登记。
-      // 安全设计：
-      //   - token 为 32 位十六进制（128 bit），由管理员离线生成后写入 KV（键 magic_<token>）；
-      //   - KV 记录 remaining 次数与 expiresAt，用满即删、到期自然失效（双保险）；
-      //   - 登记结果写 admin_dev_<deviceId>（180 天后自然过期），前端永不持有白名单；
-      //   - deviceId 做字符集/长度校验，防止借该端点写任意 KV 键。
-      if (path === '/api/admin/enroll' && request.method === 'POST') {
-        const body = await request.json().catch(() => ({}));
-        const token = String(body.token || '').trim();
-        const did = String(body.deviceId || '').trim();
-        const bad = (msg, status) => new Response(JSON.stringify({ success: false, message: msg }), {
-          status, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      // 路由：一次性后台登记（把本机设备写入管理员白名单）—— 🔴 2026-10-05 **已整段删除**。
+      //
+      // 删除原因（不是功能不想要，是安全问题）：
+      //   该端点【不校验口令】，凭一次性 token 换设备登记；而登记出的 admin_dev_*
+      //   记录被 checkAdminAuth 的 0b 分支当作后台凭据（且「无 scope」兼容为 admin）
+      //   ⇒ 一个「免密进后台」的入口。加上白名单曾随公开仓库泄漏，整条链必须断。
+      //
+      // 现在的后台入口：**只有口令**（X-Admin-Token 头 / ?admin=）。
+      //   如需新增设备免密，先读 checkAdminAuth 上方那段下线说明，别直接复原这段。
+      if (path === '/api/admin/enroll') {
+        return new Response(JSON.stringify({ success: false, message: '设备登记已下线，请用口令登录后台' }), {
+          status: 410, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
-
-        if (!token || !did) return bad('缺少 token 或设备标识', 400);
-        if (!/^[A-Za-z0-9_-]{6,80}$/.test(did)) return bad('设备标识格式不合法', 400);
-        if (!/^[a-f0-9]{32}$/.test(token)) return bad('链接无效', 410);
-
-        const key = 'magic_' + token;
-        let rec = null;
-        try { rec = await env.STATS_KV.get(key, 'json'); } catch (e) { rec = null; }
-        if (!rec) return bad('链接已失效：已用满次数或已过期', 410);
-
-        if (rec.expiresAt && Date.now() > rec.expiresAt) {
-          await env.STATS_KV.delete(key).catch(() => {});
-          return bad('链接已过期', 410);
-        }
-        const remaining = (typeof rec.remaining === 'number') ? rec.remaining : 0;
-        if (remaining <= 0) {
-          await env.STATS_KV.delete(key).catch(() => {});
-          return bad('链接已失效：已用满次数', 410);
-        }
-
-        // 1) 登记设备（180 天）。写失败必须报错且【不消耗】次数，否则用户白跑一趟
-        try {
-          await env.STATS_KV.put('admin_dev_' + did, JSON.stringify({
-            deviceId: did,
-            enrolledAt: Date.now(),
-            via: 'magic-link',
-          }), { expirationTtl: 180 * 24 * 60 * 60 });
-        } catch (e) {
-          return bad('登记写入失败，请稍后重试', 500);
-        }
-
-        // 2) 消耗一次；用满即删除
-        const left = remaining - 1;
-        const ttl = rec.expiresAt ? Math.max(60, Math.floor((rec.expiresAt - Date.now()) / 1000)) : 7200;
-        if (left <= 0) {
-          await env.STATS_KV.delete(key).catch(() => {});
-        } else {
-          await env.STATS_KV.put(key, JSON.stringify({ ...rec, remaining: left }), { expirationTtl: ttl }).catch(() => {});
-        }
-
-        return new Response(JSON.stringify({
-          success: true,
-          message: '本机已登记为管理员设备',
-          deviceId: did,
-          remaining: left,
-        }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       }
 
       // 路由：AI问答统计（2026-09-06 收紧：仅管理员可访问，防止访客提问内容泄露）
@@ -1586,31 +1539,31 @@ async function checkAdminAuth(request, env, url) {
     },
   });
 
-  // 0. 管理员设备免密放行（2026-09-20 新增，按"把我的设备设为管理员设备并自动放行"需求）
-  //    白名单只存于 env.ADMIN_DEVICE_IDS（服务端），前端 admin.html 不含设备 ID 列表；
-  //    设备 ID 为 20+ 位随机串（持有型凭证），仅已绑定设备可命中。
-  //    免密路径不消耗口令防爆破额度，也不受 IP 锁定影响。
-  const reqDeviceId = request.headers.get('X-Device-ID') || url.searchParams.get('device') || '';
+  // 0. 管理员设备免密放行（2026-09-20 新增）—— 🔴 2026-10-05 **已下线**。
+  //
+  //    下线原因：`wrangler-stats.toml` 被 git 跟踪且仓库 public ⇒ 白名单里的设备 ID
+  //    任何人克隆仓库即得；而命中即 `ok:true` 且不消耗口令额度、不受 IP 锁定
+  //    ⇒ 等同后台管理权。历史提交里的值改不回来，止损只能靠「让凭据失效」：
+  //    白名单迁到 Cloudflare Secret 并轮换新值 + `/api/admin/enroll` 入口删除。
+  //
+  //    现在后台**只认口令**（X-Admin-Token 头，或兼容的 ?admin= 查询串）。
+  //    ⚠️ 设备 ID 仍可用于**统计打点**（classifyVisitor / track 接口），
+  //       那只是匿名标识，不是凭据 —— 别连统计一起误删。
+  //
+  //    白名单改从 ADMIN_DEVICE_IDS_SECRET 读（Secret，不入库）；
+  //    为兼容期，仍接受旧的 ADMIN_DEVICE_IDS，但该变量**已从仓库删除**、
+  //    生产环境也已清空，故实际只有 Secret 一条来源。
+  const reqDeviceId = request.headers.get('X-Device-ID') || '';
   if (reqDeviceId) {
-    if (isAdminDevice(reqDeviceId, env)) {
+    const secretList = (env.ADMIN_DEVICE_IDS_SECRET || '').split(',').map(s => s.trim()).filter(Boolean);
+    const legacyList = (env.ADMIN_DEVICE_IDS || '').split(',').map(s => s.trim()).filter(Boolean);
+    if (isAdminDevice(reqDeviceId, { ADMIN_DEVICE_IDS: secretList.concat(legacyList).join(',') })) {
       return { ok: true, viaDevice: true };
     }
-    // 0b. 一次性登记链接登记过的设备（2026-09-20 新增）：KV 键 admin_dev_<deviceId>，
-    //     由 /api/admin/enroll 写入、180 天自然过期；读失败不阻断，回落口令路径。
-    try {
-      // 2026-09-22 权限分离（任务书 §3.8.A）：后台**只认** scope 含 'admin' 的设备登记。
-      // 此前只判断记录是否存在 → 一个「只为看功课」登记的 practice 设备会连带拿到后台权限（越权放大 R1）。
-      // 兼容策略：无 scope 字段 / 非 JSON 的存量登记一律视为 admin，避免既有设备被锁在门外。
-      let rec = await env.STATS_KV.get('admin_dev_' + reqDeviceId, 'json');
-      if (!rec) {
-        const plain = await env.STATS_KV.get('admin_dev_' + reqDeviceId);
-        if (plain) rec = { scope: null };
-      }
-      if (rec) {
-        const sc = Array.isArray(rec.scope) ? rec.scope : null;
-        if (!sc || sc.indexOf('admin') >= 0) return { ok: true, viaDevice: true, viaEnroll: true };
-      }
-    } catch (e) { /* 保底：回落口令校验 */ }
+    // 0b. 一次性登记链接路径 —— 🔴 已下线：登记入口 `/api/admin/enroll` 已删，
+    //     且历史遗留的 admin_dev_* 记录**没有 scope 字段**，而下面的兼容逻辑
+    //     把「无 scope」当 admin ⇒ 等于任何历史登记设备都能免密进后台。
+    //     这里彻底不再读 KV 登记记录。
   }
 
   const inputPass = request.headers.get('X-Admin-Token') || url.searchParams.get('admin') || '';
@@ -1837,21 +1790,23 @@ function pvInt(v, min, max) {
 }
 
 /**
- * 设备免密（**只读**）—— 任务书 §3.8.A/B/C
- *  · 只认 X-Device-ID 头，**绝不**读 ?device= 查询串（避免进历史/Referer/边缘日志）
- *  · 只认 KV admin_dev_<id> 的 scope 含 'practice'；静态 ADMIN_DEVICE_IDS 只服务后台，不进功课页
- *  · 记录须带 username —— 设备能看到谁的功课是**显式登记**的，不靠猜
+ * 设备免密（**只读**）—— 🔴 2026-10-05 小谦决定：**整个下线**。
+ *
+ * 下线原因（不是「功能不需要」，是安全问题）：
+ *   1. `wrangler-stats.toml` 被 git 跟踪且仓库为 public ⇒ `ADMIN_DEVICE_IDS`
+ *      白名单里的设备 ID **任何人克隆仓库即得**；
+ *   2. 而 `checkAdminAuth` 的设备分支命中即 `ok:true` ⇒ 等同**后台管理权**，
+ *      且不消耗口令额度、不受 IP 锁定保护。
+ *   即「一个为了看功课方便的免密口子」被放大成「后台管理权」（越权放大）。
+ *   历史提交里的值改不回来（GitHub 缓存 + 已有克隆），**唯一止损是让凭据失效**：
+ *   白名单迁到 Cloudflare Secret 且**轮换新值** + 删除 enroll 登记入口。
+ *
+ * 现在这里**恒返回 null**：功课/待办一律只认会话（`lct_session`）。
+ * 保留函数名只为让调用点少改、并在源码里留下「为何下线」的证据。
+ * ⚠️ 若将来要恢复，**先读上面三条**，别只把它当feature开关。
  */
 async function checkPracticeDevice(request, env) {
-  var deviceId = request.headers.get('X-Device-ID') || '';
-  if (!deviceId) return null;
-  var rec = await env.STATS_KV.get('admin_dev_' + deviceId, 'json');
-  if (!rec) return null;
-  if (rec.expiresAt && new Date(rec.expiresAt) < new Date()) return null;
-  var scope = Array.isArray(rec.scope) ? rec.scope : [];
-  if (scope.indexOf('practice') < 0) return null;
-  if (!rec.username) return null;
-  return { deviceId: deviceId, username: rec.username };
+  return null;
 }
 
 async function resolvePracticeIdentity(request, env, body) {

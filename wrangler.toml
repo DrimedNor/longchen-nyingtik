@@ -4,10 +4,11 @@ compatibility_date = "2024-09-02"
 account_id = "36e5618995c36274b4b7b6c7200a2fac"
 
 # API_KEY 通过 wrangler secret put API_KEY 设置，不写在这里
-
-# 管理员设备ID列表（这些设备的访问不统计）
-[vars]
-ADMIN_DEVICE_IDS = "dev_1788402850264_bbqjsio7d,dev_1788406478720_6fhwoodmy"
+# ADMIN_DEVICE_IDS_SECRET 通过 wrangler secret put ADMIN_DEVICE_IDS_SECRET 设置
+#
+# 🔴 2026-10-05 设备白名单移出本文件：这里曾写 ADMIN_DEVICE_IDS，而本文件被 git 跟踪、
+#   仓库为 public ⇒ 设备 ID 公开过。改存 Cloudflare Secret（值另见《机密-不入云》）。
+#   本 Worker 里该名单**只用于统计剔除、不参与鉴权**，但仍按凭据处置。
 
 # KV 命名空间绑定（与统计Worker共用，用于存储AI问答统计）
 [[kv_namespaces]]
