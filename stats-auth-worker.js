@@ -2149,7 +2149,7 @@ var TODO_WRITES = { save: 1, toggle: 1, remove: 1 };
 var TODO_MAX_ITEMS = 2000;          // 单用户上限，防无限膨胀
 var TODO_TEXT_MAX = 100;             // 单条文字上限（与练习「名称 30 字」同量级，略宽）
 
-function todoGetAll(env, username) {
+async function todoGetAll(env, username) {
   var rec = await env.STATS_KV.get('todo_' + username, 'json');
   if (!rec || typeof rec !== 'object') rec = {};
   if (!Array.isArray(rec.items)) rec.items = [];
