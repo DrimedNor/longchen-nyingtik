@@ -385,7 +385,20 @@ const STATS_PROXY_PATHS = [
 ];
 
 async function handleStatsProxy(request, url) {
-  const path = url.pathname;
+  // 🔴 2026-10-06 bug 修复（线上实证发现，不是推测）：
+  //   本函数原先直接拿 `url.pathname`（形如 `/__stats/api/track`）去和白名单里的
+  //   `/api/track` 比对 ⇒ **永远不匹配** ⇒ 全部统计端点一律 404「该统计端点不走代理」
+  //   ⇒ 前端 7 个统计端点全废。
+  //   根因：忘了剥掉 `/__stats` 这个代理前缀。转发时同样要剥（Worker 那边只有 `/api/track`）。
+  //   教训：加「同源代理」这类前缀路由时，**前缀必须成对处理**（入站判定用剥后的路径，
+  //   出站转发也用剥后的路径），漏一处就整条链断，且症状是 404 而非报错，很容易被忽略。
+  const raw = url.pathname;
+  const prefix = "/__stats";
+  if (raw !== prefix && !raw.startsWith(prefix + "/")) {
+    return json({ success: false, message: "Not found" }, 404);
+  }
+  // 剥前缀 ⇒ 得到 Worker 侧真实路径（/api/track 等）
+  const path = raw.slice(prefix.length) || "/";
   if (!STATS_PROXY_PATHS.includes(path)) {
     return json({ success: false, message: "该统计端点不走代理" }, 404);
   }
