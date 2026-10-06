@@ -1388,6 +1388,13 @@ button:active, .player-launch:active, .search-fab:active{transform:scale(.95)}
 }
 
 /* ===== 划线与分享 ===== */
+/* 注册入口（2026-10-06 · 仅临时账号可见，JS 条件挂载；这里只是样式） */
+.reg-entry-sec{border-color:var(--gold-deep)}
+.reg-entry-sec .hn-sec-title{color:var(--gold-deep)}
+.reg-entry-actions{display:flex; gap:.6rem; flex-wrap:wrap; margin-top:.2rem}
+.reg-entry-btn{background:transparent; color:var(--gold-deep); border:1px solid var(--gold-deep);
+  border-radius:4px; padding:.5rem 1rem; font-size:.86em; cursor:pointer; transition:all .15s; min-height:44px}
+.reg-entry-btn:hover{background:var(--gold-deep); color:#fff}
 /* 划线高亮：金色底纹（类似微信读书划线） */
 .hl{background:linear-gradient(transparent 55%, rgba(184,137,59,.38) 55%); cursor:pointer; border-radius:2px; padding:0 1px; transition:background .2s}
 .hl:hover{background:linear-gradient(transparent 50%, rgba(184,137,59,.6) 50%)}
@@ -1927,12 +1934,14 @@ async function checkAccess() {
   try {
     localStorage.setItem(ACCESS_KEY, "true"); // 供站内引导语等逻辑判断「已进入网站」
   } catch (e) {}
-  if (STATS_API) {
-    try {
-      await fetchWithDevice(STATS_API + "/api/track");
-    } catch (e) {
-      console.warn("设备统计上报失败:", e);
-    }
+  // 🔴 2026-10-06 改走同源代理 /__stats/api/track。
+  //   /api/track 是「记录设备」的入口，此前**零鉴权**：任何人 curl 打一下就能
+  //   凭空造一台设备（10-06 实测 deviceCount 66→67）。现由中间件验过会话才转发。
+  //   注：登录页在鉴权前问门槛状态走的是 /api/stats（只读、不记设备），不受影响。
+  try {
+    await fetchWithDevice("/__stats/api/track", { method: 'POST' });
+  } catch (e) {
+    console.warn("设备统计上报失败:", e);
   }
   return true;
 }
@@ -1987,7 +1996,7 @@ if (document.readyState === 'loading') {
 }
 
 // ========== 设备信息收集与上报 ==========
-var DEVICE_INFO_ENDPOINT = 'https://stats.longchen-nyingtik.wiki/api/stats/device-info';
+var DEVICE_INFO_ENDPOINT = '/__stats/api/stats/device-info';
 
 function collectDeviceInfo() {
   var ua = navigator.userAgent;
@@ -2067,7 +2076,7 @@ function doDeviceIdentify() {
     if (identify === 'phone' || identify === 'pc') {
       var deviceId = getDeviceId();
       if (deviceId) {
-        fetch('https://stats.longchen-nyingtik.wiki/api/stats/identify-device', {
+        fetch('/__stats/api/stats/identify-device', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ deviceId: deviceId, identify: identify })
@@ -2105,7 +2114,7 @@ if (document.readyState === 'loading') {
 // ========== 全局点击追踪统计 ==========
 var clickBuffer = [];
 var clickFlushTimer = null;
-var CLICK_STATS_ENDPOINT = 'https://stats.longchen-nyingtik.wiki/api/stats/click';
+var CLICK_STATS_ENDPOINT = '/__stats/api/stats/click';
 
 function getClickTargetInfo(el) {
   // 向上查找可点击的元素
@@ -2204,7 +2213,7 @@ document.addEventListener('click', function(e) {
 window.addEventListener('beforeunload', flushClickBuffer);
 
 // ========== 使用时长追踪统计 ==========
-var DURATION_STATS_ENDPOINT = 'https://stats.longchen-nyingtik.wiki/api/stats/duration';
+var DURATION_STATS_ENDPOINT = '/__stats/api/stats/duration';
 var pageEnterTime = Date.now();
 var currentTrackPage = location.hash.replace('#/', '') || 'index';
 var durationFlushTimer = null;
@@ -2591,7 +2600,11 @@ var audioPlayStartTime = 0;
 function reportPageView(slug, duration) {
   if (!slug || duration < 60) return;  // 时长小于1分钟忽略
   try {
-    fetch(STATS_API + '/api/stats/page-view', {
+    // 🔴 2026-10-06 改走同源代理 /__stats/*（原直连 stats 子域）。
+    //   原因：统计端点现已要求「已登录主站」才收数据（此前零鉴权，爬虫可凭空造设备
+    //   甚至灌时长把爬虫洗成真实用户）。同源代理由中间件验 Cookie 后转发，
+    //   而直连 stats 子域**不会带本站 Cookie**，改了直连就等于自家统计全废。
+    fetch('/__stats/api/stats/page-view', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-Device-ID': getDeviceId() },
       body: JSON.stringify({ slug: slug, duration: Math.round(duration) })
@@ -2602,9 +2615,9 @@ function reportPageView(slug, duration) {
 function reportAudioPlay(name, duration) {
   if (!name || duration < 60) return;  // 时长小于1分钟忽略
   try {
-    fetch(STATS_API + '/api/stats/audio-play', {
+    fetch('/__stats/api/stats/audio-play', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'X-Device-ID': getDeviceId() },
       body: JSON.stringify({ name: name, duration: Math.round(duration) })
     }).catch(function(){});
   } catch(e){}
@@ -2900,6 +2913,9 @@ function show(slug){
   }
   document.getElementById('content').innerHTML = '<div class="article">' + crumb + inner + '</div>';
   if (isHome) initHeroCarousel();
+  // 注册入口（仅首页、且仅临时账号可见；判据见 mountRegisterEntry 上方注释）
+  // 放在 innerHTML 写入之后 ⇒ 宿主节点已存在。同一行 if，避免非首页白跑一次探测请求。
+  if (isHome) mountRegisterEntry(document.getElementById('regEntryHost'));
   // 页面切换动画：强制reflow后重启动画
   var contentEl = document.getElementById('content');
   contentEl.classList.remove('page-anim');
@@ -3735,8 +3751,73 @@ function renderHomeNav(){
   html.push('<div class="ai-ask-text"><div class="ai-ask-title">龙的传人 · AI 问答</div><div class="ai-ask-desc">点击打开问答面板，AI 基于上师开示等资料为你解答</div></div></div>');
   html.push('</div>');
   html.push('</section>');
+  // ---- 注册入口（2026-10-06 · 小谦指示）----
+  //
+  // 口径：**仅对已登录的「临时账号」显示**，未登录用户完全看不到。
+  //   理由：正式账号不需要再注册；临时账号才需要给自己换一个正式身份。
+  //判定：读 /__auth/me 的 user.isTemp（服务端从 user_ 键实时读，改完立即生效）。
+  //   ⚠️ 不做前端硬编码用户名比对（后台一改名就失效）。
+  //   ⚠️ 未登录时中间件对 /__auth/me 返回 401 ⇒ 探测失败 ⇒ 天然不可见。
+  html.push('<div id="regEntryHost"></div>');
   // 续听入口已合并进右下角悬浮按钮（refreshLaunch 里切换胶囊形态），首页不再插卡片
   return '<div class="home-nav">' + html.join('') + '</div>';
+}
+
+// ---------------------------------------------------------------------------
+// 临时账号探测（2026-10-06 · 注册入口的显示条件）
+//
+// 为什么需要它：注册入口只对「已登录的临时账号」开，而临时账号的判定依据
+//   isTemp 在服务端 user_ 键里，前端拿不到 ⇒ 必须问一次 /__auth/me。
+// 口径（与小谦确认的三条一致）：
+//   · 未登录⇒ 401 ⇒ 不显示
+//   · 已登录但非临时（正式账号）⇒ 不显示
+//   · 已登录且 isTemp ⇒ 显示
+//
+// ⚠️ 这里刻意**不做任何前端缓存**（不用 localStorage/sessionStorage）：
+//   ① 临时账号可能随时转正，缓存会让「已转正」的用户继续看到注册入口；
+//   ②更踩过一次坑：用 sessionStorage 做「本次会话已探测」去重时，
+//      页面刷新后 sessionStorage 还在、而内存标记 window.__regIsTemp 已丢
+//      ⇒ 临时账号刷新后反而**看不到入口**（去重逻辑反而成了 bug）。
+//   代价是每次回首页多一次极轻的同源请求（中间件 30s 有会话 memo，压力可忽略），
+//   换来的判据永远是「问服务端当前真相」，不会过期。
+/**
+ * 在首页挂载「注册」入口。
+ * @param host  容器元素（#regEntryHost）
+ */
+function mountRegisterEntry(host){
+  if (!host) return;
+  var done = false;
+  var paint = function(){
+    if (done) return;
+    done = true;
+    var card = document.createElement('section');
+    card.className = 'hn-sec reg-entry-sec';
+    // 走邀请制：真实入口是 /invite/<邀请码>，这里给出说明与去向，
+    // 不直接跳转（没有邀请码跳过去也只会看到「邀请链接不完整」）。
+    card.innerHTML = '<h2 class="hn-sec-title">📝 注册正式账号</h2>'
+      + '<p class="hn-desc">你当前使用的是临时账号。若想换成自己的正式账号（保留现有数据），'
+      + '请联系站点主人索取专属邀请链接。</p>'
+      + '<div class="reg-entry-actions">'
+      + '<button type="button" class="reg-entry-btn" onclick="showInviteHint()">如何获取邀请链接</button>'
+      + '</div>';
+    host.appendChild(card);
+  };
+  fetch('/__auth/me', { credentials: 'same-origin', cache: 'no-store' })
+    .then(function (r){ return r.ok ? r.json() : null; })
+    .then(function (j){
+      if (j && j.success && j.user && j.user.isTemp === true){
+        paint();
+      }
+    })
+    .catch(function (){
+      // 网络失败 / 401 / 非临时账号：按「不可见」处理（不猜、不乐观显示）
+    });
+}
+/** 点「如何获取邀请链接」的说明（内容极简，不塞 URL——邀请码是凭据，不该出现在页面里）。 */
+function showInviteHint(){
+  alert('请联系站点主人（Longchen）索取专属邀请链接。\n\n'
+    + '邀请链接形如：https://longchen-nyingtik.wiki/invite/<邀请码>\n\n'
+    + '拿到后在浏览器地址栏打开即可填写用户名、密码和称呼，提交后等审核通过。');
 }
 
 // ========== 「继续听」悬浮胶囊（2026-09-08 由首页卡片合并进播放器悬浮按钮）==========
@@ -6147,7 +6228,7 @@ if (initSlug && routeWithAlias(initSlug)) {
 } else if (initSlug){ show(initSlug); }
 else { var home = TREE.children && TREE.children.find(function(c){ return c.is_index; }); show(home ? home.slug : PAGES[0].slug); }
 
-// 恢复上次播放的音频（2026-10-05 小谦指示：**先问再播**）
+// 恢复上次播放的音频（2026-10-05 小谦指示：**先问再播**；2026-10-06 修正「不播」的语义）
 //
 // 🔴 本段此前有两处真实缺陷（均为 2026-10-05 取证实测，非推测）：
 //   ① **音频在放、播放器看不见**——本段只更新了 pStatusText，**没调 showPlayer()**
@@ -6157,10 +6238,17 @@ else { var home = TREE.children && TREE.children.find(function(c){ return c.is_i
 //   ② **悬浮按钮状态自相矛盾**——refreshLaunch() 在无播放时切成「继续听·已听至 2:00」
 //      胶囊，可此刻正在播。用户点它会重新走 playTrack()，等于重置进度。
 //
-// 改为：只准备状态（**不自动播**），弹确认框问小谦「上次听到…是否继续」；
-//   同意 → 定位进度 + showPlayer() + 播放（此时状态文案是「正在播放」）；
-//   不同意 → 保持不播，播放器仍显示（用户能自己点▶，不被挡在门外）。
+// 🔴 2026-10-06 小谦指正（**我的判断偏差，不是缺陷**）：点「不播」后播放器仍弹出。
+//   根因＝下面 dismiss() 里的 `showPlayer()`——2026-10-05 我按「不让小谦被挡在门外」
+//   的理由**主动加的**（原注释自称「✅ 修复②」），但与小谦的意图正相反：
+//     问「是否继续播放」⇒ 两个选项就应当**对称地改变可见性**。
+//     「播放」→ 播放器出现、开始播；「不播」→ 播放器**不出现**。
+//   改为：dismiss() 只留状态文案（供悬浮胶囊/迷你条读），**不调 showPlayer()**，
+//        并显式把播放器收回隐藏态，确保「不播」= 屏幕干净。
+//   ⚠️ 用 hidePlayer() 而不是「什么都不做」：本页首屏若曾展开过播放器，
+//      只移除确认框并不能把它收回去，那才是「不播却还弹着」的真凶。
 // 首次访问（无播放记忆）⇒ 不提示、不打扰。
+
 setTimeout(function(){
   try {
     var savedIdx = parseInt(localStorage.getItem('longchen-audio-cur') || '-1', 10);
@@ -6200,10 +6288,18 @@ setTimeout(function(){
         // 定时器胶囊只在播放中有效：接手续播前先撤掉，否则倒计时会挂在一条暂停的音上
         if (sleepTimerId) clearSleepTimer(true);
       };
-      // 不同意：不播，但把播放器显示出来（状态栏留痕，用户可自己点▶）
+      // 2026-10-06 修正（按小谦指示）：「不播」⇒ **播放器不出现**。
+      // 原来这里有一行 showPlayer()，是我 10-05 主动加的（当时理由「不被挡在门外」），
+      // 但问句是「是否继续播放」⇒ 两个选项应对称地改变可见性：小谦点了「不播」，
+      // 屏幕就该是干净的。
+      // ⚠️ 这里**不调 hidePlayer()**：它会 currentTime=0 且 curIdx=-1，
+      //    而本分支此刻正要保留「上次听到哪儿」的续播位置（状态文案还要用它、
+      //    悬浮胶囊也还要靠它显示「继续听·已听至 2:00」），清了就成了从头开始。
+      //    只收回可见性，播放状态与进度原样保留。
       var dismiss = function(){
         if (box && box.parentElement) box.parentElement.removeChild(box);
-        showPlayer();                              // ✅ 修复②：不同意也可见，只是暂停态
+        // 确保收回隐藏态：本页若曾展开过播放器，仅移除确认框是收不回去的
+        document.getElementById('player').classList.remove('show');
         document.getElementById('pStatusText').innerHTML = '待播放：<b>' + esc(t.title) + '</b>';
         document.getElementById('pPlay').textContent = '▶';
         updateMini();

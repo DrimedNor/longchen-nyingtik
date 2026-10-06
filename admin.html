@@ -1314,7 +1314,43 @@ function renderDeviceTableView() {
     html += '</div>';
   }
 
-  html += '<p style="font-size:0.8rem;color:var(--ink-faint);margin-top:0.5rem;">💡 提示：绿色=真实用户（累计≥1分钟），灰色=爬虫（机器特征或停留<1分钟），金色=管理员，蓝色=新访客。分类在读取时动态计算，历史数据自动归位。</p>';
+  // 🔴 2026-10-06 爬虫区加「数据可信度」提示。
+  //   起因：小谦问「这些爬虫哪来的」，查完发现后台的「爬虫」标签**只贴标签、
+  //   从不拦任何东西**（classifyVisitor 是读取时算的），而统计写入端点此前零鉴权
+  //   ⇒ 爬虫不仅可以进来，还可以**往里灌假时长把设备「洗」成绿色真实用户**。
+  //   Worker 侧已于 2026-10-06 加门禁（guardStatsWrite：设备号格式＋浏览器特征＋
+  //   Referer/Origin＋限速＋会话），但**存量脏数据仍在**，且爬虫仍可能绕过特征库进来。
+  //   所以后台必须把「这批数据能不能当依据」讲清楚，而不是让人误以为绿色=可信。
+  const botList = (window._allDevices || []).filter(d => d.visitorType === 'bot');
+  if (v.tab === 'bot' && botList.length) {
+    const noUa = botList.filter(d => !d.userAgent).length;
+    const shortSpan = botList.filter(d => {
+      if (!d.firstSeen || !d.lastSeen) return false;
+      return (new Date(d.lastSeen) - new Date(d.firstSeen)) / 1000 <= 10;
+    }).length;
+    const foreign = botList.filter(d => d.country && d.country !== 'CN').length;
+    html += '<div style="background:var(--surface-soft);border-left:3px solid #9e9e9e;padding:.8rem 1rem;border-radius:6px;margin-bottom:1rem;font-size:.85rem;line-height:1.7;">'
+      + '<strong>🤖 这批「爬虫」是怎么进来的（2026-10-06 查清）</strong><br>'
+      + '本站此前<b>从未把「禁止爬虫」做成访问控制</b>——只有 3 处<b>君子协定</b>：'
+      + '<code>robots.txt</code>（爬虫自愿遵守）、<code>meta robots/X-Robots-Tag</code>（同样只是请求）、'
+      + '以及本列表用的 UA 特征库（<b>只贴标签、从不阻断</b>）。'
+      + '真正的内容门槛是登录会话校验，但那只管<b>主站内容</b>，管不到独立域名的统计接口。<br>'
+      + '<b>本批特征画像</b>：共 ' + botList.length + ' 台，其中无 UA ' + noUa + ' 台、'
+      + '首末访问间隔 ≤10 秒 ' + shortSpan + ' 台、海外 IP ' + foreign + ' 台。'
+      + '「无 UA + 停留 0～2 秒 + 换个设备号就走」= 纯脚本指纹，不是人。<br>'
+      + '<b>已做整改（2026-10-06）</b>：统计写入端点已加门禁——设备号格式＋浏览器特征（UA/Referer/Origin/CF 评分）'
+      + '＋同 IP 限速＋<b>必须已登录主站</b>（前端改走同源代理 <code>/__stats/*</code>，由中间件验 Cookie 后转发）；'
+      + '登录接口补防爆破（10 次/15 分）、用户名枚举已修。<br>'
+      + '<b>⚠️ 整改的边界（不夸大）</b>：门禁挡的是「脚本与低成本爬虫」，'
+      + '<b>挡不住刻意伪装成浏览器的攻击</b>——TA 若把 UA、Referer 都仿对，仍可写入，'
+      + '只能靠「限速 + 单次上报 ≤600 秒 + 需有效会话」把作恶成本抬高，而不是归零。'
+      + '真正的根治是 Cloudflare 付费版 Bot Management（当前免费版拿不到 botScore）。<br>'
+      + '<b>仍需你决定</b>：存量 ' + botList.length + ' 台脏设备是否清理？清理会<b>连带影响</b>设备数与停留统计，'
+      + '建议只清「无 UA 且首末间隔≤2 秒」这类确定是脚本的（样本里 46 台符合）。要我出清理脚本就说。'
+      + '</div>';
+  }
+
+  html += '<p style="font-size:0.8rem;color:var(--ink-faint);margin-top:0.5rem;">💡 提示：绿色=真实用户（累计≥1分钟），灰色=爬虫（机器特征或停留<1分钟），金色=管理员，蓝色=新访客。分类在读取时动态计算，历史数据自动归位。<br>⚠️ 2026-10-06 起：统计写入已加门禁，但<b>存量数据未清洗</b>，且爬虫可能伪装成浏览器——「绿色」只说明停留够久，不等于已验证是真人。</p>';
   container.innerHTML = html;
 }
 

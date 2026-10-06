@@ -354,6 +354,101 @@ function logoutPageHTML() {
 }
 
 // ---------------------------------------------------------------------------
+// /__stats/* 同源统计代理（2026-10-06 新增 · 安全整改）
+// ---------------------------------------------------------------------------
+// 【为什么必须有这个代理】
+//   1. 统计 Worker 在**独立域名** stats.longchen-nyingtik.wiki，与主站不同域
+//      ⇒ 浏览器发过去的请求**不会带本站 Cookie**（同站 Cookie 也不发给别的域）。
+//   2. 会话 token 只存在 httpOnly Cookie 里，前端 JS 读不到。
+//   ⇒ 所以「请求确实来自已登录用户」这件事，**只有本中间件能证明**（它读得到 Cookie）。
+//   本代理验完会话，再打一枚 X-Stats-Gate: 1 的内部标记转发给 Worker。
+//   该标记**不是凭据**：外部无法通过任何途径拿到它（见下方 header 处理），
+//   它只表示「这条请求已过主站会话门槛」。
+//
+// 【顺带解决的另一个洞】
+//   原先统计端点直连 stats 子域、完全无鉴权 ⇒ 任何人 curl 打 /api/track
+//   就能凭空造一台设备（2026-10-06 实测：deviceCount 66→67），
+//   甚至对任意 deviceId 灌时长、把爬虫"洗"成真实用户。改为只走本代理后，
+//   统计写入面与主站登录门槛**终于连成了一道**。
+//
+// 【不做的事】
+//   · 不放开新路径：只代理白名单里的统计端点，不是万能反向代理。
+//   · 不放行匿名：会话无效即 401，与主站内容门槛同口径（fail closed）。
+const STATS_PROXY_PATHS = [
+  "/api/track",
+  "/api/stats/device-info",
+  "/api/stats/identify-device",
+  "/api/stats/duration",
+  "/api/stats/click",
+  "/api/stats/page-view",
+  "/api/stats/audio-play",
+];
+
+async function handleStatsProxy(request, url) {
+  const path = url.pathname;
+  if (!STATS_PROXY_PATHS.includes(path)) {
+    return json({ success: false, message: "该统计端点不走代理" }, 404);
+  }
+  if (request.method !== "POST") {
+    return json({ success: false, message: "Method not allowed" }, 405);
+  }
+
+  // ① 验会话（读得到 Cookie 的只有这里）
+  const user = await verifySession(getCookie(request, COOKIE_NAME));
+  if (!user) {
+    return json({ success: false, message: "未登录，不接受统计上报" }, 401);
+  }
+
+  // ② 转发：把浏览器带来的头原样传过去，另加内部标记。
+  //    ⚠️ 绝不透传 X-Stats-Gate / X-Session-Token / Cookie 等任何鉴权类头，
+  //    否则外部只要能设同名头就能绕过这道门。
+  //
+  //    🔑 2026-10-06 负控实验后的加固：标记不放**请求头**，改放**请求体**内的
+  //    独立字段 `_gate`。原因：请求头是「扁平的字符串键值对」，代理加的
+  //    X-Stats-Gate 与外部可能塞的同名头在通道上无法区分——虽然实测外部塞的
+  //    会被覆盖，但「同一个通道上存在一个攻击者可写、且我方强制的字段」
+  //    本身就是脆弱设计（将来任何人加一行透传逻辑就可能破功）。
+  //    放进 body 内的独立字段后：外部能碰到的只有业务字段本身，
+  //    而代理是在**解析完 JSON 之后**才写入该键，物理上不存在被覆盖的可能。
+  const fwdHeaders = {
+    "Content-Type": "application/json",
+    "User-Agent": request.headers.get("User-Agent") || "",
+    "Referer": request.headers.get("Referer") || "",
+    "Origin": "https://longchen-nyingtik.wiki",
+  };
+  const devId = request.headers.get("X-Device-ID");
+  if (devId) fwdHeaders["X-Device-ID"] = devId;
+
+  // 解析 → 强制注入 _gate（先 spread 业务字段，再覆盖 _gate，外部无法夺权）
+  let payload = {};
+  try {
+    const raw = await request.text();
+    payload = raw ? (JSON.parse(raw) || {}) : {};
+  } catch (e) {
+    return json({ success: false, message: "请求体不是合法 JSON" }, 400);
+  }
+  if (typeof payload !== "object" || Array.isArray(payload)) {
+    return json({ success: false, message: "请求体格式错误" }, 400);
+  }
+  payload._gate = "lct-stats-v1";
+
+  const res = await fetch(WORKER + path, {
+    method: "POST",
+    headers: fwdHeaders,
+    body: JSON.stringify(payload),
+  });
+  const text = await res.text();
+  return new Response(text, {
+    status: res.status,
+    headers: {
+      "Content-Type": "application/json; charset=utf-8",
+      "Cache-Control": "no-store",
+      "X-Robots-Tag": ROBOTS_HEADER,
+    },
+  });
+}
+
+// ---------------------------------------------------------------------------
 // /__auth/* 同源鉴权代理（把会话 Cookie 落在本站主域上）
 // ---------------------------------------------------------------------------
 async function handleAuth(request, url) {
@@ -577,6 +672,7 @@ export async function onRequest(context) {
 
   // 1) 同源鉴权接口
   if (path.startsWith("/__auth/")) return handleAuth(request, url);
+  if (path.startsWith("/__stats/")) return handleStatsProxy(request, url);
 
   // 1.5) 功课接口代理（含设备免密只读；鉴权在 Worker，见上方说明）
   if (path.startsWith('/__api/practice/')) return handlePracticeApi(request, url);

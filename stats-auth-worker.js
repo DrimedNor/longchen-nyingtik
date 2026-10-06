@@ -8,14 +8,22 @@
  * 4. 累计国内设备数达到 100 后，启用注册审核访问
  * 5. 提供注册、登录、管理员审核相关 API
  * 
- * 环境变量：
+ * 环境变量（全部只存 Cloudflare Secret，绝不写进 toml/git）：
  * - ACCESS_PASSWORD：访问密码（设备数达到 10 后需要）
+ *   🔴 2026-10-06 整改：①**未配置时该门 fail-closed（500 拒绝）**，不再返回 success:true 放行；
+ *      ②已补防爆破（5 次 / 15 分钟，计数键 `access_fail_<ip>`，与管理口 `admin_fail_` 隔离）。
  * - DEVICE_THRESHOLD：设备数阈值，默认 10，达到后启用密码保护
  * - REGISTER_THRESHOLD：注册审核阈值，默认 100，达到后启用注册审核
- * - ADMIN_PASSWORD：管理员密码，用于审核后台
- * 
+ * - ADMIN_PASSWORD：管理员密码，用于审核后台（同样 fail-closed）
+ * - ADMIN_DEVICE_IDS_SECRET：管理员设备白名单（**仅统计剔除+后台免密**，值不入库）
+ *
  * KV 命名空间绑定：
- * - STATS_KV：存储统计数据和用户数据
+ * - STATS_KV：存储统计数据、用户数据、待办、划线
+ *
+ * ⚠️ 用户对象的 `isTemp` 字段（2026-10-06 新增）：标记「临时账号」。
+ *    临时账号是**人工直接写 KV 造的**（注册流程要邀请码+审核，代码里无造号接口），
+ *    造号时置 true；走注册的正式账号为 false。**绝不能用 status 表达**——
+ *    下面三处 `owner.status !== 'approved'` 会把它判成状态异常、当场踢下线。
  */
 
 export default {
@@ -59,8 +67,15 @@ export default {
     try {
       // 路由：记录访问（每个页面加载时调用）
       if (path === '/api/track' || path === '/track') {
-        // 记录设备访问（所有IP都记录，用于统计）
-        if (deviceId) {
+        // 🔴 2026-10-06 加门禁。**注意本端点不要求会话**（requireSession:false）：
+        //   登录页在鉴权前就要问它「要不要输密码」，要求会话会把自己锁在门外。
+        //   但「设备入库」这一步要卡——否则任何人 curl 打一下就能凭空造一台设备
+        //   （实测 2026-10-06：curl/8.4.0 打进来，deviceCount 66→67）。
+        //   口径：可疑请求仍返回正常 status（不报错、不打草惊蛇），只是**不记录设备**。
+        const gate = await guardStatsWrite(request, env, { requireSession: false });
+        const mayRecord = gate.ok;
+
+        if (mayRecord && deviceId) {
           const geo = {
             country: country,
             region: request.cf?.region || '',
@@ -74,6 +89,8 @@ export default {
           const userAgent = request.headers.get('User-Agent') || '';
           const botScore = request.cf?.botManagement?.score; // 免费版可能为 undefined
           await recordDevice(env.STATS_KV, deviceId, clientIP, geo, userAgent, botScore);
+        } else if (!mayRecord) {
+          console.warn('track：拒绝记录设备（无 UA/无 Referer/设备号伪造/超频）');
         }
         
         // 所有IP都需要密码验证（不区分国内国外）
@@ -96,7 +113,16 @@ export default {
         });
       }
       
-      // 路由：验证密码
+      // 路由：验证密码（访问密码门，设备数达 DEVICE_THRESHOLD 后启用）
+      //
+      // 🔴 2026-10-06 小谦指示，两处安全整改：
+      //   ① **未配置 ACCESS_PASSWORD 时改为拒绝**（原行为是 `success:true`「未设置密码」）。
+      //      那是一条 fail-open：Secret 一旦被清/改名，这个门会**默认放行**，
+      //      正是「安全默认应是拒绝」的反例。口径对齐 checkAdminAuth 的
+      //      「未配置 ADMIN_PASSWORD ⇒ 500 明确失败，绝不静默放行」。
+      //   ② **补防爆破**。原来这个门**完全没有失败计数**（`admin_fail_` 只用于管理口），
+      //      而它是全站访问门槛 ⇒ 可被无限次爆破。改为 5 次 / 15 分钟，
+      //      计数键 `access_fail_<ip>`，与管理口互不干扰。
       if (path === '/api/verify-password' || path === '/verify-password') {
         if (request.method !== 'POST') {
           return new Response(JSON.stringify({ error: 'Method not allowed' }), {
@@ -104,27 +130,58 @@ export default {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           });
         }
-        
+
         const body = await request.json();
         const inputPassword = body.password;
         const correctPassword = env.ACCESS_PASSWORD;
-        
+
+        // ① 未配置 ⇒ 拒绝（fail-closed），不再返回 success:true
         if (!correctPassword) {
-          return new Response(JSON.stringify({ success: true, message: '未设置密码' }), {
+          console.error('ACCESS_PASSWORD secret 未配置，拒绝访问校验（不放行）');
+          return new Response(JSON.stringify({ success: false, message: '服务端未配置访问密码（ACCESS_PASSWORD），请联系站点主人' }), {
+            status: 500,
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           });
         }
-        
+
+        const failKey = 'access_fail_' + clientIP;
+        let failData = null;
+        try { failData = await env.STATS_KV.get(failKey, 'json'); } catch (e) { failData = null; }
+
+        // ② 锁定期检查
+        if (failData && failData.lockedUntil && Date.now() < failData.lockedUntil) {
+          const remainMin = Math.ceil((failData.lockedUntil - Date.now()) / 60000);
+          return new Response(JSON.stringify({ success: false, message: '密码错误次数过多，已锁定，请 ' + remainMin + ' 分钟后再试' }), {
+            status: 429,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+
         if (inputPassword === correctPassword) {
+          // 通过：清失败计数（尽力而为，KV 写失败不阻断鉴权）
+          if (failData) {
+            await env.STATS_KV.delete(failKey).catch(() => {});
+          }
           return new Response(JSON.stringify({ success: true, message: '验证通过' }), {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           });
-        } else {
-          return new Response(JSON.stringify({ success: false, message: '密码错误，请重试' }), {
-            status: 401,
+        }
+
+        // 失败计数 +1；满 5 次锁 15 分钟
+        const count = ((failData && failData.windowEnd && Date.now() < failData.windowEnd) ? failData.count : 0) + 1;
+        if (count >= 5) {
+          const until = Date.now() + 15 * 60 * 1000;
+          await env.STATS_KV.put(failKey, JSON.stringify({ count: count, windowEnd: until, lockedUntil: until }), { expirationTtl: 16 * 60 }).catch(() => {});
+          return new Response(JSON.stringify({ success: false, message: '密码错误次数过多，已锁定 15 分钟' }), {
+            status: 429,
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           });
         }
+        await env.STATS_KV.put(failKey, JSON.stringify({ count: count, windowEnd: Date.now() + 15 * 60 * 1000 }), { expirationTtl: 16 * 60 }).catch(() => {});
+        return new Response(JSON.stringify({ success: false, message: '密码错误，请重试（再错 ' + (5 - count) + ' 次将锁定 15 分钟）' }), {
+          status: 401,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
       }
       
       // 路由：用户注册（需要邀请码）
@@ -201,6 +258,13 @@ export default {
           ip: clientIP,
           country: country,
           status: 'pending', // pending / approved / rejected
+          // 🔴 2026-10-06：是否「临时账号」。走注册的正式账号一律 false。
+          //   临时账号是**人工在后台造的**（注册流程要邀请码+审核，代码里没有造号接口），
+          //   造号时把这个字段置 true —— 前端据此只对临时账号显示「注册」入口
+          //   （正式账号不需要再注册，临时账号才需要给自己换一个正式身份）。
+          //   ⚠️ 不要用 status 表达「临时」：会话校验那三处 owner.status !== 'approved'
+          //   会把它判成状态异常、当场踢下线。
+          isTemp: false,
           createdAt: new Date().toISOString(),
           lastLoginTime: null,
           loginCount: 0,
@@ -241,30 +305,72 @@ export default {
         
         const body = await request.json();
         const { username, password } = body;
-        
+
         if (!username || !password) {
           return new Response(JSON.stringify({ success: false, message: '请输入用户名和密码' }), {
             status: 400,
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           });
         }
-        
-        const user = await env.STATS_KV.get('user_' + username, 'json');
-        
-        if (!user) {
-          return new Response(JSON.stringify({ success: false, message: '用户不存在' }), {
-            status: 404,
+
+        // 🔴 2026-10-06 补登录端点防爆破。
+        //   此前 /api/login **完全没有失败计数**（只有 CF 侧对主站 /__auth/login 的
+        //   限速规则，而本端点是另一条路径、且 CF 免费套餐表达式字段受限）。
+        //   配合刚修掉的用户名枚举 ⇒ 攻击者可无限制地试用户名＋试密码。
+        //   口径对齐 access_fail_ / admin_fail_：10 次 / 15 分钟，键 login_fail_<ip>。
+        const loginFailKey = 'login_fail_' + clientIP;
+        let loginFail = null;
+        try { loginFail = await env.STATS_KV.get(loginFailKey, 'json'); } catch (e) { loginFail = null; }
+        if (loginFail && loginFail.lockedUntil && Date.now() < loginFail.lockedUntil) {
+          const remain = Math.ceil((loginFail.lockedUntil - Date.now()) / 60000);
+          return new Response(JSON.stringify({ success: false, message: '登录失败次数过多，已临时锁定，请 ' + remain + ' 分钟后再试' }), {
+            status: 429,
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           });
         }
-        
-        // 验证密码（2026-09-18：PBKDF2/旧格式自适应；旧格式验证通过时惰性升级）
-        const pwCheck = await verifyPassword(user.passwordHash, password);
-        if (!pwCheck.ok) {
-          return new Response(JSON.stringify({ success: false, message: '密码错误' }), {
+
+        const bumpLoginFail = async () => {
+          const c = ((loginFail && loginFail.windowEnd && Date.now() < loginFail.windowEnd) ? loginFail.count : 0) + 1;
+          const until = Date.now() + 15 * 60 * 1000;
+          const payload = c >= 10
+            ? { count: c, windowEnd: until, lockedUntil: until }
+            : { count: c, windowEnd: until };
+          await env.STATS_KV.put(loginFailKey, JSON.stringify(payload), { expirationTtl: 16 * 60 }).catch(() => {});
+          return c;
+        };
+
+        const user = await env.STATS_KV.get('user_' + username, 'json');
+
+        // 🔴 2026-10-06 修「用户名可枚举」。
+        //   原来：用户不存在回「用户不存在」(404)、密码错回「密码错误」(401)
+        //   ⇒ 攻击者能靠响应差异把**有效用户名列表**一个个试出来（本人实测：
+        //   xiaoqian→「密码错误」而 admin/root→「用户不存在」）。
+        //   修法：**对外文案与状态码统一**为「用户名或密码错误」，404/401 一律不区分；
+        //   对「用户存在」照常走 PBKDF2 校验（耗时本就不同，但响应体绝不泄露差异）。
+        //   注：本条只改**对外**表述，内部判断顺序不变（仍需读 KV 才能区分，
+        //   那是服务端的事，客户端只看得到一句话）。
+        if (!user) {
+          // 与密码错误**完全相同**的响应体与状态码（连措辞都一致），不给探测留缝
+          await bumpLoginFail();
+          return new Response(JSON.stringify({ success: false, message: '用户名或密码错误' }), {
             status: 401,
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           });
+        }
+
+        // 验证密码（2026-09-18：PBKDF2/旧格式自适应；旧格式验证通过时惰性升级）
+        const pwCheck = await verifyPassword(user.passwordHash, password);
+        if (!pwCheck.ok) {
+          await bumpLoginFail();
+          return new Response(JSON.stringify({ success: false, message: '用户名或密码错误' }), {
+            status: 401,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+
+        // 密码正确 → 清失败计数（尽力而为；KV 写失败不阻断登录）
+        if (loginFail) {
+          await env.STATS_KV.delete(loginFailKey).catch(() => {});
         }
         
         if (user.status === 'pending') {
@@ -342,7 +448,18 @@ export default {
         }
         return new Response(JSON.stringify({
           success: true,
-          user: { username: session.username, nickname: session.nickname }
+          // 🔴 2026-10-06：回传 isTemp，供前端判断「是否显示注册入口」。
+          //   **故意从 owner（user_ 键）实时读，而不是从 session 读**——
+          //   session_ 最长 30 天，若临时账号转正（或反过来），改 user_ 键立即生效，
+          //   不必等会话过期。
+          //   存量账号没有这个字段 ⇒ !!undefined === false ⇒ 天然向后兼容（都不显示注册）。
+          //   ⚠️ 绝不能复用 status 加'temp' 取值：下面第 376 行的 owner.status !== 'approved'
+          //   会立刻判会话失效 ⇒ 临时账号当场掉线。必须用独立布尔字段。
+          user: {
+            username: session.username,
+            nickname: session.nickname,
+            isTemp: !!owner.isTemp
+          }
         }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
@@ -621,6 +738,14 @@ export default {
       // 路由：接收页面浏览统计
       if (path === '/api/stats/page-view' && request.method === 'POST') {
         try {
+          // 🔴 2026-10-06 加门禁（同 click：此前零鉴权，可任意刷 page_stats_*）
+          const gate = await guardStatsWrite(request, env, { requireSession: true });
+          if (!gate.ok) {
+            return new Response(JSON.stringify({ success: false, message: gate.message }), {
+              status: gate.status,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            });
+          }
           const body = await request.json();
           const { slug, duration } = body;
           const deviceId = request.headers.get('X-Device-ID') || '';
@@ -659,6 +784,14 @@ export default {
       // 路由：接收音频播放统计
       if (path === '/api/stats/audio-play' && request.method === 'POST') {
         try {
+          // 🔴 2026-10-06 加门禁（同 page-view：此前零鉴权，可任意刷 audio_stats_*）
+          const gate = await guardStatsWrite(request, env, { requireSession: true });
+          if (!gate.ok) {
+            return new Response(JSON.stringify({ success: false, message: gate.message }), {
+              status: gate.status,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            });
+          }
           const body = await request.json();
           const { name, duration } = body;
           const deviceId = request.headers.get('X-Device-ID') || '';
@@ -697,6 +830,16 @@ export default {
       // 路由：接收用户点击统计（批量上报）
       if (path === '/api/stats/click' && request.method === 'POST') {
         try {
+          // 🔴 2026-10-06 加门禁。此前零鉴权且**设备号来自 body 而非请求头**，
+          //   连 X-Device-ID 都不用带 ⇒ 任何脚本可无限刷 click_stats_* 键，
+          //   既污染点击热图，也是一个「往 KV 塞任意键」的写入口。
+          const gate = await guardStatsWrite(request, env, { requireSession: true });
+          if (!gate.ok) {
+            return new Response(JSON.stringify({ success: false, message: gate.message }), {
+              status: gate.status,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            });
+          }
           const body = await request.json();
           const { clicks, deviceId } = body;
           // 管理员设备的点击不统计
@@ -782,6 +925,17 @@ export default {
       // 路由：接收使用时长统计
       if (path === '/api/stats/duration' && request.method === 'POST') {
         try {
+          // 🔴 2026-10-06 加门禁。这个端点此前零鉴权，**可对任意 deviceId 累加时长**，
+          //   而 classifyVisitor 的第 4 条判据正是「累计停留 ≥60 秒 → real」
+          //   ⇒ 任何人 POST 一次 duration:99999 就能把自己或任意设备「洗」成真实用户，
+          //      直接污染后台分类与全部时长统计。这是本轮最严重的一条，已优先修。
+          const gate = await guardStatsWrite(request, env, { requireSession: true });
+          if (!gate.ok) {
+            return new Response(JSON.stringify({ success: false, message: gate.message }), {
+              status: gate.status,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            });
+          }
           const body = await request.json();
           const { deviceId, duration, page } = body;
           // 管理员设备的使用时长不统计
@@ -790,7 +944,17 @@ export default {
               headers: { ...corsHeaders, 'Content-Type': 'application/json' },
             });
           }
-          if (deviceId && duration && duration > 0) {
+          // 🔴 2026-10-06 单次上报上限：正常页面 heartbeat 是 30～60 秒量级。
+          //   原来无上限 ⇒ 一次请求就能加 99999 秒。不封顶的话门禁只挡身份、不挡数据失真。
+          const dur = Number(duration);
+          if (deviceId && Number.isFinite(dur) && dur > 0) {
+            if (dur > 600) {
+              console.warn('duration：单次上报 ' + dur + ' 秒超上限，已丢弃（device=' + deviceId + '）');
+              return new Response(JSON.stringify({ success: false, message: '单次上报时长异常，已丢弃' }), {
+                status: 400,
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+              });
+            }
             const today = new Date().toISOString().split('T')[0];
             
             // 记录设备累计使用时长
@@ -836,11 +1000,24 @@ export default {
       // 路由：接收设备信息
       if (path === '/api/stats/device-info' && request.method === 'POST') {
         try {
+          // 🔴 2026-10-06 加门禁。此前零鉴权 ⇒ 可给**任意** deviceId 覆写档案
+          //   （实测我探针用 python-requests 就把 dev_probe_ghost_test 写成了 botfarm/Linux）。
+          const gate = await guardStatsWrite(request, env, { requireSession: true });
+          if (!gate.ok) {
+            return new Response(JSON.stringify({ success: false, message: gate.message }), {
+              status: gate.status,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            });
+          }
           const body = await request.json();
           const { deviceId, deviceType, os, browser, screenWidth, screenHeight, language, isTouch, isWechat } = body;
           if (deviceId) {
             const deviceKey = 'device_' + deviceId;
             const deviceDetail = await env.STATS_KV.get(deviceKey, 'json');
+            // 🔴 2026-10-06 新增：只允许写**已存在**的设备档案。
+            //   原来 deviceDetail 为 null 时会静默跳过——看似安全，实际是
+            //   「先有设备才能改设备」这条隐式约束没人写明。新增显式日志，
+            //   免得以后有人为了「方便」把这里改成 upsert 就开了个洞。
             if (deviceDetail) {
               deviceDetail.deviceType = deviceType || deviceDetail.deviceType;
               deviceDetail.os = os || deviceDetail.os;
@@ -867,6 +1044,14 @@ export default {
       // 路由：记录设备标识（手机/电脑识别）
       if (path === '/api/stats/identify-device' && request.method === 'POST') {
         try {
+          // 🔴 2026-10-06 加门禁（同 device-info：此前零鉴权，可任意改他人设备标识）
+          const gate = await guardStatsWrite(request, env, { requireSession: true });
+          if (!gate.ok) {
+            return new Response(JSON.stringify({ success: false, message: gate.message }), {
+              status: gate.status,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            });
+          }
           const body = await request.json();
           const { deviceId, identify } = body;
           if (deviceId && identify) {
@@ -1478,6 +1663,151 @@ function simpleHash(str) {
     hash = hash & hash; // Convert to 32bit integer
   }
   return 'h_' + Math.abs(hash).toString(36) + '_' + str.length;
+}
+
+// ════════════════════════════════════════════════════════════════════════
+// 统计写入面门禁（2026-10-06 小谦派活：「后台很多爬虫设备是哪来的？重新盘点漏洞并升级」）
+// ════════════════════════════════════════════════════════════════════════
+//
+// 【为什么加这道门】诊断结论：此前「禁止爬虫」只存在于 3 处**君子协定**——
+//   robots.txt（爬虫自愿遵守）／meta robots + X-Robots-Tag（同样只是请求）／
+//   UA 特征库（只**贴标签**、从不阻断，后台那个灰色「爬虫」徽章就是它算出来的）。
+//   真正的内容门槛是 functions/_middleware.js 的会话校验，**但它只管内容，不管统计**。
+//   而 stats-auth-worker.js 与主站是**两个独立域名**，主站的门槛管不到它。
+//   ⇒ 实测后果（2026-10-06 线上实证）：curl 打 /api/track 返回 200 且 deviceCount 真的 +1；
+//     /api/stats/device-info、/api/stats/duration 同样零鉴权，
+//     后者**可对任意设备号累加时长 ⇒ 能把爬虫「洗」成 real**，让统计反过来被污染。
+//
+// 【门禁口径】fail-closed 优先，但**不能挡住真实用户**：本站统计全部发生在
+// 「已登录浏览主站」之后（index.html 需会话），所以对**写统计**的端点要求
+// 「有效会话 OR 管理员设备」是安全的。/api/track 仍需放行匿名，
+//   因为它同时是「取访问门槛状态」的接口（登录页在鉴权前就要问它要不要密码）。
+//   ⇒ 折中：**/api/track 保留匿名可读，但拒绝可疑 UA 造新设备**；
+//     其余写统计端点一律要求会话。
+
+// 可疑 UA 特征库（在 BOT_UA_PATTERNS 基础上补齐「无 UA / 空 UA / 极短 UA」三类——
+//   实测 159 台设备里 62 台（39%）UA 为空，那些是脚本而非浏览器）
+//
+// ⚠️ 刻意**不收**这些通用词：fetch / scan / check / monitor / probe / testing
+//   第一版把它们写进去了，自测时确实能多拦几个，但它们会出现在**正常浏览器/插件**
+//   的 UA 里（如某些截屏、监控、辅助工具扩展），风险是「误杀真实用户」——
+//   本站用户只有小谦和几个朋友，误杀一个的代价远大于多漏一个爬虫。
+//   宁可漏放（爬虫进来只是数据脏），不可误杀（朋友进不来＝站点失效）。
+//   少抓一个爬虫有第二道防线兜着（见下），误杀没有第二道防线。
+const SUSPECT_UA_PATTERNS =
+  /bot\b|crawl|spider|slurp|scrapy|archiver|scraper|curl\/|wget\/|python-requests|python-urllib|httpx|go-http-client|java\/|okhttp|libwww|httpunit|nutch|phantomjs|playwright|puppeteer|selenium|headless|axios|node-fetch|postmanruntime|insomnia|restsharp|guzzle|apache-httpclient|lwp-|okhttp3|semrush|ahrefs|mj12|dotbot|petalbot|megaindex|serpstat|dataforseo|bytespider|gptbot|chatgpt-user|claudebot|ccbot|perplexity|applebot|amazonbot|meta-externalagent|facebookexternalhit|telegrambot|discordbot|twitterbot|linkedinbot|slackbot|embedly|quora link preview|skypeuripreview|nuzzel|bitlybot|iframely|vkshare|w3c_validator|pingdom|uptimerobot|gtmetrix|lighthouse|pagespeed|chrome-lighthouse|spinn3r|ichiro|fx_crawler|ia_archiver|archive\.org_bot|semrushbot|mj12bot|seznambot|mail\.ru_bot|neevabot|sitebulb|deepcrawl|webzio|zyte|sentry|datadog|newrelic/i;
+
+// 合法设备号格式：dev_<13位毫秒时间戳>_<9位base36>
+//   实测攻击者可随意编设备号（我探针用 dev_probe_ghost_test 就写进去了）。
+//   收紧为「必须像浏览器 localStorage 生成的」，可挡掉绝大多数脚本伪造。
+const VALID_DEVICE_ID = /^dev_\d{13}_[a-z0-9]{9}$/;
+
+/**
+ * 判断本次请求是否「像一台真实浏览器」。
+ * 返回 { ok: true } 或 { ok: false, reason }
+ */
+function looksLikeRealBrowser(request, env) {
+  const ua = (request.headers.get('User-Agent') || '').trim();
+
+  // ① UA 缺失或过短 —— 浏览器 UA 至少几十字节；空 UA 一律视为脚本
+  if (!ua) return { ok: false, reason: 'no-ua' };
+  if (ua.length < 20) return { ok: false, reason: 'ua-too-short' };
+
+  // ② 命中可疑特征
+  if (SUSPECT_UA_PATTERNS.test(ua)) return { ok: false, reason: 'suspect-ua' };
+
+  // ③ Cloudflare 明确判定为机器人（付费版有；免费版为 undefined，天然跳过）
+  const score = request.cf?.botManagement?.score;
+  if (typeof score === 'number' && score < 30) return { ok: false, reason: 'cf-bot-score' };
+
+  // ④ 无 Referer 且非同源 fetch —— 真实页面发起的 XHR 必带 Referer；
+  //    直接用 curl 打的没有。这条挡掉「知道域名就手搓请求」的最低成本爬虫。
+  const referer = request.headers.get('Referer') || '';
+  const origin = request.headers.get('Origin') || '';
+  const sameOrigin = origin && origin.endsWith('longchen-nyingtik.wiki');
+  if (!referer && !sameOrigin) return { ok: false, reason: 'no-referer' };
+
+  return { ok: true };
+}
+
+/**
+ * 统计写入端点的统一门禁。
+ * 规则：
+ *   1. 设备号必须符合 localStorage 生成格式（挡脚本伪造）
+ *   2. 请求必须像真实浏览器（UA + Referer/Origin + CF 评分）
+ *   3. 高频请求按 IP 限速（10 次/分钟），挡批量刷设备
+ * 另：**登录后的统计必须有会话**，避免他人伪造他人设备号。
+ * 返回 { ok: true, reason } 或 { ok: false, status, message }
+ */
+async function guardStatsWrite(request, env, opts) {
+  const opts2 = opts || {};
+  const ip = request.headers.get('CF-Connecting-IP') || 'unknown';
+  const deviceId = request.headers.get('X-Device-ID') || '';
+  const jsonErr = (status, message) => ({ ok: false, status, message });
+
+  // ① 设备号格式
+  if (!deviceId) return jsonErr(400, '缺少 X-Device-ID');
+  if (!VALID_DEVICE_ID.test(deviceId)) {
+    return jsonErr(403, '设备号格式不合法（本站设备号由浏览器生成，形如 dev_<时间戳>_<随机串>）');
+  }
+
+  // ② 请求像不像浏览器
+  const browser = looksLikeRealBrowser(request, env);
+  if (!browser.ok) {
+    // 不回显具体原因细节给外部，避免变成「如何绕过」的说明书；
+    // 但写进 console 便于小谦在 Cloudflare 日志里追。
+    console.warn('统计写入被门禁拒绝：reason=' + browser.reason + ' ua=' +
+      (request.headers.get('User-Agent') || '(空)').slice(0, 80) + ' ip=' + ip);
+    return jsonErr(403, '请求特征异常，未记录（本站仅接受真实浏览器访问）');
+  }
+
+  // ③ 限速：同 IP 1 分钟内超过 20 次统计写入即拒（防批量造设备）
+  const rlKey = 'stats_rl_' + ip;
+  try {
+    const cur = (await env.STATS_KV.get(rlKey, 'json').catch(() => null)) || { n: 0, resetAt: Date.now() + 60000 };
+    if (Date.now() > cur.resetAt) { cur.n = 0; cur.resetAt = Date.now() + 60000; }
+    cur.n += 1;
+    await env.STATS_KV.put(rlKey, JSON.stringify(cur), { expirationTtl: 120 }).catch(() => {});
+    if (cur.n > 20) return jsonErr(429, '统计上报过于频繁，请稍后再试');
+  } catch (e) {
+    // KV 读失败不阻断统计（统计是「尽力而为」），保持原口径
+  }
+
+  // ④ 会话要求：登录用户才有资格写「他人设备」的统计。
+  //    本站统计只发生在登录后（index.html 需会话），所以这条不影响正常用户。
+  //
+  //    🔑 关键设计（2026-10-06）：**不能靠前端传 token 来证明**。
+  //    会话 token 只存在 httpOnly Cookie 里（functions/_middleware.js 登录时种下），
+  //    前端 JS 根本读不到；而统计请求是浏览器**直接跨域**打向 stats 子域的，
+  //    不会带本站 Cookie（同站 Cookie 也不会发给另一个域）。
+  //    ⇒ 唯一既安全又可行的做法：**由中间件加一个同源代理 /__stats/*，**
+  //      由它（持有 Cookie、能验会话）转发到本 Worker，并打上
+  //      X-Stats-Gate: 1 这枚**只有它能造**的内部标记。
+  //      标记不是凭据（不能反向冒用），它只说明「这次请求确实过了主站会话门槛」。
+  //    保留 isAdminDevice 兜底：管理员设备走 admin.html 直连也能写统计。
+  if (opts2.requireSession !== false) {
+    const gateFlag = request.headers.get('X-Stats-Gate') || '';
+    let okSession = (gateFlag === '1');
+    if (!okSession) {
+      const token = (request.headers.get('X-Session-Token') || '').trim();
+      if (token) {
+        const session = await env.STATS_KV.get('session_' + token, 'json').catch(() => null);
+        if (session) {
+          if (session.status === 'approved') okSession = true;
+          else {
+            // 临时账号（isTemp）也放行：它是人工造的真实账号，不是爬虫
+            const owner = await env.STATS_KV.get('user_' + session.username, 'json').catch(() => null);
+            if (owner && (owner.status === 'approved' || owner.isTemp === true)) okSession = true;
+          }
+        }
+      }
+    }
+    if (!okSession && !isAdminDevice(deviceId, env)) {
+      return jsonErr(401, '未登录，不接受统计上报');
+    }
+  }
+
+  return { ok: true };
 }
 
 // 判断是否为管理员设备（用于统计剔除）
